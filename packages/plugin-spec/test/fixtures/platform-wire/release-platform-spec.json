@@ -8,6 +8,7 @@
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "releaseTag": "soksak-spec-v0.0.1",
+  "dependencies": [],
   "packages": [
     {
       "ecosystem": "javascript",

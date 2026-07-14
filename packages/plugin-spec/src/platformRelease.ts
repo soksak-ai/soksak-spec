@@ -12,6 +12,7 @@ import {
   githubReleaseAssetBelongsTo,
   isStrictSemver,
   parseCanonicalGithubRepository,
+  parseCanonicalGithubReleaseAssetUrl,
   releaseTagForUnit,
 } from "./unit.js";
 import { checkKnownKeys, isRecord } from "./util.js";
@@ -49,6 +50,18 @@ export type PlatformReleasePackage =
   | PlatformJavascriptPackage
   | PlatformRustPackage;
 
+export interface PlatformReleaseManifestReference {
+  url: string;
+  sha256: string;
+}
+
+export interface PlatformReleaseDependency {
+  kind: PlatformReleaseKind;
+  id: string;
+  version: string;
+  manifest: PlatformReleaseManifestReference;
+}
+
 export interface PlatformReleaseManifest {
   spec: typeof PLATFORM_RELEASE_SPEC;
   kind: PlatformReleaseKind;
@@ -56,6 +69,7 @@ export interface PlatformReleaseManifest {
   version: string;
   source: UnitSourceReference;
   releaseTag: string;
+  dependencies: PlatformReleaseDependency[];
   packages: PlatformReleasePackage[];
 }
 
@@ -159,14 +173,71 @@ function parseRustPackage(
     : null;
 }
 
+function parseDependency(
+  raw: unknown,
+  index: number,
+  owner: { kind: PlatformReleaseKind; id: string },
+  errors: string[],
+): PlatformReleaseDependency | null {
+  const label = `platformRelease.dependencies[${index}]`;
+  const before = errors.length;
+  const value = strictObject(
+    raw,
+    ["id", "kind", "manifest", "version"],
+    ["id", "kind", "manifest", "version"],
+    label,
+    errors,
+  );
+  if (!value) return null;
+  const kind = typeof value.kind === "string" &&
+    (PLATFORM_RELEASE_KINDS as readonly string[]).includes(value.kind)
+    ? value.kind as PlatformReleaseKind
+    : null;
+  if (!kind) errors.push(`${label}.kind: spec|sdk required`);
+  const id = typeof value.id === "string" ? value.id : "";
+  if (!UNIT_ID_RE.test(id)) errors.push(`${label}.id: flat unit id required`);
+  const version = typeof value.version === "string" ? value.version : "";
+  if (!isStrictSemver(version)) errors.push(`${label}.version: strict SemVer required`);
+  if (kind === owner.kind && id === owner.id) errors.push(`${label}: self dependency forbidden`);
+
+  const manifest = strictObject(
+    value.manifest,
+    ["sha256", "url"],
+    ["sha256", "url"],
+    `${label}.manifest`,
+    errors,
+  );
+  let parsedManifest: PlatformReleaseManifestReference | null = null;
+  if (manifest) {
+    const url = typeof manifest.url === "string" ? manifest.url : "";
+    const sha256 = typeof manifest.sha256 === "string" ? manifest.sha256 : "";
+    const asset = parseCanonicalGithubReleaseAssetUrl(url);
+    if (
+      !asset ||
+      !releaseTagForUnit(id, version, asset.releaseTag) ||
+      asset.asset !== `${id}-release.json`
+    ) {
+      errors.push(
+        `${label}.manifest.url: canonical versioned GitHub Release manifest URL required`,
+      );
+    }
+    if (!SHA256_RE.test(sha256)) {
+      errors.push(`${label}.manifest.sha256: exact lowercase SHA-256 required`);
+    }
+    if (errors.length === before) parsedManifest = { url, sha256 };
+  }
+  if (errors.length !== before || !kind || !parsedManifest) return null;
+  return { kind, id, version, manifest: parsedManifest };
+}
+
 export function parsePlatformReleaseManifest(
   raw: unknown,
 ): PlatformParseResult<PlatformReleaseManifest> {
   const errors: string[] = [];
   const value = strictObject(
     raw,
-    ["id", "kind", "packages", "releaseTag", "source", "spec", "version"],
-    ["id", "kind", "packages", "releaseTag", "source", "spec", "version"],
+    ["dependencies", "id", "kind", "packages", "releaseTag", "source", "spec", "version"],
+    ["dependencies", "id", "kind", "packages", "releaseTag", "source", "spec", "version"],
     "platformRelease",
     errors,
   );
@@ -189,6 +260,24 @@ export function parsePlatformReleaseManifest(
     errors.push("platformRelease.releaseTag: v<version> or <id>-v<version> required");
   }
   const source = parseSource(value.source, errors);
+
+  const dependencies: PlatformReleaseDependency[] = [];
+  if (!Array.isArray(value.dependencies)) {
+    errors.push("platformRelease.dependencies: array required");
+  } else if (kind) {
+    value.dependencies.forEach((rawDependency, index) => {
+      const dependency = parseDependency(rawDependency, index, { kind, id }, errors);
+      if (dependency) dependencies.push(dependency);
+    });
+    const keys = dependencies.map((item) => `${item.kind}\u0000${item.id}`);
+    if (new Set(keys).size !== keys.length) {
+      errors.push("platformRelease.dependencies: duplicate kind/id forbidden");
+    }
+    const sorted = [...keys].sort();
+    if (keys.some((key, index) => key !== sorted[index])) {
+      errors.push("platformRelease.dependencies: entries must be sorted by kind and id");
+    }
+  }
 
   const packages: PlatformReleasePackage[] = [];
   if (!Array.isArray(value.packages) || value.packages.length === 0) {
@@ -235,6 +324,7 @@ export function parsePlatformReleaseManifest(
       version,
       source,
       releaseTag,
+      dependencies,
       packages,
     },
   };

@@ -9,6 +9,18 @@ const digest = "1".repeat(64);
 const repository = "https://github.com/soksak-ai/soksak-spec";
 const releaseTag = "soksak-spec-v0.0.1";
 
+function specDependency() {
+  return {
+    kind: "spec",
+    id: "soksak-spec",
+    version: "0.0.1",
+    manifest: {
+      url: `${repository}/releases/download/${releaseTag}/soksak-spec-release.json`,
+      sha256: digest,
+    },
+  };
+}
+
 function validRelease() {
   return {
     spec: PLATFORM_RELEASE_SPEC,
@@ -17,6 +29,7 @@ function validRelease() {
     version: "0.0.1",
     source: { repository, commit },
     releaseTag,
+    dependencies: [],
     packages: [
       {
         ecosystem: "javascript",
@@ -35,12 +48,80 @@ function validRelease() {
   };
 }
 
+function validSdkRelease() {
+  const sdkRepository = "https://github.com/soksak-ai/soksak-plugin-sdk";
+  const sdkReleaseTag = "soksak-plugin-sdk-v0.0.1";
+  return {
+    spec: PLATFORM_RELEASE_SPEC,
+    kind: "sdk",
+    id: "soksak-plugin-sdk",
+    version: "0.0.1",
+    source: { repository: sdkRepository, commit },
+    releaseTag: sdkReleaseTag,
+    dependencies: [specDependency()],
+    packages: [{
+      ecosystem: "javascript",
+      name: "@soksak-ai/plugin-api",
+      version: "0.0.1",
+      artifact: {
+        url: `${sdkRepository}/releases/download/${sdkReleaseTag}/soksak-ai-plugin-api-0.0.1.tgz`,
+        sha256: digest,
+        format: "tgz",
+      },
+    }],
+  };
+}
+
 describe("spec and SDK owner release manifest", () => {
   it("binds every developer package to one exact source commit and release", () => {
     expect(parsePlatformReleaseManifest(validRelease())).toEqual({
       ok: true,
       value: validRelease(),
     });
+  });
+
+  it("binds an SDK to the exact owner manifest of its platform dependencies", () => {
+    expect(parsePlatformReleaseManifest(validSdkRelease())).toEqual({
+      ok: true,
+      value: validSdkRelease(),
+    });
+
+    const floating = validSdkRelease();
+    floating.dependencies[0].manifest.url =
+      "https://github.com/soksak-ai/soksak-spec/releases/latest/download/soksak-spec-release.json";
+    const parsed = parsePlatformReleaseManifest(floating);
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) {
+      expect(parsed.errors).toContain(
+        "platformRelease.dependencies[0].manifest.url: canonical versioned GitHub Release manifest URL required",
+      );
+    }
+  });
+
+  it("rejects self-dependencies and non-canonical dependency order", () => {
+    const self = validSdkRelease();
+    self.dependencies[0] = {
+      ...self.dependencies[0],
+      kind: "sdk",
+      id: self.id,
+    };
+    const selfParsed = parsePlatformReleaseManifest(self);
+    expect(selfParsed.ok).toBe(false);
+    if (!selfParsed.ok) {
+      expect(selfParsed.errors).toContain(
+        "platformRelease.dependencies[0]: self dependency forbidden",
+      );
+    }
+
+    const duplicate = validSdkRelease();
+    duplicate.dependencies.push(specDependency());
+    const duplicateParsed = parsePlatformReleaseManifest(duplicate);
+    expect(duplicateParsed.ok).toBe(false);
+    if (!duplicateParsed.ok) {
+      expect(duplicateParsed.errors).toContain(
+        "platformRelease.dependencies: duplicate kind/id forbidden",
+      );
+    }
   });
 
   it("keeps install-unit kinds outside the developer package release wire", () => {

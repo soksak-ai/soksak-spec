@@ -1,0 +1,34 @@
+{
+  "spec": "soksak-spec-platform-release@0.0.1",
+  "kind": "sdk",
+  "id": "soksak-plugin-sdk",
+  "version": "0.0.1",
+  "source": {
+    "repository": "https://github.com/soksak-ai/soksak-plugin-sdk",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "releaseTag": "soksak-plugin-sdk-v0.0.1",
+  "dependencies": [
+    {
+      "kind": "spec",
+      "id": "soksak-spec",
+      "version": "0.0.1",
+      "manifest": {
+        "url": "https://github.com/soksak-ai/soksak-spec/releases/download/soksak-spec-v0.0.1/soksak-spec-release.json",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  ],
+  "packages": [
+    {
+      "ecosystem": "javascript",
+      "name": "@soksak-ai/plugin-api",
+      "version": "0.0.1",
+      "artifact": {
+        "url": "https://github.com/soksak-ai/soksak-plugin-sdk/releases/download/soksak-plugin-sdk-v0.0.1/soksak-ai-plugin-api-0.0.1.tgz",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "format": "tgz"
+      }
+    }
+  ]
+}

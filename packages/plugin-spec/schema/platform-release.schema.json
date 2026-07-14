@@ -11,6 +11,7 @@
     "version",
     "source",
     "releaseTag",
+    "dependencies",
     "packages"
   ],
   "properties": {
@@ -23,6 +24,10 @@
       "type": "string",
       "minLength": 2,
       "maxLength": 512
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/platformDependency" }
     },
     "packages": {
       "type": "array",
@@ -68,6 +73,26 @@
       "properties": {
         "repository": { "$ref": "#/$defs/repositoryUrl" },
         "commit": { "$ref": "#/$defs/commit" }
+      }
+    },
+    "platformManifestReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256"],
+      "properties": {
+        "url": { "$ref": "#/$defs/releaseAssetUrl" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "platformDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "version", "manifest"],
+      "properties": {
+        "kind": { "enum": ["spec", "sdk"] },
+        "id": { "$ref": "#/$defs/unitId" },
+        "version": { "$ref": "#/$defs/semver" },
+        "manifest": { "$ref": "#/$defs/platformManifestReference" }
       }
     },
     "javascriptPackageName": {

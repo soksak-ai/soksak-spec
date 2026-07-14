@@ -149,6 +149,7 @@ export function buildPlatformRelease({ commit, archiveName, archiveDigest }) {
     version,
     source: { repository, commit },
     releaseTag,
+    dependencies: [],
     packages: [
       {
         ecosystem: "javascript",

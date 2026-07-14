@@ -61,9 +61,9 @@ describe("portable platform wire artifacts", () => {
     for (const kind of ["kit", "plugin", "sidecar"]) {
       expect(parseReleaseManifest(json(join(FIXTURES, `release-${kind}.json`))).ok, kind).toBe(true);
     }
-    expect(
-      parsePlatformReleaseManifest(json(join(FIXTURES, "release-platform-spec.json"))).ok,
-    ).toBe(true);
+    for (const name of ["release-platform-spec.json", "release-platform-sdk.json"]) {
+      expect(parsePlatformReleaseManifest(json(join(FIXTURES, name))).ok, name).toBe(true);
+    }
     for (const name of [
       "conformance-kit-kind.json",
       "conformance-kit-release.json",
@@ -94,10 +94,12 @@ describe("portable platform wire artifacts", () => {
       const valid = validators.release(json(join(FIXTURES, `release-${kind}.json`)));
       expect(valid, JSON.stringify(validators.release.errors)).toBe(true);
     }
-    expect(
-      validators.platformRelease(json(join(FIXTURES, "release-platform-spec.json"))),
-      JSON.stringify(validators.platformRelease.errors),
-    ).toBe(true);
+    for (const name of ["release-platform-spec.json", "release-platform-sdk.json"]) {
+      expect(
+        validators.platformRelease(json(join(FIXTURES, name)),),
+        `${name}: ${JSON.stringify(validators.platformRelease.errors)}`,
+      ).toBe(true);
+    }
     for (const name of [
       "conformance-kit-kind.json",
       "conformance-kit-release.json",
