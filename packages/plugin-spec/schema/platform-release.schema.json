@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:soksak:spec:platform-release:0.0.1",
+  "title": "soksak spec and SDK owner release manifest 0.0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "spec",
+    "kind",
+    "id",
+    "version",
+    "source",
+    "releaseTag",
+    "packages"
+  ],
+  "properties": {
+    "spec": { "const": "soksak-spec-platform-release@0.0.1" },
+    "kind": { "enum": ["spec", "sdk"] },
+    "id": { "$ref": "#/$defs/unitId" },
+    "version": { "$ref": "#/$defs/semver" },
+    "source": { "$ref": "#/$defs/source" },
+    "releaseTag": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 512
+    },
+    "packages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/javascriptPackage" },
+          { "$ref": "#/$defs/rustPackage" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "unitId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,127}$"
+    },
+    "semver": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+(?:[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repositoryUrl": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"
+    },
+    "releaseAssetUrl": {
+      "type": "string",
+      "pattern": "^https://github\\.com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9][A-Za-z0-9._-]{0,99}/releases/download/[^/?#]+/[a-z0-9][a-z0-9._-]{0,254}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": { "$ref": "#/$defs/repositoryUrl" },
+        "commit": { "$ref": "#/$defs/commit" }
+      }
+    },
+    "javascriptPackageName": {
+      "type": "string",
+      "pattern": "^(?:@[a-z0-9][a-z0-9._-]{0,126}/[a-z0-9][a-z0-9._-]{0,126}|[a-z0-9][a-z0-9._-]{0,126})$"
+    },
+    "rustPackageName": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,127}$"
+    },
+    "javascriptArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "format"],
+      "properties": {
+        "url": { "$ref": "#/$defs/releaseAssetUrl" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "format": { "const": "tgz" }
+      }
+    },
+    "javascriptPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecosystem", "name", "version", "artifact"],
+      "properties": {
+        "ecosystem": { "const": "javascript" },
+        "name": { "$ref": "#/$defs/javascriptPackageName" },
+        "version": { "$ref": "#/$defs/semver" },
+        "artifact": { "$ref": "#/$defs/javascriptArtifact" }
+      }
+    },
+    "rustPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ecosystem", "name", "version"],
+      "properties": {
+        "ecosystem": { "const": "rust" },
+        "name": { "$ref": "#/$defs/rustPackageName" },
+        "version": { "$ref": "#/$defs/semver" }
+      }
+    }
+  }
+}

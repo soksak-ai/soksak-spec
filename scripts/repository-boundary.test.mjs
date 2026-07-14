@@ -1,0 +1,120 @@
+import assert from "node:assert/strict";
+import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const baseline = "0.0.1";
+
+function read(path) {
+  return readFileSync(join(root, path), "utf8");
+}
+
+function json(path) {
+  return JSON.parse(read(path));
+}
+
+function regularTree(at = root, prefix = "") {
+  const violations = [];
+  for (const entry of readdirSync(at, { withFileTypes: true })) {
+    if (prefix === "" && [".git", "artifacts", "node_modules", "target"].includes(entry.name)) continue;
+    if (prefix === "packages/plugin-spec" && entry.name === "dist") continue;
+    const path = join(at, entry.name);
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) violations.push(relative);
+    else if (stat.isDirectory()) violations.push(...regularTree(path, relative));
+    else if (!stat.isFile()) violations.push(relative);
+  }
+  return violations;
+}
+
+function symbolicLinks(at, prefix = "") {
+  if (!existsSync(at)) return [];
+  const violations = [];
+  for (const entry of readdirSync(at, { withFileTypes: true })) {
+    const path = join(at, entry.name);
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink()) violations.push(relative);
+    else if (stat.isDirectory()) violations.push(...symbolicLinks(path, relative));
+  }
+  return violations;
+}
+
+function assertCargoPackage(path) {
+  const manifest = read(path);
+  assert.match(manifest, /^version\s*=\s*"0\.0\.1"$/m, `${path}: baseline version`);
+  assert.match(manifest, /^publish\s*=\s*false$/m, `${path}: registry publication disabled`);
+  assert.doesNotMatch(manifest, /path\s*=\s*"\//, `${path}: absolute dependencies are forbidden`);
+  assert.doesNotMatch(manifest, /(?:crates\.io|cargo publish)/i, `${path}: registry distribution is forbidden`);
+}
+
+test("repository owns a complete reproducible 0.0.1 boundary", () => {
+  for (const path of [
+    ".github/workflows/release.yml",
+    ".github/workflows/verify.yml",
+    ".gitignore",
+    ".nvmrc",
+    "Cargo.lock",
+    "LICENSE",
+    "README.md",
+    "package.json",
+    "pnpm-lock.yaml",
+    "rust-toolchain.toml",
+    "scripts/release-verify.mjs",
+    "vitest.config.mjs",
+  ]) {
+    assert.equal(existsSync(join(root, path)), true, `required repository file: ${path}`);
+  }
+
+  const workspace = json("package.json");
+  assert.equal(workspace.private, true);
+  assert.equal(workspace.version, baseline);
+  assert.equal(workspace.packageManager, "pnpm@10.30.3");
+  assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
+  assert.equal(
+    workspace.scripts?.["test:unit"],
+    "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked",
+  );
+  assert.equal(workspace.scripts?.["release:verify"], "node scripts/release-verify.mjs");
+  assert.equal(workspace.scripts?.test, "pnpm test:unit && pnpm release:verify");
+  assert.equal(
+    Object.entries(workspace.scripts ?? {}).some(([name, command]) =>
+      /publish/i.test(name) || /(?:npm|pnpm|cargo)\s+publish/.test(String(command))
+    ),
+    false,
+  );
+
+  const pluginSpec = json("packages/plugin-spec/package.json");
+  assert.equal(pluginSpec.version, baseline);
+  assert.equal(pluginSpec.private, true);
+  assert.equal(pluginSpec.publishConfig, undefined);
+
+  for (const crate of [
+    "crates/soksak-spec-contract/Cargo.toml",
+    "crates/soksak-spec-service/Cargo.toml",
+    "crates/soksak-spec-socket/Cargo.toml",
+  ]) {
+    assertCargoPackage(crate);
+  }
+
+  assert.deepEqual(regularTree(), [], "source tree contains only regular files and directories");
+  assert.deepEqual(
+    symbolicLinks(join(root, "node_modules"), "node_modules"),
+    [],
+    "installed dependencies contain no symbolic links",
+  );
+  assert.equal(read(".nvmrc").trim(), "22.12.0");
+  assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"1\.96\.0"$/m);
+
+  for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
+    const source = read(workflow);
+    const uses = [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)].map((match) => match[1]);
+    assert.ok(uses.length > 0, `${workflow}: actions required`);
+    for (const action of uses) {
+      assert.match(action, /^[^@\s]+@[a-f0-9]{40}$/, `${workflow}: action must use a full commit: ${action}`);
+    }
+  }
+});

@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/soksak-spec-contract",
+  "crates/soksak-spec-service",
+  "crates/soksak-spec-socket",
+]

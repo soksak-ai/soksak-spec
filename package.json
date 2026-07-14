@@ -1,0 +1,17 @@
+{
+  "name": "soksak-spec-workspace",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "build": "pnpm --filter @soksak-ai/plugin-spec build",
+    "test:unit": "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked",
+    "release:verify": "node scripts/release-verify.mjs",
+    "test": "pnpm test:unit && pnpm release:verify"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.3",
+    "typescript": "5.8.3",
+    "vitest": "4.1.8"
+  }
+}

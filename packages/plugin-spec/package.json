@@ -1,0 +1,42 @@
+{
+  "name": "@soksak-ai/plugin-spec",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Public soksak plugin, sidecar, kit, release, conformance, and signed-registry contracts.",
+  "license": "MIT",
+  "author": "soksak-ai",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soksak-ai/soksak-spec.git",
+    "directory": "packages/plugin-spec"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/spec.d.ts",
+      "default": "./dist/spec.js"
+    }
+  },
+  "bin": {
+    "soksak-validate": "bin/validate.mjs"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "docs",
+    "LICENSE",
+    "README.md",
+    "schema",
+    "test/fixtures/platform-wire"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  }
+}

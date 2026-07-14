@@ -1,0 +1,10 @@
+[package]
+name = "soksak-spec-socket"
+version = "0.0.1"
+edition = "2021"
+publish = false
+license = "MIT"
+repository = "https://github.com/soksak-ai/soksak-spec"
+description = "Socket protocol contract shared by the app and its clients: version constants, the compatibility window, and the pure compatibility verdict. No transport code."
+
+[dependencies]
