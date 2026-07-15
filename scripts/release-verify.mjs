@@ -18,7 +18,8 @@ import {
 } from "../packages/plugin-spec/dist/spec.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repository = "https://github.com/soksak-ai/soksak-spec";
+const STRICT_SEMVER_RE = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const RUST_CRATES = ["soksak-spec-contract", "soksak-spec-service", "soksak-spec-socket"];
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -41,6 +42,42 @@ function tryRun(command, args) {
 
 function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function strictSemver(value, label) {
+  if (typeof value !== "string" || value.length > 256 || !STRICT_SEMVER_RE.test(value)) {
+    throw new Error(`${label}: strict SemVer required`);
+  }
+  return value;
+}
+
+function packageArchiveName(name, version) {
+  return `${name.replace(/^@/, "").replace("/", "-")}-${version}.tgz`;
+}
+
+export function specReleaseIdentity(workspace, pluginSpec) {
+  const release = workspace?.soksakRelease;
+  if (
+    release === null || typeof release !== "object" || Array.isArray(release) ||
+    release.kind !== "spec" ||
+    typeof release.id !== "string" || !/^soksak-[a-z0-9-]+$/.test(release.id) ||
+    typeof release.repository !== "string" ||
+    typeof release.manifest !== "string" || release.manifest !== `${release.id}-release.json`
+  ) {
+    throw new Error("workspace soksakRelease metadata is invalid");
+  }
+  const version = strictSemver(workspace.version, "workspace.version");
+  if (pluginSpec?.version !== version || typeof pluginSpec?.name !== "string") {
+    throw new Error("workspace and plugin-spec versions must both equal the same SemVer");
+  }
+  return {
+    kind: release.kind,
+    id: release.id,
+    repository: release.repository,
+    manifest: release.manifest,
+    version,
+    packageName: pluginSpec.name,
+  };
 }
 
 export function resolveSourceCommit(explicit, checkoutHead = tryRun(
@@ -123,14 +160,14 @@ function packOnce(destination) {
   return join(destination, archives[0]);
 }
 
-function verifyArchive(path) {
+function verifyArchive(path, identity) {
   const verbose = run("tar", ["-tvzf", path]).split("\n").filter(Boolean);
   const names = run("tar", ["-tzf", path]).split("\n").filter(Boolean);
   validateArchiveEntries(verbose, names);
   const packed = JSON.parse(run("tar", ["-xOzf", path, "package/package.json"]));
   if (
-    packed.name !== "@soksak-ai/plugin-spec" ||
-    packed.version !== "0.0.1" ||
+    packed.name !== identity.packageName ||
+    packed.version !== identity.version ||
     packed.private !== true ||
     packed.publishConfig !== undefined
   ) {
@@ -139,31 +176,29 @@ function verifyArchive(path) {
   return { names, packed };
 }
 
-export function buildPlatformRelease({ commit, archiveName, archiveDigest }) {
-  const version = "0.0.1";
-  const releaseTag = `soksak-spec-v${version}`;
+export function buildPlatformRelease({ commit, archiveName, archiveDigest, identity }) {
+  const version = strictSemver(identity?.version, "release identity version");
+  const releaseTag = `${identity.id}-v${version}`;
   return {
     spec: PLATFORM_RELEASE_SPEC,
-    kind: "spec",
-    id: "soksak-spec",
+    kind: identity.kind,
+    id: identity.id,
     version,
-    source: { repository, commit },
+    source: { repository: identity.repository, commit },
     releaseTag,
     dependencies: [],
     packages: [
       {
         ecosystem: "javascript",
-        name: "@soksak-ai/plugin-spec",
+        name: identity.packageName,
         version,
         artifact: {
-          url: `${repository}/releases/download/${releaseTag}/${archiveName}`,
+          url: `${identity.repository}/releases/download/${releaseTag}/${archiveName}`,
           sha256: archiveDigest,
           format: "tgz",
         },
       },
-      { ecosystem: "rust", name: "soksak-spec-contract", version },
-      { ecosystem: "rust", name: "soksak-spec-service", version },
-      { ecosystem: "rust", name: "soksak-spec-socket", version },
+      ...RUST_CRATES.map((name) => ({ ecosystem: "rust", name, version })),
     ],
   };
 }
@@ -178,15 +213,9 @@ export function verifyRelease(argv = process.argv.slice(2)) {
   const pluginSpec = JSON.parse(
     readFileSync(join(root, "packages/plugin-spec/package.json"), "utf8"),
   );
-  if (workspace.version !== "0.0.1" || pluginSpec.version !== workspace.version) {
-    throw new Error("workspace and plugin-spec versions must both equal 0.0.1");
-  }
-  for (const path of [
-    "crates/soksak-spec-contract/Cargo.toml",
-    "crates/soksak-spec-service/Cargo.toml",
-    "crates/soksak-spec-socket/Cargo.toml",
-  ]) {
-    exactCargoVersion(path, workspace.version);
+  const identity = specReleaseIdentity(workspace, pluginSpec);
+  for (const crate of RUST_CRATES) {
+    exactCargoVersion(`crates/${crate}/Cargo.toml`, identity.version);
   }
 
   run("pnpm", ["build"]);
@@ -202,22 +231,22 @@ export function verifyRelease(argv = process.argv.slice(2)) {
     if (!firstBytes.equals(secondBytes)) {
       throw new Error("plugin-spec archive is not byte-reproducible");
     }
-    const { names } = verifyArchive(first);
-    verifyArchive(second);
+    const { names } = verifyArchive(first, identity);
+    verifyArchive(second, identity);
 
     const archiveName = basename(first);
-    if (archiveName !== "soksak-ai-plugin-spec-0.0.1.tgz") {
+    if (archiveName !== packageArchiveName(identity.packageName, identity.version)) {
       throw new Error(`unexpected archive name: ${archiveName}`);
     }
     const archiveDigest = sha256(first);
-    const manifest = buildPlatformRelease({ commit, archiveName, archiveDigest });
+    const manifest = buildPlatformRelease({ commit, archiveName, archiveDigest, identity });
     const parsed = parsePlatformReleaseManifest(manifest);
     if (!parsed.ok) {
       throw new Error(`generated platform release is invalid:\n${parsed.errors.join("\n")}`);
     }
 
     const finalArchive = join(artifacts, archiveName);
-    const manifestPath = join(artifacts, "soksak-spec-release.json");
+    const manifestPath = join(artifacts, identity.manifest);
     copyFileSync(first, finalArchive);
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     run(process.execPath, [

@@ -63,6 +63,8 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
     "package.json",
     "pnpm-lock.yaml",
     "rust-toolchain.toml",
+    "scripts/publish-release.mjs",
+    "scripts/release-context.mjs",
     "scripts/release-verify.mjs",
     "vitest.config.mjs",
   ]) {
@@ -86,6 +88,12 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
     ),
     false,
   );
+  assert.deepEqual(workspace.soksakRelease, {
+    kind: "spec",
+    id: "soksak-spec",
+    repository: "https://github.com/soksak-ai/soksak-spec",
+    manifest: "soksak-spec-release.json",
+  });
 
   const pluginSpec = json("packages/plugin-spec/package.json");
   assert.equal(pluginSpec.version, baseline);
@@ -98,6 +106,26 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
     "crates/soksak-spec-socket/Cargo.toml",
   ]) {
     assertCargoPackage(crate);
+  }
+
+  const releaseWorkflow = read(".github/workflows/release.yml");
+  assert.match(releaseWorkflow, /\bon:\s*\n\s+workflow_dispatch:/);
+  assert.doesNotMatch(releaseWorkflow, /\btags:/);
+  assert.doesNotMatch(releaseWorkflow, /(?:^|[^A-Z_])v?0\.0\.1(?:$|[^0-9])/m, "workflow never owns a product version");
+  assert.match(releaseWorkflow, /permission-administration:\s*read/);
+  assert.match(releaseWorkflow, /permission-contents:\s*write/);
+  assert.match(releaseWorkflow, /SOKSAK_RELEASE_TOKEN:/);
+  assert.doesNotMatch(releaseWorkflow, /\bGITHUB_TOKEN\b/);
+  assert.doesNotMatch(releaseWorkflow, /github\.token/);
+  assert.match(
+    releaseWorkflow,
+    /actions\/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1/,
+  );
+
+  for (const script of ["scripts/release-verify.mjs", "scripts/publish-release.mjs"]) {
+    const source = read(script);
+    assert.doesNotMatch(source, /\bconst\s+(?:VERSION|version|TAG|tag)\s*=\s*["'](?:v?0\.0\.1)["']/);
+    assert.doesNotMatch(source, /\.version\s*!==\s*["']0\.0\.1["']/);
   }
 
   assert.deepEqual(regularTree(), [], "source tree contains only regular files and directories");

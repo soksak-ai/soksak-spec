@@ -3,6 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@10.30.3",
+  "soksakRelease": {
+    "kind": "spec",
+    "id": "soksak-spec",
+    "repository": "https://github.com/soksak-ai/soksak-spec",
+    "manifest": "soksak-spec-release.json"
+  },
   "scripts": {
     "build": "pnpm --filter @soksak-ai/plugin-spec build",
     "test:unit": "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked",
