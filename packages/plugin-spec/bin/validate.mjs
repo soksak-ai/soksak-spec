@@ -10,7 +10,6 @@ import {
   certifyRegistryIndex,
   parseConformanceReport,
   parseManifest,
-  parsePlatformReleaseManifest,
   parseRegistryPublicKey,
   parseReleaseManifest,
   transparencyViolations,
@@ -21,14 +20,13 @@ import {
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
   soksak-validate release <release.json>...
-  soksak-validate platform-release <platform-release.json>...
   soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json>]
   soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id> [--at <ISO-8601>] [--high-water <sequence>:<sha256>]
 
 호환: 모드 없는 경로는 plugin 모드로 해석합니다.
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
-const MODES = new Set(["plugin", "release", "platform-release", "conformance", "registry"]);
+const MODES = new Set(["plugin", "release", "conformance", "registry"]);
 
 function usageExit(message) {
   if (message) console.error(message);
@@ -136,27 +134,6 @@ function validateReleases(paths) {
       continue;
     }
     console.log(`✓ ${path} (${parsed.value.kind}:${parsed.value.id}@${parsed.value.version})`);
-  }
-  return failed > 0 ? 1 : 0;
-}
-
-function validatePlatformReleases(paths) {
-  let failed = 0;
-  for (const path of paths) {
-    const document = readDocument(path);
-    if (!document) {
-      failed++;
-      continue;
-    }
-    const parsed = parsePlatformReleaseManifest(document.raw);
-    if (!parsed.ok) {
-      printErrors(path, parsed.errors);
-      failed++;
-      continue;
-    }
-    console.log(
-      `✓ ${path} (${parsed.value.kind}:${parsed.value.id}@${parsed.value.version})`,
-    );
   }
   return failed > 0 ? 1 : 0;
 }
@@ -308,7 +285,6 @@ async function main(argv) {
   if (args.length === 0) return usageExit(`${mode}: 입력 경로가 필요합니다`);
   if (mode === "plugin") return validatePlugins(args);
   if (mode === "release") return validateReleases(args);
-  if (mode === "platform-release") return validatePlatformReleases(args);
   if (mode === "conformance") return validateConformance(args);
   return validateRegistry(args);
 }

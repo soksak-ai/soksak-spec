@@ -81,21 +81,7 @@ precedence. No match is a hard failure. It must not retry an official registry, 
 private registry, a package registry, or a git branch. A release consumer detects dependency
 cycles and fails with the cycle path; it never drops an edge to make the graph installable.
 
-## 4. Developer platform release
-
-`soksak-spec-platform-release@0.0.1` distributes the public spec and author SDK without
-turning either into a runtime plugin, sidecar, or kit. It binds every developer package to
-the owner repository, exact 40-character source commit, versioned GitHub Release asset, and
-SHA-256.
-
-Its `dependencies` array is the complete developer-package closure. Every entry binds an
-exact `kind`, `id`, and version to the dependency owner's versioned GitHub Release manifest
-URL and SHA-256. Entries are sorted and duplicate-free; self-dependencies are rejected.
-Consequently the SDK can consume the spec without an npm-registry fallback, floating branch,
-or repository-layout guess. A local developer may substitute already downloaded bytes only
-when an explicit path is supplied and those bytes match the same committed SHA-256.
-
-## 5. Platform schemas, runtime contracts, and evidence
+## 4. Platform schemas, runtime contracts, and evidence
 
 Platform schema ids describe documents:
 
@@ -145,7 +131,7 @@ the supplied report/owner documents for authoring and audit; trust for installat
 only after the registry operator has independently produced or accepted that evidence and
 signed its exact digest into a certified index.
 
-## 6. Signed registry certification
+## 5. Signed registry certification
 
 `soksak-spec-registry@0.0.1` is signed with Ed25519. Trust configuration pins the expected
 `registryId`, expected `keyId`, and the 32-byte public key independently of the downloaded
@@ -176,7 +162,7 @@ installation then verifies owner-manifest bytes, exact indexed identity, same-re
 URLs, every report digest, complete required evidence, and finally every artifact digest
 before extraction.
 
-## 7. Portable files and CLI
+## 6. Portable files and CLI
 
 The schemas are:
 

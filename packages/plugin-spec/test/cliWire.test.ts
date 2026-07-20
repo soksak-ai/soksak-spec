@@ -20,28 +20,6 @@ describe("soksak-validate public wire modes", () => {
     expect(result.stdout).toContain("release-plugin.json");
   });
 
-  it("validates a spec or SDK owner release without treating it as an install unit", () => {
-    const result = run(
-      "platform-release",
-      join(FIXTURES, "release-platform-spec.json"),
-    );
-    expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout).toContain("spec:soksak-spec@0.0.1");
-
-    const sdk = run(
-      "platform-release",
-      join(FIXTURES, "release-platform-sdk.json"),
-    );
-    expect(sdk.status, sdk.stderr).toBe(0);
-    expect(sdk.stdout).toContain("sdk:soksak-plugin-sdk@0.0.1");
-
-    const wrongWire = run(
-      "release",
-      join(FIXTURES, "release-platform-spec.json"),
-    );
-    expect(wrongWire.status).toBe(1);
-  });
-
   it("binds conformance evidence to the exact owner release bytes", () => {
     const valid = run(
       "conformance",

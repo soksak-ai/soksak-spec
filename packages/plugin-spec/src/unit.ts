@@ -43,7 +43,6 @@ export const ARTIFACT_FORMATS = ["tar.gz", "tgz"] as const;
 export type ArtifactFormat = (typeof ARTIFACT_FORMATS)[number];
 
 export const RELEASE_SPEC = "soksak-spec-release@0.0.1" as const;
-export const PLATFORM_RELEASE_SPEC = "soksak-spec-platform-release@0.0.1" as const;
 export const REGISTRY_SPEC = "soksak-spec-registry@0.0.1" as const;
 export const CONFORMANCE_REPORT_SPEC = "soksak-spec-conformance@0.0.1" as const;
 export const UNIT_SPEC_BY_KIND = {
@@ -54,7 +53,6 @@ export const UNIT_SPEC_BY_KIND = {
 
 export const PLATFORM_SCHEMA_IDS = [
   CONFORMANCE_REPORT_SPEC,
-  PLATFORM_RELEASE_SPEC,
   REGISTRY_SPEC,
   RELEASE_SPEC,
   UNIT_SPEC_BY_KIND.kit,

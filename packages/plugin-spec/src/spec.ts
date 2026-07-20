@@ -69,7 +69,6 @@ export * from "./semver.js";
 import { UNIT_ID_RE, UNIT_SPEC_BY_KIND, isUnitDependencyRange } from "./unit.js";
 export * from "./unit.js";
 export * from "./release.js";
-export * from "./platformRelease.js";
 export * from "./conformanceWire.js";
 export * from "./pluginRuntime.js";
 import {
@@ -333,7 +332,7 @@ export interface PluginManifest {
   runtime: PluginRuntimePolicy;
   minAppVersion?: string;
   template?: boolean; // true = 개발 템플릿(읽기 전용). 활성화 대상이 아니다 — 목록·상세만 노출하고 토글을 주지 않는다.
-  // 플러그인↔플러그인 의존(라이브러리 플러그인). pluginId → semver 범위(예: "^0.0.1").
+  // 플러그인↔플러그인 의존(라이브러리 플러그인). pluginId → semver 범위(예: "^0.1.0").
   // 설치 시 미설치 의존을 전이적으로 동반 설치(동의 게이트), 삭제 시 의존자 cascade(고아 방지).
   // 코어 권한(permissions)과 별개 축 — 이건 다른 플러그인에 대한 의존. 범용(어떤 플러그인↔플러그인).
   dependencies?: Record<string, string>;
@@ -661,7 +660,7 @@ export function parseManifest(
           errors.push(`dependencies: 자기 자신("${depId}") 의존 금지`);
         } else if (typeof range !== "string" || !isUnitDependencyRange(range)) {
           errors.push(
-            `dependencies["${depId}"]: 공통 unit semver 범위(예: ^0.0.1, >=0.0.1 <0.1.0, 0.0.1, *)`,
+            `dependencies["${depId}"]: 공통 unit semver 범위(예: ^0.1.0, >=1.0.0 <2.0.0, 1.2.3, *)`,
           );
         } else {
           dependencies[depId] = range;
