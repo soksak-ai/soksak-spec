@@ -1,0 +1,275 @@
+# 버전 관리
+
+이 문서는 Soksak 플러그인, 사이드카, 킷, 계약, 스펙, 릴리스, 레지스트리, 설정 및 설치
+기록에 대한 영어 정본 [VERSIONING.md](VERSIONING.md)의 한국어 번역본이다.
+
+이 문서의 예시는 실행 가능한 fixture이다. 필드, 식별자, 버전, 명령 및 오류 코드는 영어
+정본과 동일하게 유지한다.
+
+## 1. 버전의 역할
+
+<!-- rule:version-roles -->
+
+Soksak에는 하나의 앱 버전만 있으며 별도의 호환 버전은 없다. `appVersion`은 실행 중인
+앱의 정확한 버전이다. `appVersionRequirement`는 플러그인 릴리스가 허용하는 조건이다.
+플러그인 자체의 `version`은 해당 플러그인 릴리스를 식별한다.
+
+<!-- example:plugin-valid:valid-plugin -->
+```json
+{
+  "id": "example-plugin",
+  "name": "Example",
+  "version": "0.0.1",
+  "appVersionRequirement": "0.0.1",
+  "description": "Versioning example",
+  "permissions": []
+}
+```
+
+이 manifest에서 `appVersion: "0.0.1"`은 허용되고 `appVersion: "0.0.2"`는
+`APP_VERSION_UNSUPPORTED`로 거부된다. 설치와 로드는 같은 검사를 사용한다.
+
+`minAppVersion`, `appCompatibility`, `soksakCompatibility`, `requiresSoksak`,
+`engines`는 alias가 아니다.
+
+<!-- example:plugin-obsolete-minimum:invalid-plugin -->
+```json
+{
+  "id": "example-plugin",
+  "name": "Example",
+  "version": "0.0.1",
+  "minAppVersion": "0.0.1",
+  "description": "Obsolete version field",
+  "permissions": []
+}
+```
+
+예상 오류: `MANIFEST_UNKNOWN_FIELD`. 최소 버전만으로는 호환되지 않는 상한을 표현할 수
+없다.
+
+## 2. 정체성과 요구 조건
+
+<!-- rule:identity-requirement -->
+
+소유자 또는 provider는 정확한 `{id, version}`을 보고한다. Consumer는
+`{id, requirement}`를 보고한다. ID에는 버전을 포함하지 않는다.
+
+<!-- example:provider-valid:valid-provider -->
+```json
+{ "id": "soksak-spec-sidecar-terminal", "version": "0.0.1" }
+```
+
+<!-- example:consumer-valid:valid-requirement -->
+```json
+{ "id": "soksak-spec-sidecar-terminal", "requirement": "0.0.1" }
+```
+
+<!-- example:consumer-provider-shape:invalid-requirement -->
+```json
+{ "id": "soksak-spec-sidecar-terminal", "version": "0.0.1" }
+```
+
+예상 오류: `REQUIREMENT_FIELD_REQUIRED`. `range`는 `requirement`의 alias가 아니다.
+
+<!-- example:consumer-wildcard:invalid-requirement -->
+```json
+{ "id": "soksak-spec-sidecar-terminal", "requirement": "*" }
+```
+
+예상 오류: `REQUIREMENT_UNBOUNDED`. 빈 조건, `*`, `x`, `latest`, branch, Git URL 및
+기타 package locator는 호환성을 증명하지 않는다.
+
+## 3. 0.0.1 정책
+
+<!-- rule:baseline-policy -->
+
+현재 모든 Soksak 소유 릴리스는 `0.0.1`이다. 모든 소유자 manifest는 정확한 조건
+`0.0.1`을 선언한다. 이는 SemVer 문법 위에 적용하는 릴리스 정책이다.
+
+<!-- example:plugin-unproved-range:invalid-plugin -->
+```json
+{
+  "id": "example-plugin",
+  "name": "Example",
+  "version": "0.0.1",
+  "appVersionRequirement": ">=0.0.1 <1.0.0",
+  "description": "Unproved compatibility",
+  "permissions": []
+}
+```
+
+예상 오류: `BASELINE_REQUIREMENT_NOT_EXACT`. 향후 릴리스는 주장하는 버전 계열을 교차
+버전 테스트한 뒤에만 유계 조건을 선언할 수 있다. 테스트 실패를 이유로 조건을 넓히지
+않는다.
+
+`0.0.2-dev.1` 같은 SemVer prerelease는 문법상 유효하다. 0.0.1 레지스트리는 prerelease를
+게시하거나 자동 선택하지 않는다. SemVer는 prerelease 식별자를 숫자 및 사전식 규칙으로
+비교하며 dev, alpha, beta, rc 제품 절차를 알지 못한다.
+
+## 4. 플러그인과 사이드카 인터페이스
+
+<!-- rule:plugin-sidecar-interface -->
+
+플러그인은 provider 저장소가 아니라 필요한 인터페이스를 명시한다. 설정에서 provider를
+선택한다. 선택된 사이드카는 같은 인터페이스 ID를 허용된 버전으로 제공해야 한다.
+
+<!-- example:terminal-plugin-valid:valid-plugin -->
+```json
+{
+  "id": "terminal-view",
+  "name": "Terminal",
+  "version": "0.0.1",
+  "appVersionRequirement": "0.0.1",
+  "description": "Terminal view",
+  "permissions": ["sidecar"],
+  "implements": [
+    { "id": "soksak-spec-plugin-terminal", "version": "0.0.1" }
+  ],
+  "sidecars": [
+    {
+      "name": "terminal",
+      "interface": {
+        "id": "soksak-spec-sidecar-terminal",
+        "requirement": "0.0.1"
+      }
+    }
+  ]
+}
+```
+
+<!-- example:terminal-sidecar-valid:valid-sidecar -->
+```json
+{
+  "id": "terminal-provider",
+  "version": "0.0.1",
+  "interface": {
+    "id": "soksak-spec-sidecar-terminal",
+    "version": "0.0.1"
+  },
+  "process": "dist/terminal-provider"
+}
+```
+
+사이드카는 앱 버전 조건을 선언하지 않는다. 버전이 있는 인터페이스를 통해 통신한다. Core
+내부 함수에 직접 의존한다면 공개 프로토콜이 누락된 것이다.
+
+## 5. 외부 패키지
+
+<!-- rule:package-manager-ownership -->
+
+외부 라이브러리는 해당 package manager가 소유하며 `plugin.json`에 반복하지 않는다.
+Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선택된 내용을 기록한다.
+
+<!-- example:node-package-valid:package-json -->
+```json
+{
+  "dependencies": { "@xterm/xterm": "^5.5.0" },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
+```
+
+- Node 릴리스는 커밋된 lockfile과 frozen install을 사용한다.
+- Rust 릴리스는 `Cargo.toml`과 `Cargo.lock`을 사용하며 Git dependency는 full `rev`를 사용한다.
+- Go 릴리스는 `go.mod`와 `go.sum`을 사용한다.
+- 릴리스 빌드는 npm `file:`, Cargo `path`, Go `replace`, sibling source path 및 설치로
+  변경된 lockfile을 거부한다. 이는 이식 가능한 릴리스 입력이 아니라 로컬 구조를 나타낸다.
+
+## 6. 개발 경로
+
+<!-- rule:development-source -->
+
+개발 경로는 하나의 플러그인, 사이드카, 킷, 계약 또는 스펙을 읽는 위치를 변경하고 해당
+항목만 관리형 업데이트에서 제외한다. 검증을 비활성화하지 않는다.
+
+<!-- example:development-path-valid:settings-fragment -->
+```json
+{
+  "sidecars": {
+    "terminal-provider": {
+      "development": {
+        "path": "/absolute/development/terminal-provider"
+      }
+    }
+  }
+}
+```
+
+개발 manifest도 정체성, 버전, 해당되는 경우 앱 조건, 인터페이스, 권한 및 경로 검사를
+통과해야 한다. 경로와 별도로 `development: true`를 저장하지 않는다.
+
+## 7. 릴리스와 설치 내용
+
+<!-- rule:release-install-separation -->
+
+릴리스는 게시된 내용을 기록한다. 런타임 관계나 빌드 dependency를 다시 기록하지 않는다.
+
+<!-- example:plugin-release-valid:release -->
+```json
+{
+  "plugin": { "id": "example-plugin", "version": "0.0.1" },
+  "source": {
+    "repository": "https://github.com/soksak-ai/example-plugin",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "artifacts": [
+    {
+      "target": "any",
+      "format": "tgz",
+      "manifest": "plugin.json",
+      "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/example-plugin-0.0.1.tgz",
+      "size": 12345,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "reports": []
+}
+```
+
+레지스트리는 정확한 릴리스와 검증된 descriptor를 게시한다. 설정은 사용자 선택을 기록한다.
+Core 소유 설치 기록은 실제 exact 버전, target, 절대 경로, source commit, manifest digest 및
+artifact digest를 저장한다. 이 사실들을 서로 복사하지 않는다.
+
+인스톨러는 별도 위치에 다운로드하고 압축 해제 전에 크기와 SHA-256을 검사하며 manifest와
+조건을 검증한 후 내용과 기록을 한 transaction으로 교체한다. 오류가 발생하면 기존 설치를
+변경하지 않는다.
+
+## 8. 충돌과 업데이트
+
+<!-- rule:conflict-policy -->
+
+한 설치에서는 주어진 ID에 하나의 버전을 선택한다. 교집합이 없는 조건은 fallback이나
+호환 계층 없이 실패한다. 오류에는 모든 consumer와 requirement가 표시된다.
+
+```text
+VERSION_REQUIREMENT_CONFLICT
+terminal-view@2.0.0 requires terminal-contract >=2.0.0 <3.0.0
+other-terminal@1.5.0 requires terminal-contract >=1.6.0 <2.0.0
+The installed state was not changed.
+```
+
+Major 버전은 의도적으로 호환되지 않는 공개 변경을 표시한다. Requirement는 호환 테스트
+후에만 넓히며 실패한 구현을 통과시키기 위해 넓히지 않는다.
+
+## 9. 소유권
+
+<!-- rule:ownership-summary -->
+
+| 사실 | 소유자 |
+| --- | --- |
+| 플러그인 릴리스 버전 | `plugin.json` |
+| 실행 중인 Soksak 버전 | Runtime `appVersion` |
+| 허용하는 Soksak 버전 | Plugin `appVersionRequirement` |
+| 제공 인터페이스 버전 | Provider manifest `version` |
+| 허용 인터페이스 버전 | Consumer manifest `requirement` |
+| 외부 source dependency | Package manifest 및 lock/checksum |
+| 게시된 바이트 | Release descriptor 및 attestation |
+| 발견 가능한 릴리스 | Registry |
+| 활성화, provider, 개발 경로 | Settings |
+| 설치된 바이트 | Core 소유 설치 기록 |
+
+공개 unit, dependency scope, install profile, dependency closure, composition graph, execution
+graph, deployment graph는 없다. 일시적인 로컬 검증 데이터는 저장 계약이나 사용자 개념이
+아니다.
