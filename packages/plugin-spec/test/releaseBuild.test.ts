@@ -92,6 +92,17 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     }
   });
 
+  it("emits one domain conformance report per implemented plugin contract", () => {
+    writeFixture({ plugin: { implements: [{ id: "soksak-spec-plugin-terminal", version: "0.0.1" }] } });
+    expect(build().status).toBe(0);
+    const report = JSON.parse(fs.readFileSync(path.join(outDir, "conformance-contract-01.json"), "utf8"));
+    expect(report.claim).toEqual({ contract: { id: "soksak-spec-plugin-terminal", version: "0.0.1" } });
+    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
+    expect(release.reports.map((item: { url: string }) => item.url)).toContain(
+      "https://github.com/soksak-ai/soksak-plugin-example/releases/download/v0.0.1/conformance-contract-01.json",
+    );
+  });
+
   it("reads private build metadata from frontend/package.json", () => {
     writeFixture({ frontendPackage: true, pkg: { name: "@soksak/soksak-plugin-example", license: undefined } });
     expect(build().status).toBe(0);

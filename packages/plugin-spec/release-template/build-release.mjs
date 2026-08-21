@@ -141,6 +141,10 @@ const report = (claim) => ({
 const reports = [
   ["conformance-plugin.json", report({ manifest: true })],
   ["conformance-release.json", report({ release: true })],
+  ...(plugin.implements ?? []).map((contract, index) => [
+    `conformance-contract-${String(index + 1).padStart(2, "0")}.json`,
+    report({ contract }),
+  ]),
 ].map(([name, value]) => {
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
   return { name, value, bytes, reference: { url: `${REPOSITORY}/releases/download/${tag}/${name}`, sha256: sha256(bytes) } };
