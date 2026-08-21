@@ -91,7 +91,7 @@ export function assertTag(tag) {
 
 export function readTargetMatrix() {
   const matrix = JSON.parse(fs.readFileSync(path.join(ROOT, "release", "targets.json"), "utf8"));
-  if (!Array.isArray(matrix) || matrix.length !== 5) throw new Error("release matrix must contain exactly five targets");
+  if (!Array.isArray(matrix) || matrix.length === 0) throw new Error("release matrix must contain at least one target");
   let previous = "";
   const seen = new Set();
   for (const [index, entry] of matrix.entries()) {
@@ -99,7 +99,7 @@ export function readTargetMatrix() {
       !entry || typeof entry !== "object" || Array.isArray(entry) ||
       JSON.stringify(Object.keys(entry).sort()) !== JSON.stringify(["runner", "target"])
     ) throw new Error(`release target ${index} must contain only runner and target`);
-    if (!/^(?:aarch64|x86_64)-(?:apple-darwin|pc-windows-msvc|unknown-linux-gnu)$/.test(entry.target)) {
+    if (!/^(?:aarch64|x86_64)-(?:apple-darwin|pc-windows-msvc|unknown-linux-(?:gnu|musl))$/.test(entry.target)) {
       throw new Error(`unsupported release target: ${entry.target}`);
     }
     if (typeof entry.runner !== "string" || entry.runner.length === 0) throw new Error(`runner required for ${entry.target}`);

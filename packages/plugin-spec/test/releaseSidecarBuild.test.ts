@@ -31,7 +31,8 @@ function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string } = {}): void {
+function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string; targets?: string[] } = {}): void {
+  const targets = overrides.targets ?? TARGETS;
   const sidecar = {
     spec: "soksak-spec-sidecar@0.0.1",
     id: "soksak-sidecar-example",
@@ -49,7 +50,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   fs.writeFileSync(path.join(root, "sidecar.json"), `${JSON.stringify(sidecar, null, 2)}\n`);
   fs.writeFileSync(
     path.join(root, "release", "targets.json"),
-    `${JSON.stringify(TARGETS.map((target) => ({ target, runner: "runner" })), null, 2)}\n`,
+    `${JSON.stringify(targets.map((target) => ({ target, runner: "runner" })), null, 2)}\n`,
   );
   fs.writeFileSync(
     path.join(root, "validation", "spec-validator.json"),
@@ -59,7 +60,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
     path.join(root, "Cargo.toml"),
     `[package]\nname = "${sidecar.id}"\nversion = "${overrides.cargoVersion ?? sidecar.version}"\npublish = false\n`,
   );
-  for (const target of TARGETS) {
+  for (const target of targets) {
     const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
     const bytes = Buffer.from(`archive-bytes-${target}`);
     fs.writeFileSync(path.join(artifactsDir, asset), bytes);
@@ -129,6 +130,16 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
       });
       expect(report.artifacts).toHaveLength(5);
     }
+  });
+
+  it("accepts a sidecar-specific four-target matrix", () => {
+    const targets = TARGETS.filter((target) => !target.includes("windows"));
+    writeFixture({ targets });
+    const r = build();
+    expect(r.stderr).toBe("");
+    expect(r.status).toBe(0);
+    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
+    expect(release.artifacts.map((artifact: { target: string }) => artifact.target)).toEqual(targets);
   });
 
   // --emit-summary lets a caller (the core `release.build` command handler) parse the manifest +
