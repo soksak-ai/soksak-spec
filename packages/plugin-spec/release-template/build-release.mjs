@@ -49,8 +49,14 @@ const FILES = JSON.parse(fs.readFileSync(path.join(root, "release-files.json")))
 if (!Array.isArray(FILES) || FILES.length === 0) {
   throw new Error("release-files.json must declare a non-empty ordered file set");
 }
+for (const required of ["LICENSE", "main.js", "plugin.json"]) {
+  if (!FILES.includes(required)) throw new Error(`release-files.json must include ${required}`);
+}
 
-const packageBytes = fs.readFileSync(path.join(root, "package.json"));
+const packagePath = [path.join(root, "package.json"), path.join(root, "frontend", "package.json")]
+  .find((candidate) => fs.existsSync(candidate));
+if (!packagePath) throw new Error("plugin package metadata is missing");
+const packageBytes = fs.readFileSync(packagePath);
 const manifestBytes = fs.readFileSync(path.join(root, "plugin.json"));
 const pkg = JSON.parse(packageBytes);
 const plugin = JSON.parse(manifestBytes);
@@ -60,8 +66,8 @@ if (typeof pkg.version !== "string" || pkg.version.length > 256 || !STRICT_SEMVE
 const VERSION = pkg.version;
 const ID = plugin.id;
 if (typeof ID !== "string") throw new Error("plugin manifest id must be a string");
-if (pkg.name !== ID || pkg.private !== true || pkg.license !== "Apache-2.0") {
-  throw new Error("package manifest does not satisfy the private product boundary");
+if (pkg.private !== true) {
+  throw new Error("plugin package metadata must be private");
 }
 if (pkg.publishConfig !== undefined || Object.keys(pkg.scripts ?? {}).some((name) => /publish/i.test(name))) {
   throw new Error("language-registry publication is forbidden");

@@ -17,7 +17,7 @@ const FILES = ["LICENSE", "NOTICE", "README.ko.md", "README.md", "main.js", "plu
 let root = "";
 let outDir = "";
 
-function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Record<string, unknown> } = {}): void {
+function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Record<string, unknown>; frontendPackage?: boolean } = {}): void {
   const pkg = {
     name: "soksak-plugin-example",
     version: "0.0.1",
@@ -39,7 +39,9 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
   fs.copyFileSync(path.join(TEMPLATE, "build-release.mjs"), path.join(root, "scripts", "build-release.mjs"));
   fs.copyFileSync(path.join(TEMPLATE, "archive.mjs"), path.join(root, "scripts", "archive.mjs"));
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(FILES)}\n`);
-  fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify(pkg, null, 2)}\n`);
+  const packagePath = overrides.frontendPackage ? path.join(root, "frontend", "package.json") : path.join(root, "package.json");
+  fs.mkdirSync(path.dirname(packagePath), { recursive: true });
+  fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "plugin.json"), `${JSON.stringify(plugin, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "main.js"), "export default { controller: {} };\n");
   fs.writeFileSync(path.join(root, "LICENSE"), "Apache-2.0\n");
@@ -90,6 +92,11 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     }
   });
 
+  it("reads private build metadata from frontend/package.json", () => {
+    writeFixture({ frontendPackage: true, pkg: { name: "@soksak/soksak-plugin-example", license: undefined } });
+    expect(build().status).toBe(0);
+  });
+
   it("is deterministic — same inputs produce the same archive sha256", () => {
     writeFixture();
     const a = JSON.parse(build().stdout);
@@ -111,11 +118,11 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(r.stderr).toMatch(/consumes\[0\] has invalid keys/);
   });
 
-  it("refuses a non-Apache-2.0 owner package (private product boundary)", () => {
-    writeFixture({ pkg: { license: "MIT" } });
+  it("refuses a non-private plugin package", () => {
+    writeFixture({ pkg: { private: false } });
     const r = build();
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toMatch(/private product boundary/);
+    expect(r.stderr).toMatch(/must be private/);
   });
 
   it("refuses a stale spec id (public plugin boundary)", () => {
