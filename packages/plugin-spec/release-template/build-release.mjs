@@ -129,7 +129,7 @@ const release = {
   plugin: { id: ID, version: VERSION },
   source: { repository: REPOSITORY, commit },
   artifacts: [artifact],
-  reports: reports.map(({ reference }) => reference),
+  reports: reports.map(({ reference }) => reference).sort((left, right) => left.url.localeCompare(right.url)),
 };
 const releaseBytes = Buffer.from(`${JSON.stringify(release, null, 2)}\n`);
 
