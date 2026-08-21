@@ -17,7 +17,7 @@ const FILES = ["LICENSE", "NOTICE", "README.ko.md", "README.md", "main.js", "plu
 let root = "";
 let outDir = "";
 
-function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Record<string, unknown>; frontendPackage?: boolean } = {}): void {
+function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Record<string, unknown>; frontendPackage?: boolean; releaseDependencies?: unknown[] } = {}): void {
   const pkg = {
     name: "soksak-plugin-example",
     version: "0.0.1",
@@ -39,6 +39,10 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
   fs.copyFileSync(path.join(TEMPLATE, "build-release.mjs"), path.join(root, "scripts", "build-release.mjs"));
   fs.copyFileSync(path.join(TEMPLATE, "archive.mjs"), path.join(root, "scripts", "archive.mjs"));
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(FILES)}\n`);
+  if (overrides.releaseDependencies) {
+    fs.mkdirSync(path.join(root, "release"), { recursive: true });
+    fs.writeFileSync(path.join(root, "release", "dependencies.json"), `${JSON.stringify(overrides.releaseDependencies, null, 2)}\n`);
+  }
   const packagePath = overrides.frontendPackage ? path.join(root, "frontend", "package.json") : path.join(root, "package.json");
   fs.mkdirSync(path.dirname(packagePath), { recursive: true });
   fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
@@ -95,6 +99,14 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
   it("reads private build metadata from frontend/package.json", () => {
     writeFixture({ frontendPackage: true, pkg: { name: "@soksak/soksak-plugin-example", license: undefined } });
     expect(build().status).toBe(0);
+  });
+
+  it("records an exact build kit dependency without selecting a sidecar", () => {
+    writeFixture({ releaseDependencies: [{ kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" }] });
+    expect(build().status).toBe(0);
+    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
+    expect(release.dependencies).toEqual([{ kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" }]);
+    expect(release.dependencies).not.toEqual(expect.arrayContaining([expect.objectContaining({ sidecar: expect.anything() })]));
   });
 
   it("is deterministic — same inputs produce the same archive sha256", () => {

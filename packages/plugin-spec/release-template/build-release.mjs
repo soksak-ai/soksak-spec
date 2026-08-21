@@ -87,12 +87,29 @@ for (const [index, consumer] of (plugin.consumes ?? []).entries()) {
   exactKeys(consumer, ["id", "range"], `consumes[${index}]`);
 }
 
-const dependencies = Object.entries(plugin.dependencies ?? {})
+const runtimePluginDependencies = Object.entries(plugin.dependencies ?? {})
   .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
   .map(([id, range]) => {
     if (range !== "0.0.1") throw new Error(`plugin dependency must be exact 0.0.1: ${id}`);
     return { plugin: { id, version: "0.0.1" }, scope: "runtime" };
   });
+const declaredDependencyPath = path.join(root, "release", "dependencies.json");
+const declaredDependencies = fs.existsSync(declaredDependencyPath)
+  ? JSON.parse(fs.readFileSync(declaredDependencyPath, "utf8"))
+  : [];
+if (!Array.isArray(declaredDependencies)) throw new Error("release/dependencies.json must be an array");
+for (const [index, dependency] of declaredDependencies.entries()) {
+  exactKeys(dependency, ["kit", "scope"], `release dependencies[${index}]`);
+  exactKeys(dependency.kit, ["id", "version"], `release dependencies[${index}].kit`);
+  if (dependency.kit.version !== "0.0.1" || !/^[a-z0-9][a-z0-9-]*$/.test(dependency.kit.id)) {
+    throw new Error(`release dependencies[${index}].kit must be an exact 0.0.1 kit reference`);
+  }
+  if (dependency.scope !== "runtime" && dependency.scope !== "build") {
+    throw new Error(`release dependencies[${index}].scope must be runtime or build`);
+  }
+}
+const dependencies = [...runtimePluginDependencies, ...declaredDependencies]
+  .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
 const tag = `v${VERSION}`;
 const archiveName = `${ID}-${VERSION}-any.tgz`;
