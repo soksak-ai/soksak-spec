@@ -15,7 +15,6 @@ import {
   releaseIdentity,
   transparencyViolations,
   verifyConformanceReport,
-  verifyPluginRuntimeDependencyProjection,
 } from "../dist/spec.js";
 
 const USAGE = `사용:
@@ -172,14 +171,6 @@ function validateConformance(args) {
       printErrors(pluginManifestPath, ["plugin manifest identity must exactly match the owner plugin release"]);
       return 1;
     }
-    const projection = verifyPluginRuntimeDependencyProjection(
-      parsed.manifest.dependencies,
-      release.value,
-    );
-    if (!projection.ok) {
-      printErrors(pluginManifestPath, projection.errors);
-      return 1;
-    }
     ownerPlugin = parsed.manifest;
   }
   let ownerSidecar;
@@ -222,7 +213,7 @@ function validateConformance(args) {
     }
     if ("manifest" in report.value.claim && identity.kind === "plugin" && !ownerPlugin) {
       printErrors(path, [
-        "soksak-spec-plugin@0.0.1 evidence requires --plugin-manifest so runtime plugin dependencies can be matched to the release closure",
+        "soksak-spec-plugin@0.0.1 evidence requires --plugin-manifest",
       ]);
       failed++;
       continue;

@@ -31,21 +31,14 @@ export interface IntegrityReference {
 }
 
 export interface ReleaseArtifact extends IntegrityReference {
+  size: number;
   target: "any" | RustSidecarTarget;
   format: ArtifactFormat;
   manifest: "plugin.json" | "sidecar.json" | "kit.json" | "contract.json" | "spec.json";
 }
 
-export type ReleaseDependency =
-  | { plugin: ExactReference; scope: "runtime" | "build" }
-  | { sidecar: ExactReference; scope: "runtime" | "build" }
-  | { kit: ExactReference; scope: "runtime" | "build" }
-  | { contract: ExactReference; scope: "runtime" | "build" }
-  | { spec: ExactReference; scope: "runtime" | "build" };
-
 interface ReleaseFields {
   source: ReleaseSource;
-  dependencies: ReleaseDependency[];
   artifacts: ReleaseArtifact[];
   reports: IntegrityReference[];
 }
@@ -73,14 +66,6 @@ export function releaseIdentity(release: ReleaseDocument): ReleaseIdentity {
   if ("contract" in release) return { kind: "contract", ...release.contract };
   if ("spec" in release) return { kind: "spec", ...release.spec };
   return { kind: "kit", ...release.kit };
-}
-
-export function dependencyIdentity(dependency: ReleaseDependency): ReleaseIdentity {
-  if ("plugin" in dependency) return { kind: "plugin", ...dependency.plugin };
-  if ("sidecar" in dependency) return { kind: "sidecar", ...dependency.sidecar };
-  if ("contract" in dependency) return { kind: "contract", ...dependency.contract };
-  if ("spec" in dependency) return { kind: "spec", ...dependency.spec };
-  return { kind: "kit", ...dependency.kit };
 }
 
 function strictObject(
@@ -138,36 +123,6 @@ function parseIntegrity(raw: unknown, label: string, repository: string, errors:
   return errors.length === before ? { url: value.url as string, sha256: value.sha256 as string } : null;
 }
 
-function parseDependencies(raw: unknown, owner: ReleaseIdentity, errors: string[]): ReleaseDependency[] {
-  const result: ReleaseDependency[] = [];
-  if (!Array.isArray(raw)) {
-    errors.push("release.dependencies: array required");
-    return result;
-  }
-  raw.forEach((item, index) => {
-    const label = `release.dependencies[${index}]`;
-    const before = errors.length;
-    const value = strictObject(item, ["contract", "kit", "plugin", "scope", "sidecar", "spec"], ["scope"], label, errors);
-    if (!value) return;
-    if (value.scope !== "runtime" && value.scope !== "build") errors.push(`${label}.scope: runtime|build required`);
-    const kinds = (["plugin", "sidecar", "kit", "contract", "spec"] as const).filter((kind) => value[kind] !== undefined);
-    if (kinds.length !== 1) {
-      errors.push(`${label}: exactly one plugin, sidecar, kit, contract, or spec required`);
-      return;
-    }
-    const kind = kinds[0];
-    const reference = parseReference(value[kind], `${label}.${kind}`, errors);
-    if (!reference || errors.length !== before) return;
-    if (kind === owner.kind && reference.id === owner.id) errors.push(`${label}: self dependency forbidden`);
-    else result.push({ [kind]: reference, scope: value.scope } as ReleaseDependency);
-  });
-  sortedUnique(result.map((dependency) => {
-    const identity = dependencyIdentity(dependency);
-    return `${identity.kind}\0${identity.id}\0${identity.version}`;
-  }), "release.dependencies", errors);
-  return result;
-}
-
 function expectedManifest(kind: ReleaseKind): ReleaseArtifact["manifest"] {
   if (kind === "plugin") return "plugin.json";
   if (kind === "sidecar") return "sidecar.json";
@@ -185,10 +140,11 @@ function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, err
   raw.forEach((item, index) => {
     const label = `release.artifacts[${index}]`;
     const before = errors.length;
-    const value = strictObject(item, ["format", "manifest", "sha256", "target", "url"], ["format", "manifest", "sha256", "target", "url"], label, errors);
+    const value = strictObject(item, ["format", "manifest", "sha256", "size", "target", "url"], ["format", "manifest", "sha256", "size", "target", "url"], label, errors);
     if (!value) return;
     if (!releaseAssetBelongsTo(value.url, repository)) errors.push(`${label}.url: v0.0.1 asset in source repository required`);
     if (typeof value.sha256 !== "string" || !SHA256_RE.test(value.sha256)) errors.push(`${label}.sha256: exact SHA-256 required`);
+    if (!Number.isSafeInteger(value.size) || (value.size as number) <= 0) errors.push(`${label}.size: positive safe integer required`);
     if (!(ARTIFACT_FORMATS as readonly unknown[]).includes(value.format)) errors.push(`${label}.format: tar.gz|tgz required`);
     if (value.manifest !== expectedManifest(kind)) errors.push(`${label}.manifest: ${expectedManifest(kind)} required`);
     if (kind === "sidecar") {
@@ -197,6 +153,7 @@ function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, err
     if (errors.length === before) result.push({
       url: value.url as string,
       sha256: value.sha256 as string,
+      size: value.size as number,
       target: value.target as ReleaseArtifact["target"],
       format: value.format as ArtifactFormat,
       manifest: value.manifest as ReleaseArtifact["manifest"],
@@ -209,7 +166,7 @@ function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, err
 
 export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseDocument> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["artifacts", "contract", "dependencies", "kit", "plugin", "reports", "sidecar", "source", "spec"], ["artifacts", "dependencies", "reports", "source"], "release", errors);
+  const value = strictObject(raw, ["artifacts", "contract", "kit", "plugin", "reports", "sidecar", "source", "spec"], ["artifacts", "reports", "source"], "release", errors);
   if (!value) return { ok: false, errors };
   const kinds = (["plugin", "sidecar", "kit", "contract", "spec"] as const).filter((kind) => value[kind] !== undefined);
   if (kinds.length !== 1) errors.push("release: exactly one plugin, sidecar, kit, contract, or spec identity required");
@@ -217,8 +174,6 @@ export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseD
   const reference = kind ? parseReference(value[kind], `release.${kind}`, errors) : null;
   const source = parseSource(value.source, errors);
   if (!kind || !reference || !source) return { ok: false, errors };
-  const identity = { kind, ...reference };
-  const dependencies = parseDependencies(value.dependencies, identity, errors);
   const artifacts = parseArtifacts(value.artifacts, kind, source.repository, errors);
   const reports: IntegrityReference[] = [];
   if (!Array.isArray(value.reports) || value.reports.length === 0) errors.push("release.reports: non-empty array required");
@@ -228,22 +183,10 @@ export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseD
   });
   sortedUnique(reports.map((report) => report.url), "release.reports", errors);
   if (errors.length > 0) return { ok: false, errors };
-  const fields = { source, dependencies, artifacts, reports };
+  const fields = { source, artifacts, reports };
   if (kind === "plugin") return { ok: true, value: { ...fields, plugin: reference } };
   if (kind === "sidecar") return { ok: true, value: { ...fields, sidecar: reference } };
   if (kind === "kit") return { ok: true, value: { ...fields, kit: reference } };
   if (kind === "contract") return { ok: true, value: { ...fields, contract: reference } };
   return { ok: true, value: { ...fields, spec: reference } };
-}
-
-export function verifyPluginRuntimeDependencyProjection(
-  runtimeDependencies: Readonly<Record<string, string>> | undefined,
-  release: ReleaseDocument,
-): { ok: true } | { ok: false; errors: string[] } {
-  if (!("plugin" in release)) return { ok: false, errors: ["plugin dependencies require a plugin release"] };
-  const runtime = Object.entries(runtimeDependencies ?? {}).map(([id, version]) => ({ id, version })).sort((a, b) => a.id.localeCompare(b.id));
-  const declared = release.dependencies.flatMap((dependency) => "plugin" in dependency && dependency.scope === "runtime" ? [dependency.plugin] : []).sort((a, b) => a.id.localeCompare(b.id));
-  return JSON.stringify(runtime) === JSON.stringify(declared)
-    ? { ok: true }
-    : { ok: false, errors: ["plugin runtime dependencies must equal release runtime plugin dependencies"] };
 }

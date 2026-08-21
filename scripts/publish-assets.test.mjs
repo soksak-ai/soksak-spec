@@ -29,8 +29,7 @@ function fixture() {
   const manifest = {
     spec: { id: "soksak-spec", version },
     source: { repository: `https://github.com/${repository}`, commit },
-    dependencies: [],
-    artifacts: [{ target: "any", url: `https://github.com/${repository}/releases/download/${tag}/${archiveName}`, sha256: sha256(archive), format: "tgz", manifest: "spec.json" }],
+    artifacts: [{ target: "any", url: `https://github.com/${repository}/releases/download/${tag}/${archiveName}`, size: archive.length, sha256: sha256(archive), format: "tgz", manifest: "spec.json" }],
     reports,
   };
   writeFileSync(join(directory, archiveName), archive);

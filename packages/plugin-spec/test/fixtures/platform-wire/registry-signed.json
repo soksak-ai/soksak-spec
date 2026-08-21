@@ -11,19 +11,11 @@
         "repository": "https://github.com/example/weather-plugin",
         "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
-      "dependencies": [
-        {
-          "kit": {
-            "id": "terminal-common",
-            "version": "0.0.1"
-          },
-          "scope": "runtime"
-        }
-      ],
       "artifacts": [
         {
           "target": "any",
           "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz",
+          "size": 12345,
           "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
           "format": "tgz",
           "manifest": "plugin.json"
@@ -51,11 +43,11 @@
         "repository": "https://github.com/example/weather-sidecar",
         "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
-      "dependencies": [],
       "artifacts": [
         {
           "target": "aarch64-apple-darwin",
           "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-aarch64-apple-darwin.tar.gz",
+          "size": 12345,
           "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
           "format": "tar.gz",
           "manifest": "sidecar.json"
@@ -63,6 +55,7 @@
         {
           "target": "x86_64-unknown-linux-gnu",
           "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-x86_64-unknown-linux-gnu.tar.gz",
+          "size": 23456,
           "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
           "format": "tar.gz",
           "manifest": "sidecar.json"
@@ -94,11 +87,11 @@
         "repository": "https://github.com/example/terminal-common",
         "commit": "cccccccccccccccccccccccccccccccccccccccc"
       },
-      "dependencies": [],
       "artifacts": [
         {
           "target": "any",
           "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz",
+          "size": 12345,
           "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
           "format": "tgz",
           "manifest": "kit.json"
@@ -126,19 +119,11 @@
         "repository": "https://github.com/example/terminal-contract",
         "commit": "dddddddddddddddddddddddddddddddddddddddd"
       },
-      "dependencies": [
-        {
-          "spec": {
-            "id": "soksak-spec",
-            "version": "0.0.1"
-          },
-          "scope": "build"
-        }
-      ],
       "artifacts": [
         {
           "target": "any",
           "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.tgz",
+          "size": 12345,
           "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
           "format": "tgz",
           "manifest": "contract.json"
@@ -162,11 +147,11 @@
         "repository": "https://github.com/example/soksak-spec",
         "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       },
-      "dependencies": [],
       "artifacts": [
         {
           "target": "any",
           "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.tgz",
+          "size": 12345,
           "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
           "format": "tgz",
           "manifest": "spec.json"
@@ -180,19 +165,9 @@
       ]
     }
   ],
-  "profiles": [
-    {
-      "id": "weather",
-      "plugin": {
-        "id": "weather-plugin",
-        "version": "0.0.1"
-      },
-      "bindings": []
-    }
-  ],
   "issuedAt": "2026-07-14T00:00:00Z",
   "expiresAt": "2026-07-15T00:00:00Z",
   "algorithm": "ed25519",
   "keyId": "fixture-2026",
-  "signature": "oCskngJnATSsN/xOI6e83/SRoRaFlfT5Gufwj14p3F7iPR2cpC7MUX9+GkR7FYFrh/UmdHvOcfk0U6Zln4gSBw=="
+  "signature": "wYgtsjfvktA4k2h9r5WuTpRCiu7IYuiElQ/8nVp982nAXcY4X7beTKj4eSuDS74p3KOXp/aNmJZaEiXRJSdUAQ=="
 }

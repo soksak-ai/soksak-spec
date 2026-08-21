@@ -171,7 +171,7 @@ function verifyArchive(path, identity) {
   return { names, packed };
 }
 
-export function buildPlatformRelease({ commit, archiveName, archiveDigest, identity }) {
+export function buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize, identity }) {
   const version = strictSemver(identity?.version, "release identity version");
   const releaseTag = `v${version}`;
   const repository = identity.repository;
@@ -179,6 +179,7 @@ export function buildPlatformRelease({ commit, archiveName, archiveDigest, ident
     target: "any",
     url: `${repository}/releases/download/${releaseTag}/${archiveName}`,
     sha256: archiveDigest,
+    size: archiveSize,
     format: "tgz",
     manifest: "spec.json",
   };
@@ -197,7 +198,6 @@ export function buildPlatformRelease({ commit, archiveName, archiveDigest, ident
   return {
     spec: { id: identity.id, version },
     source: { repository: identity.repository, commit },
-    dependencies: [],
     artifacts: [artifact],
     reports: reports.map(({ reference }) => reference),
     reportFiles: reports,
@@ -240,7 +240,7 @@ export function verifyRelease(argv = process.argv.slice(2)) {
       throw new Error(`unexpected archive name: ${archiveName}`);
     }
     const archiveDigest = sha256(first);
-    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, identity });
+    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize: first.length, identity });
     const { reportFiles, ...manifest } = built;
     const parsed = parseReleaseManifest(manifest);
     if (!parsed.ok) {

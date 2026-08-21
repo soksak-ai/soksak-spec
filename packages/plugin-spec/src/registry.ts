@@ -1,10 +1,8 @@
 import {
-  dependencyIdentity,
   parseReleaseManifest,
   releaseIdentity,
   type PlatformParseResult,
   type PluginRelease,
-  type ReleaseDependency,
   type ReleaseDocument,
   type ReleaseIdentity,
   type SidecarRelease,
@@ -15,12 +13,6 @@ import {
 import { SHA256_RE } from "./release-primitives.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
-export interface RegistryProfile {
-  id: string;
-  plugin: { id: string; version: string };
-  bindings: unknown[];
-}
-
 export interface RegistryPayload {
   id: string;
   sequence: number;
@@ -29,7 +21,6 @@ export interface RegistryPayload {
   kits: KitRelease[];
   contracts: ContractRelease[];
   specs: SpecRelease[];
-  profiles: RegistryProfile[];
 }
 
 export interface SignedRegistryIndex extends RegistryPayload {
@@ -97,21 +88,9 @@ function parseReleaseArray<T extends ReleaseDocument>(raw: unknown, label: strin
   return result;
 }
 
-function parseProfile(raw: unknown, index: number, errors: string[]): RegistryProfile | null {
-  const label = "registry.profiles[" + index + "]";
-  const value = strictObject(raw, ["bindings", "id", "plugin"], ["bindings", "id", "plugin"], label, errors);
-  if (!value) return null;
-  if (typeof value.id !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(value.id)) errors.push(label + ".id: profile id required");
-  const plugin = strictObject(value.plugin, ["id", "version"], ["id", "version"], label + ".plugin", errors);
-  if (!plugin || typeof plugin.id !== "string" || plugin.version !== "0.0.1") errors.push(label + ".plugin: exact plugin reference required");
-  if (!Array.isArray(value.bindings)) errors.push(label + ".bindings: array required");
-  if (!plugin || !Array.isArray(value.bindings) || typeof value.id !== "string") return null;
-  return { id: value.id, plugin: { id: plugin.id as string, version: "0.0.1" }, bindings: value.bindings };
-}
-
 export function parseRegistryPayload(raw: unknown): PlatformParseResult<RegistryPayload> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["contracts", "id", "kits", "plugins", "profiles", "sequence", "sidecars", "specs"], ["contracts", "id", "kits", "plugins", "profiles", "sequence", "sidecars", "specs"], "registry", errors);
+  const value = strictObject(raw, ["contracts", "id", "kits", "plugins", "sequence", "sidecars", "specs"], ["contracts", "id", "kits", "plugins", "sequence", "sidecars", "specs"], "registry", errors);
   if (!value) return { ok: false, errors };
   if (typeof value.id !== "string" || !REGISTRY_ID_RE.test(value.id)) errors.push("registry.id: registry id required");
   if (!Number.isSafeInteger(value.sequence) || (value.sequence as number) < 1) errors.push("registry.sequence: positive integer required");
@@ -120,24 +99,17 @@ export function parseRegistryPayload(raw: unknown): PlatformParseResult<Registry
   const kits = parseReleaseArray<KitRelease>(value.kits, "registry.kits", "kit", errors);
   const contracts = parseReleaseArray<ContractRelease>(value.contracts, "registry.contracts", "contract", errors);
   const specs = parseReleaseArray<SpecRelease>(value.specs, "registry.specs", "spec", errors);
-  const profiles: RegistryProfile[] = [];
-  if (!Array.isArray(value.profiles)) errors.push("registry.profiles: array required");
-  else value.profiles.forEach((item, index) => { const profile = parseProfile(item, index, errors); if (profile) profiles.push(profile); });
-  sortedUnique(profiles.map((profile) => profile.id), "registry.profiles", errors);
-  const index = new Map(registryReleases({ id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, contracts, specs, profiles }).map((release) => [identityKey(releaseIdentity(release)), release]));
-  for (const release of index.values()) for (const dependency of release.dependencies) if (!index.has(identityKey(dependencyIdentity(dependency)))) errors.push("registry dependency absent: " + identityKey(dependencyIdentity(dependency)));
-  for (const profile of profiles) if (!index.has("plugin:" + profile.plugin.id + "@" + profile.plugin.version)) errors.push("registry profile plugin absent: " + profile.id);
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, value: { id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, contracts, specs, profiles } };
+  return { ok: true, value: { id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, contracts, specs } };
 }
 
 export function parseSignedRegistryIndex(raw: unknown): PlatformParseResult<SignedRegistryIndex> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["algorithm", "contracts", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "profiles", "sequence", "sidecars", "signature", "specs"], ["algorithm", "contracts", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "profiles", "sequence", "sidecars", "signature", "specs"], "registry", errors);
+  const value = strictObject(raw, ["algorithm", "contracts", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "sequence", "sidecars", "signature", "specs"], ["algorithm", "contracts", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "sequence", "sidecars", "signature", "specs"], "registry", errors);
   if (!value) return { ok: false, errors };
   const payload = parseRegistryPayload({
     id: value.id, sequence: value.sequence,
-    plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, contracts: value.contracts, specs: value.specs, profiles: value.profiles,
+    plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, contracts: value.contracts, specs: value.specs,
   });
   if (!payload.ok) errors.push(...payload.errors);
   if (!validTimestamp(value.issuedAt)) errors.push("registry.issuedAt: canonical timestamp required");
@@ -172,14 +144,14 @@ export function canonicalRegistryPayload(raw: unknown): Uint8Array {
   delete source.signature;
   const registry = parseRegistryPayload({
     id: source.id, sequence: source.sequence,
-    plugins: source.plugins, sidecars: source.sidecars, kits: source.kits, contracts: source.contracts, specs: source.specs, profiles: source.profiles,
+    plugins: source.plugins, sidecars: source.sidecars, kits: source.kits, contracts: source.contracts, specs: source.specs,
   });
   if (!registry.ok) throw new Error("invalid registry payload: " + registry.errors.join("; "));
   if (!validTimestamp(source.issuedAt) || !validTimestamp(source.expiresAt) || source.algorithm !== "ed25519" || typeof source.keyId !== "string" || !KEY_ID_RE.test(source.keyId)) {
     throw new Error("invalid registry signing envelope");
   }
   const value = registry.value;
-  const registryPayload: RegistryPayload = { id: value.id, sequence: value.sequence, plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, contracts: value.contracts, specs: value.specs, profiles: value.profiles };
+  const registryPayload: RegistryPayload = { id: value.id, sequence: value.sequence, plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, contracts: value.contracts, specs: value.specs };
   const payload = { registry: registryPayload, issuedAt: source.issuedAt, expiresAt: source.expiresAt, algorithm: "ed25519", keyId: source.keyId };
   return new TextEncoder().encode(canonicalJson(payload));
 }
@@ -216,12 +188,4 @@ export async function certifyRegistryIndex(raw: unknown, policy: RegistryTrustPo
   const certified = Object.freeze({ index: parsed.value, digest, continuity, highWater: { sequence: parsed.value.sequence, digest } });
   certifiedRegistries.add(certified);
   return { ok: true, value: certified };
-}
-
-export type RegistryDependencyResolutionResult = { ok: true; value: ReleaseDocument } | { ok: false; errors: string[] };
-export function resolveRegistryDependency(certified: CertifiedRegistryIndex, dependency: ReleaseDependency): RegistryDependencyResolutionResult {
-  if (!certifiedRegistries.has(certified as object)) return { ok: false, errors: ["uncertified registry index"] };
-  const wanted = identityKey(dependencyIdentity(dependency));
-  const release = registryReleases(certified.index).find((candidate) => identityKey(releaseIdentity(candidate)) === wanted);
-  return release ? { ok: true, value: release } : { ok: false, errors: ["dependency absent from origin registry: " + wanted] };
 }

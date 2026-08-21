@@ -82,34 +82,9 @@ if (plugin.version !== VERSION || plugin.entry !== "main.js") {
   throw new Error("plugin manifest does not satisfy the public plugin boundary");
 }
 
-const runtimePluginDependencies = Object.entries(plugin.dependencies ?? {})
-  .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-  .map(([id, range]) => {
-    if (range !== "0.0.1") throw new Error(`plugin dependency must be exact 0.0.1: ${id}`);
-    return { plugin: { id, version: "0.0.1" }, scope: "runtime" };
-  });
-const declaredDependencyPath = path.join(root, "release", "dependencies.json");
-const declaredDependencies = fs.existsSync(declaredDependencyPath)
-  ? JSON.parse(fs.readFileSync(declaredDependencyPath, "utf8"))
-  : [];
-if (!Array.isArray(declaredDependencies)) throw new Error("release/dependencies.json must be an array");
-for (const [index, dependency] of declaredDependencies.entries()) {
-  if (!dependency || typeof dependency !== "object" || Array.isArray(dependency)) throw new Error(`release dependencies[${index}] must be an object`);
-  const kinds = ["plugin", "sidecar", "kit", "contract", "spec"].filter((kind) => dependency[kind] !== undefined);
-  if (kinds.length !== 1 || JSON.stringify(Object.keys(dependency).sort()) !== JSON.stringify([kinds[0], "scope"].sort())) {
-    throw new Error(`release dependencies[${index}] must name exactly one direct kind and scope`);
-  }
-  const kind = kinds[0];
-  exactKeys(dependency[kind], ["id", "version"], `release dependencies[${index}].${kind}`);
-  if (dependency[kind].version !== "0.0.1" || !/^[a-z0-9][a-z0-9-]*$/.test(dependency[kind].id)) {
-    throw new Error(`release dependencies[${index}].${kind} must be an exact 0.0.1 reference`);
-  }
-  if (dependency.scope !== "runtime" && dependency.scope !== "build") {
-    throw new Error(`release dependencies[${index}].scope must be runtime or build`);
-  }
+if (fs.existsSync(path.join(root, "release", "dependencies.json"))) {
+  throw new Error("release/dependencies.json is not a release input");
 }
-const dependencies = [...runtimePluginDependencies, ...declaredDependencies]
-  .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
 const tag = `v${VERSION}`;
 const archiveName = `${ID}-${VERSION}-any.tgz`;
@@ -128,6 +103,7 @@ const artifact = {
   target: "any",
   url: `${REPOSITORY}/releases/download/${tag}/${archiveName}`,
   sha256: artifactSha256,
+  size: archive.length,
   format: "tgz",
   manifest: "plugin.json",
 };
@@ -152,7 +128,6 @@ const reports = [
 const release = {
   plugin: { id: ID, version: VERSION },
   source: { repository: REPOSITORY, commit },
-  dependencies,
   artifacts: [artifact],
   reports: reports.map(({ reference }) => reference),
 };

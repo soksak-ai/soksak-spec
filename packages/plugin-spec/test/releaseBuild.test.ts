@@ -109,20 +109,15 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(build().status).toBe(0);
   });
 
-  it("records exact kit, contract, and spec build dependencies without selecting a sidecar", () => {
+  it("rejects obsolete release dependency metadata", () => {
     writeFixture({ releaseDependencies: [
       { kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" },
       { contract: { id: "soksak-contract-plugin-terminal", version: "0.0.1" }, scope: "build" },
       { spec: { id: "soksak-spec", version: "0.0.1" }, scope: "build" },
     ] });
-    expect(build().status).toBe(0);
-    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    expect(release.dependencies).toEqual([
-      { contract: { id: "soksak-contract-plugin-terminal", version: "0.0.1" }, scope: "build" },
-      { kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" },
-      { spec: { id: "soksak-spec", version: "0.0.1" }, scope: "build" },
-    ]);
-    expect(release.dependencies).not.toEqual(expect.arrayContaining([expect.objectContaining({ sidecar: expect.anything() })]));
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("release/dependencies.json is not a release input");
   });
 
   it("is deterministic — same inputs produce the same archive sha256", () => {

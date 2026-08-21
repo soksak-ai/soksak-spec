@@ -1,7 +1,6 @@
 {
   "spec": { "id": "soksak-spec", "version": "0.0.1" },
   "source": { "repository": "https://github.com/example/soksak-spec", "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
-  "dependencies": [],
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.tgz", "sha256": "7777777777777777777777777777777777777777777777777777777777777777", "format": "tgz", "manifest": "spec.json" }],
+  "artifacts": [{ "target": "any", "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.tgz", "size": 12345, "sha256": "7777777777777777777777777777777777777777777777777777777777777777", "format": "tgz", "manifest": "spec.json" }],
   "reports": [{ "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.conformance.json", "sha256": "8888888888888888888888888888888888888888888888888888888888888888" }]
 }

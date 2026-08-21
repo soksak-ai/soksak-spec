@@ -1,8 +1,7 @@
 {
   "kit": { "id": "terminal-common", "version": "0.0.1" },
   "source": { "repository": "https://github.com/example/terminal-common", "commit": "cccccccccccccccccccccccccccccccccccccccc" },
-  "dependencies": [],
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz", "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "format": "tgz", "manifest": "kit.json" }],
+  "artifacts": [{ "target": "any", "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz", "size": 12345, "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "format": "tgz", "manifest": "kit.json" }],
   "reports": [
     { "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit-kind.conformance.json", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
     { "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit-release.conformance.json", "sha256": "9999999999999999999999999999999999999999999999999999999999999999" }

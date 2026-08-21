@@ -1,7 +1,6 @@
 {
   "contract": { "id": "terminal-contract", "version": "0.0.1" },
   "source": { "repository": "https://github.com/example/terminal-contract", "commit": "dddddddddddddddddddddddddddddddddddddddd" },
-  "dependencies": [{ "spec": { "id": "soksak-spec", "version": "0.0.1" }, "scope": "build" }],
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.tgz", "sha256": "5555555555555555555555555555555555555555555555555555555555555555", "format": "tgz", "manifest": "contract.json" }],
+  "artifacts": [{ "target": "any", "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.tgz", "size": 12345, "sha256": "5555555555555555555555555555555555555555555555555555555555555555", "format": "tgz", "manifest": "contract.json" }],
   "reports": [{ "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.conformance.json", "sha256": "6666666666666666666666666666666666666666666666666666666666666666" }]
 }

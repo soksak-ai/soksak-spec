@@ -35,8 +35,8 @@ describe("portable platform wire artifacts", () => {
     expect(registry.$id).toBe("urn:soksak:spec:registry:0.0.1");
     expect(registryPublicKey.$id).toBe("urn:soksak:spec:registry-public-key:0.0.1");
 
-    expect(release.minProperties).toBe(5);
-    expect(release.maxProperties).toBe(5);
+    expect(release.minProperties).toBe(4);
+    expect(release.maxProperties).toBe(4);
     expect(release.$defs.reference.properties.version.const).toBe("0.0.1");
     expect(registry.properties.plugins.items.allOf[0].$ref).toBe(release.$id);
     expect(registry.properties.sidecars.items.allOf[0].$ref).toBe(release.$id);

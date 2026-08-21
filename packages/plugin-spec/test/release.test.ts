@@ -22,13 +22,9 @@ describe("plugin, sidecar, and kit release documents", () => {
     expect(spec.value.spec.id).toBe("soksak-spec");
   });
 
-  it("keeps dependency kinds explicit and versions exact", () => {
-    const parsed = parseReleaseManifest(pluginRelease());
-    expect(parsed, JSON.stringify(parsed)).toMatchObject({ ok: true });
-    if (!parsed.ok) return;
-    expect(parsed.value.dependencies).toEqual([
-      { kit: { id: "terminal-common", version: "0.0.1" }, scope: "runtime" },
-    ]);
+  it("rejects dependency and scope fields in release documents", () => {
+    expect(parseReleaseManifest(pluginRelease({ dependencies: [] })).ok).toBe(false);
+    expect(parseReleaseManifest(pluginRelease({ scope: "runtime" })).ok).toBe(false);
   });
 
   it("rejects generic kind and id release identities", () => {
@@ -49,13 +45,9 @@ describe("plugin, sidecar, and kit release documents", () => {
     expect(parseReleaseManifest(wrongTarget).ok).toBe(false);
   });
 
-  it("rejects dependency objects that name more or fewer than one kind", () => {
-    const ambiguous = pluginRelease();
-    ambiguous.dependencies = [{
-      plugin: { id: "other", version: "0.0.1" },
-      kit: { id: "terminal-common", version: "0.0.1" },
-      scope: "runtime",
-    }];
-    expect(parseReleaseManifest(ambiguous).ok).toBe(false);
+  it("requires the artifact byte size", () => {
+    const missing = pluginRelease();
+    delete (missing.artifacts as Record<string, unknown>[])[0].size;
+    expect(parseReleaseManifest(missing).ok).toBe(false);
   });
 });

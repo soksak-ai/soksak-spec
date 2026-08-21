@@ -4,7 +4,6 @@ import {
   canonicalRegistryPayload,
   certifyRegistryIndex,
   parseSignedRegistryIndex,
-  resolveRegistryDependency,
   type RegistryPublicKey,
 } from "../src/registry.js";
 import { contractRelease, kitRelease, pluginRelease, sidecarRelease, specRelease } from "./releaseFixture.js";
@@ -20,11 +19,6 @@ function unsigned(sequence = 1): Record<string, unknown> {
     kits: [kitRelease()],
     contracts: [contractRelease()],
     specs: [specRelease()],
-    profiles: [{
-      id: "weather",
-      plugin: { id: "weather-plugin", version: "0.0.1" },
-      bindings: [],
-    }],
     issuedAt: "2026-08-21T00:00:00Z",
     expiresAt: "2026-09-21T00:00:00Z",
     algorithm: "ed25519",
@@ -48,7 +42,7 @@ function trust(publicKey: RegistryPublicKey, highWater?: { sequence: number; dig
 }
 
 describe("signed plugin registry", () => {
-  it("parses all five direct release arrays and profiles", () => {
+  it("parses all five direct release arrays", () => {
     const parsed = parseSignedRegistryIndex(signer().signed(unsigned()));
     expect(parsed, JSON.stringify(parsed)).toMatchObject({ ok: true });
     if (!parsed.ok) return;
@@ -57,7 +51,6 @@ describe("signed plugin registry", () => {
     expect(parsed.value.kits[0].kit.id).toBe("terminal-common");
     expect(parsed.value.contracts[0].contract.id).toBe("terminal-contract");
     expect(parsed.value.specs[0].spec.id).toBe("soksak-spec");
-    expect(parsed.value.profiles[0].plugin.id).toBe("weather-plugin");
   });
 
   it("rejects the old combined release array and generic release identities", () => {
@@ -92,20 +85,9 @@ describe("signed plugin registry", () => {
     expect(createPublicKey({ key: spki, format: "der", type: "spki" })).toBeTruthy();
   });
 
-  it("resolves exact dependencies only inside the certified registry", async () => {
-    const { publicKey, signed } = signer();
-    const certified = await certifyRegistryIndex(signed(unsigned()), trust(publicKey));
-    expect(certified.ok).toBe(true);
-    if (!certified.ok) return;
-    const dependency = certified.value.index.plugins[0].dependencies[0];
-    const resolved = resolveRegistryDependency(certified.value, dependency);
-    expect(resolved.ok && "kit" in resolved.value && resolved.value.kit.id).toBe("terminal-common");
-    const absent = resolveRegistryDependency(certified.value, { kit: { id: "absent", version: "0.0.1" }, scope: "runtime" });
-    expect(absent.ok).toBe(false);
-  });
-
-  it("rejects forged certified objects", () => {
-    const forged = { index: unsigned(), digest: "0".repeat(64), continuity: "initial", highWater: { sequence: 1, digest: "0".repeat(64) } } as any;
-    expect(resolveRegistryDependency(forged, { kit: { id: "terminal-common", version: "0.0.1" }, scope: "runtime" }).ok).toBe(false);
+  it("rejects install profiles", () => {
+    const value = unsigned();
+    value.profiles = [];
+    expect(parseSignedRegistryIndex({ ...value, signature: Buffer.alloc(64).toString("base64") }).ok).toBe(false);
   });
 });

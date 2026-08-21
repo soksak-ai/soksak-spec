@@ -49,7 +49,6 @@ import {
   certifyRegistryIndex,
   parseManifest,
   parseReleaseManifest,
-  resolveRegistryDependency,
 } from "@soksak-ai/plugin-spec";
 ```
 
@@ -57,8 +56,8 @@ All external input starts as `unknown` and must cross the relevant parser. Only
 `certifyRegistryIndex` returns a `CertifiedRegistryIndex` usable by exact dependency resolution.
 
 `parseManifest(raw, dirName)` remains the plugin-specific parser. Its manifest id must equal
-`dirName`. `plugin.json` owns runtime declarations; source, install dependencies, artifacts,
-and archive manifest selection are owned by the release document.
+`dirName`. `plugin.json` owns runtime declarations. The release document owns source, artifacts,
+and archive manifest selection without restating runtime or build dependencies.
 
 ## Plugin UI surfaces
 

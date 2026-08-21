@@ -1,8 +1,7 @@
 {
   "plugin": { "id": "weather-plugin", "version": "0.0.1" },
   "source": { "repository": "https://github.com/example/weather-plugin", "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-  "dependencies": [{ "kit": { "id": "terminal-common", "version": "0.0.1" }, "scope": "runtime" }],
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "format": "tgz", "manifest": "plugin.json" }],
+  "artifacts": [{ "target": "any", "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz", "size": 12345, "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "format": "tgz", "manifest": "plugin.json" }],
   "reports": [
     { "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-kind.conformance.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
     { "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-release.conformance.json", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }

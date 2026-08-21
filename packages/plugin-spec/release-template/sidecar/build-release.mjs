@@ -37,6 +37,7 @@ const artifacts = readTargetMatrix().map(({ target }) => {
     target,
     url: `${REPOSITORY}/releases/download/${TAG}/${asset}`,
     sha256: digest,
+    size: bytes.length,
     format: "tar.gz",
     manifest: "sidecar.json",
   };
@@ -63,7 +64,6 @@ const reports = [
 });
 const release = {
   ...releaseIdentity(options.commit),
-  dependencies: [],
   artifacts,
   reports: reports.map(({ reference }) => reference),
 };

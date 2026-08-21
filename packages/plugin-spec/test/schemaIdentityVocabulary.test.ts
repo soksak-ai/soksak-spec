@@ -36,8 +36,9 @@ describe("schema metadata and payload identity", () => {
   it("requires all five direct registry arrays", () => {
     const registry = JSON.parse(read("test/fixtures/platform-wire/registry-signed.json"));
     expect(Object.keys(registry).sort()).toEqual(expect.arrayContaining([
-      "plugins", "sidecars", "kits", "contracts", "specs", "profiles",
+      "plugins", "sidecars", "kits", "contracts", "specs",
     ]));
+    expect(registry).not.toHaveProperty("profiles");
     expect(registry).not.toHaveProperty(["un", "its"].join(""));
   });
 
