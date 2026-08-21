@@ -143,6 +143,7 @@ describe("plugin runtime 0.0.1 closed wire", () => {
       id: "runtime-policy",
       name: "Runtime policy",
       version: "0.0.1",
+      appVersionRequirement: "0.0.1",
       description: "Runtime policy fixture",
       permissions: [],
     };

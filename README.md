@@ -8,7 +8,7 @@ This repository owns only platform-wide boundaries:
 - `@soksak-ai/plugin-spec`: plugin, release, conformance, and signed-registry
   schemas plus the headless validator.
 - `soksak-spec-contract`: canonical provider `{id, version}` and consumer
-  `{id, range}` references.
+  `{id, requirement}` references.
 - `soksak-spec-service`: the common plugin-service handshake and frame set.
 - `soksak-spec-socket`: generic protocol compatibility judgment.
 

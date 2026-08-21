@@ -13,6 +13,7 @@ function base(
     id: "demo",
     name: "Demo",
     version: "1.0.0",
+    appVersionRequirement: "0.0.1",
     description: "UI surface fixture",
     entry: "main.js",
     permissions,
@@ -261,7 +262,7 @@ describe("entry:null service boundary", () => {
         entry: null,
         sidecars: [{
           name: "demo-svc",
-          interface: { id: "soksak-spec-sidecar-demo", range: ">=0.0.1 <1.0.0" },
+          interface: { id: "soksak-spec-sidecar-demo", requirement: "0.0.1" },
         }],
         service: { sidecar: "demo-svc", interface: SERVICE_CONTRACT_REQUIREMENT },
       },

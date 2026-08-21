@@ -30,6 +30,7 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
     id: "soksak-plugin-example",
     name: { en: "Example", ko: "예제" },
     version: "0.0.1",
+    appVersionRequirement: "0.0.1",
     description: { en: "Example plugin", ko: "예제 플러그인" },
     entry: "main.js",
     permissions: ["data"],
@@ -134,7 +135,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
   });
 
   it("does not pin which contracts a plugin relates to", () => {
-    writeFixture({ plugin: { consumes: [{ id: "soksak-spec-plugin-git", range: "0.0.1" }] } });
+    writeFixture({ plugin: { consumes: [{ id: "soksak-spec-plugin-git", requirement: "0.0.1" }] } });
     expect(build().status).toBe(0);
   });
 
@@ -142,7 +143,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     writeFixture({ plugin: { consumes: [{ id: "soksak-spec-plugin-git" }] } });
     const r = build();
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toMatch(/consumes\[0\]\.range/);
+    expect(r.stderr).toMatch(/consumes\[0\]\.requirement/);
   });
 
   it("refuses a non-private plugin package", () => {

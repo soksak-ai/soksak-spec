@@ -2,6 +2,7 @@
   "id": "c2-clean",
   "name": "C2 Clean Fixture",
   "version": "0.1.0",
+  "appVersionRequirement": "0.0.1",
   "description": "headless gate fixture — content view with declared status codes, command and node surfaces present: zero C2 violations",
   "permissions": [
     "ui",

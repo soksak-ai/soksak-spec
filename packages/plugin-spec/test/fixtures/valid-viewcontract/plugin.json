@@ -2,6 +2,7 @@
   "id": "valid-viewcontract",
   "name": "Valid ViewContract Fixture",
   "version": "0.0.1",
+  "appVersionRequirement": "0.0.1",
   "description": "headless gate fixture — a program's viewContract contract-id pin must pass parseManifest",
   "permissions": [
     "programs",
@@ -22,7 +23,7 @@
         "view": "content",
         "viewContract": {
           "id": "soksak-spec-plugin-terminal",
-          "range": ">=0.0.1 <1.0.0"
+          "requirement": "0.0.1"
         }
       }
     ]

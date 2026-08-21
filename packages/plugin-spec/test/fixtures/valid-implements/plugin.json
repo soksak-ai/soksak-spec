@@ -2,6 +2,7 @@
   "id": "valid-implements",
   "name": "Valid Implements Fixture",
   "version": "0.0.1",
+  "appVersionRequirement": "0.0.1",
   "description": "headless gate fixture — implements contract pins must pass parseManifest",
   "permissions": [],
   "implements": [

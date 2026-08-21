@@ -19,7 +19,7 @@ import {
 // 절대 충돌하지 않는다(PS6 — C1 스캔이 코어 소스의 플러그인 id 토큰을 적발하나 계약 id 는 제외).
 export const SERVICE_CONTRACT_REQUIREMENT: ContractRequirement = Object.freeze({
   id: "soksak-spec-service",
-  range: "0.0.1",
+  requirement: "0.0.1",
 });
 
 // 커맨드 파라미터 스펙 — 코어 레지스트리 ParamSpec(src/commands/registry.ts)과 동형.

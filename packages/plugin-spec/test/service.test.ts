@@ -20,12 +20,13 @@ function base(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     id: "demo",
     name: "데모",
     version: "0.0.1",
+    appVersionRequirement: "0.0.1",
     description: "테스트용",
     entry: null,
     permissions: ["commands", "sidecar", "service"],
     sidecars: [{
       name: "demo-svc",
-      interface: { id: "soksak-spec-sidecar-fixture-wire", range: ">=0.0.1 <1.0.0" },
+      interface: { id: "soksak-spec-sidecar-fixture-wire", requirement: "0.0.1" },
     }],
     service: { sidecar: "demo-svc", interface: SERVICE_CONTRACT_REQUIREMENT },
     contributes: {
@@ -52,7 +53,7 @@ describe("service — 수용(PS3·PS4)", () => {
   it("pins the first-party service requirement to the exact 0.0.1 contract", () => {
     expect(SERVICE_CONTRACT_REQUIREMENT).toEqual({
       id: "soksak-spec-service",
-      range: "0.0.1",
+      requirement: "0.0.1",
     });
   });
 

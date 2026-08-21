@@ -26,7 +26,7 @@ describe("semverCompare / semverGte", () => {
 });
 
 describe("semverSatisfies — 기존 형식 회귀", () => {
-  it("* 는 항상 참", () => expect(semverSatisfies("9.9.9", "*")).toBe(true));
+  it("* is not a supported requirement", () => expect(semverSatisfies("9.9.9", "*")).toBeNull());
   it("정확 일치", () => {
     expect(semverSatisfies("2.0.0", "2.0.0")).toBe(true);
     expect(semverSatisfies("2.0.1", "2.0.0")).toBe(false);
@@ -80,7 +80,7 @@ describe("semverSatisfies — 복합 범위·비교연산자(사고 수정)", ()
     expect(semverSatisfies("1.2.3-alpha.1", ">=1.2.3")).toBe(false);
   });
   it("안정 범위가 명시하지 않은 prerelease를 설치 후보로 승격하지 않는다", () => {
-    expect(semverSatisfies("1.1.0-alpha.1", "*")).toBe(false);
+    expect(semverSatisfies("1.1.0-alpha.1", "*")).toBeNull();
     expect(semverSatisfies("1.1.0-alpha.1", "^1.0.0")).toBe(false);
     expect(semverSatisfies("1.2.3-beta.2", ">=1.0.0 <2.0.0")).toBe(false);
     expect(semverSatisfies("1.2.3-beta.2", ">=1.2.3-beta.1 <2.0.0")).toBe(true);

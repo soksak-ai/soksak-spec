@@ -7,7 +7,7 @@ import {
 const PROVIDER = { id: "soksak-spec-plugin-fixture-tasks", version: "0.0.1" };
 const REQUIREMENT = {
   id: "soksak-spec-plugin-fixture-tasks",
-  range: ">=0.0.1 <1.0.0",
+  requirement: "0.0.1",
 };
 
 function base(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -15,6 +15,7 @@ function base(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     id: "demo",
     name: "Demo",
     version: "0.0.1",
+    appVersionRequirement: "0.0.1",
     description: "contract fixture",
     permissions: [],
     ...overrides,
@@ -49,7 +50,7 @@ describe("domain contract references", () => {
   it("requires provider version and consumer range with no shadow fields", () => {
     for (const implementsValue of [
       [{ id: PROVIDER.id }],
-      [{ ...PROVIDER, range: "*" }],
+      [{ ...PROVIDER, requirement: "0.0.1" }],
       [{ ...PROVIDER, version: "0.0" }],
     ]) {
       expect(errorsOf(base({ implements: implementsValue }))).not.toEqual([]);
@@ -57,7 +58,7 @@ describe("domain contract references", () => {
     for (const consumesValue of [
       [{ id: REQUIREMENT.id }],
       [{ ...REQUIREMENT, version: "0.0.1" }],
-      [{ ...REQUIREMENT, range: "latest" }],
+      [{ ...REQUIREMENT, requirement: "latest" }],
     ]) {
       expect(errorsOf(base({ consumes: consumesValue }))).not.toEqual([]);
     }

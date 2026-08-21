@@ -2,6 +2,7 @@
   "id": "weather-plugin",
   "name": "Weather Plugin",
   "version": "0.0.1",
+  "appVersionRequirement": "0.0.1",
   "description": "Language-neutral owner fixture for plugin release conformance.",
   "permissions": [],
   "contributes": {}

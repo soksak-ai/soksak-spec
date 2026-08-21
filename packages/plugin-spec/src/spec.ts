@@ -66,7 +66,7 @@ export * from "./service.js";
 // semver 비교 유틸 — 단일진실은 semver.ts(공개 API 는 여기서 재수출).
 import { SEMVER_RE } from "./semver.js";
 export * from "./semver.js";
-import { COMPONENT_ID_RE, isDependencyRange } from "./release-primitives.js";
+import { COMPONENT_ID_RE } from "./release-primitives.js";
 export * from "./release-primitives.js";
 export * from "./release.js";
 export * from "./sidecar.js";
@@ -137,8 +137,8 @@ export interface ContributedView {
   id: string; // 플러그인 내 고유. 전역 키는 "<pluginId>.<id>"
   title: LocalizedText;
   icon: string; // 아이콘 레일용 짧은 글리프(문자 1~2개/이모지). v1 은 SVG 미지원
-  placements: ViewPlacement[]; // 파싱 시 기본 ["sidebar-right"] 로 채움
-  defaultPlacement: ViewPlacement; // 파싱 시 placements[0] 으로 채움
+  placements: ViewPlacement[];
+  defaultPlacement: ViewPlacement;
   // 콘텐츠 뷰 아래 네이티브 레이어(임베드 webview 등)가 비쳐야 함 — 코어가 그 셀을 투명 홀로 처리한다.
   // 브라우저류 뷰(child webview 임베드)가 선언한다(코어 하드 체크 없음 — 데이터 주도). 기본 false.
   transparent: boolean; // 파싱 시 기본 false
@@ -269,7 +269,7 @@ export type ReachStrategy =
 // 외부 런타임 의존성 = 4-tuple: identity(name·bin) + observe(작동 관찰) + accept(수용 술어) + reach(공급).
 // observe/accept/reach 는 선택 — 미선언이면 레거시 동작(존재=수용, install=공급). reconcile 엔진(M3)이 실행.
 // 사이드카(engine 모델) 의존 선언 — 플러그인이 열 공유 네이티브 모듈. name 은 사이드카 이름
-// (soksak-sidecar-<name> 의 <name>), interface 는 계약 요구 `{ id, range }`.
+// (soksak-sidecar-<name> 의 <name>), interface 는 계약 요구 `{ id, requirement }`.
 // 로드 시 바이너리 자기보고(soksak_sidecar_abi)와 대조 — 불일치는 거부(선언≡실물). 정본 docs/SIDECARS.md.
 export interface SidecarDep {
   name: string; // ^[a-z0-9][a-z0-9-]*$
@@ -329,7 +329,7 @@ export interface PluginManifest {
   // Opaque frame 바깥으로 확장하는 동작은 코드 냄새로 추측하지 않고 명시적으로 선언한다.
   // local srcdoc/data/blob iframe은 기본 허용; remote iframe·navigation·WebRTC만 이 정책이 연다.
   runtime: PluginRuntimePolicy;
-  minAppVersion?: string;
+  appVersionRequirement: string;
   template?: boolean; // true = 개발 템플릿(읽기 전용). 활성화 대상이 아니다 — 목록·상세만 노출하고 토글을 주지 않는다.
   // 플러그인↔플러그인 의존(라이브러리 플러그인). pluginId → semver 범위(예: "^0.1.0").
   // 설치 시 미설치 의존을 전이적으로 동반 설치(동의 게이트), 삭제 시 의존자 cascade(고아 방지).
@@ -461,7 +461,7 @@ const VIEW_ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 const STATUS_CODE_RE = /^[a-z0-9][a-z0-9-]*$/;
 // 사이드카 이름(soksak-sidecar-<name> 의 <name>) — 경로 조립에 쓰이므로 traversal 안전 형식.
 const SIDECAR_NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
-// 사이드카 interface 도 계약 요구 `{ id, range }`다 — 별도 정규식 없이
+// 사이드카 interface 도 계약 요구 `{ id, requirement }`다 — 별도 정규식 없이
 // CONTRACT_ID_RE 로 검증한다. wire 축이 하나의 계약 id 문법으로 수렴(NAMING §8).
 const COMMAND_NAME_RE = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 const EXT_RE = /^[a-z0-9]+$/;
@@ -593,7 +593,7 @@ export function parseManifest(
       "renamedFrom",
       "entry",
       "runtime",
-      "minAppVersion",
+      "appVersionRequirement",
       "template",
       "dependencies",
       "libraries",
@@ -630,11 +630,8 @@ export function parseManifest(
       errors.push("renamedFrom: 자기 id 와 같을 수 없음(개명 아님)");
     }
   }
-  if (
-    raw.minAppVersion !== undefined &&
-    (!isNonEmptyString(raw.minAppVersion) || !SEMVER_RE.test(raw.minAppVersion))
-  ) {
-    errors.push("minAppVersion: semver 형식이어야 함");
+  if (raw.appVersionRequirement !== "0.0.1") {
+    errors.push("appVersionRequirement: exact 0.0.1 required");
   }
   if (raw.template !== undefined && typeof raw.template !== "boolean") {
     errors.push("template: true/false 여야 함");
@@ -648,17 +645,17 @@ export function parseManifest(
     if (!isRecord(raw.dependencies)) {
       errors.push("dependencies: 객체(pluginId → semver 범위)여야 함");
     } else {
-      for (const [depId, range] of Object.entries(raw.dependencies)) {
+      for (const [depId, version] of Object.entries(raw.dependencies)) {
         if (!PLUGIN_ID_RE.test(depId)) {
           errors.push(`dependencies: 키 "${depId}" 는 플러그인 id 형식(^[a-z0-9][a-z0-9-]*$)`);
         } else if (isNonEmptyString(raw.id) && depId === raw.id) {
           errors.push(`dependencies: 자기 자신("${depId}") 의존 금지`);
-        } else if (typeof range !== "string" || !isDependencyRange(range)) {
+        } else if (version !== "0.0.1") {
           errors.push(
-            `dependencies["${depId}"]: semantic version range required (for example 0.0.1)`,
+            `dependencies["${depId}"]: exact 0.0.1 required`,
           );
         } else {
-          dependencies[depId] = range;
+          dependencies[depId] = version;
         }
       }
     }
@@ -1012,13 +1009,9 @@ export function parseManifest(
             if (
               !Array.isArray(v.placements) ||
               v.placements.length === 0 ||
-              v.placements.some(
-                (p) => !VIEW_PLACEMENTS.includes(p as ViewPlacement),
-              )
+              v.placements.some((placement) => !VIEW_PLACEMENTS.includes(placement as ViewPlacement))
             ) {
-              errs.push(
-                `contributes.views["${v.id}"].placements: ${VIEW_PLACEMENTS.join("|")} 의 비어있지 않은 배열`,
-              );
+              errs.push(`contributes.views["${v.id}"].placements: ${VIEW_PLACEMENTS.join("|")} 의 비어있지 않은 배열`);
               return null;
             }
             placements = v.placements as ViewPlacement[];
@@ -1026,9 +1019,7 @@ export function parseManifest(
           let defaultPlacement = placements[0];
           if (v.defaultPlacement !== undefined) {
             if (!placements.includes(v.defaultPlacement as ViewPlacement)) {
-              errs.push(
-                `contributes.views["${v.id}"].defaultPlacement: placements 에 포함되어야 함`,
-              );
+              errs.push(`contributes.views["${v.id}"].defaultPlacement: placements 에 포함되어야 함`);
               return null;
             }
             defaultPlacement = v.defaultPlacement as ViewPlacement;
@@ -1473,10 +1464,7 @@ export function parseManifest(
       ...(raw.renamedFrom !== undefined ? { renamedFrom: (raw.renamedFrom as string).trim() } : {}),
       entry,
       runtime,
-      minAppVersion:
-        raw.minAppVersion !== undefined
-          ? (raw.minAppVersion as string).trim()
-          : undefined,
+      appVersionRequirement: raw.appVersionRequirement as string,
       ...(raw.template === true ? { template: true } : {}),
       ...(Object.keys(dependencies).length > 0 ? { dependencies } : {}),
       ...(libraries.length > 0 ? { libraries } : {}),

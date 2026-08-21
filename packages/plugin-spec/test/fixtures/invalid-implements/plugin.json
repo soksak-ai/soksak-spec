@@ -2,6 +2,7 @@
   "id": "invalid-implements",
   "name": "Invalid Implements Fixture",
   "version": "0.1.0",
+  "appVersionRequirement": "0.0.1",
   "description": "headless gate fixture — an implementation name without the -spec marker is not a contract id and must be rejected",
   "permissions": [],
   "implements": [

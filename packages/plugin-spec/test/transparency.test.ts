@@ -20,6 +20,7 @@ function base(views: unknown[]): Record<string, unknown> {
     id: "demo",
     name: "데모",
     version: "1.0.0",
+    appVersionRequirement: "0.0.1",
     description: "테스트용",
     permissions: ["ui", "commands"],
     contributes: {

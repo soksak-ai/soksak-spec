@@ -2,6 +2,7 @@
   "id": "invalid-viewcontract",
   "name": "Invalid ViewContract Fixture",
   "version": "0.1.0",
+  "appVersionRequirement": "0.0.1",
   "description": "headless gate fixture — a viewContract that is not a contract id must be rejected",
   "permissions": [
     "programs"

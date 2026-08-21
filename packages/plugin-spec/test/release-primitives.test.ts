@@ -34,10 +34,10 @@ describe("public plugin, sidecar, and kit identity source", () => {
     for (const version of ["01.0.0", "1.02.0", "1.0.0-01", "1.0", "v1.0.0"]) {
       expect(STRICT_SEMVER_RE.test(version), version).toBe(false);
     }
-    for (const range of ["*", "1.2.3", "^1.2.3", "~1.2.3", ">=1.0.0 <2.0.0", "=1.2.3-alpha.1"]) {
+    for (const range of ["1.2.3", "^1.2.3", "~1.2.3", ">=1.0.0 <2.0.0", "=1.2.3-alpha.1"]) {
       expect(isDependencyRange(range), range).toBe(true);
     }
-    for (const range of ["latest", "1.x", "^01.0.0", ">=1.0.0 || <2.0.0", ""]) {
+    for (const range of ["*", "latest", "1.x", "^01.0.0", ">=1.0.0 || <2.0.0", ""]) {
       expect(isDependencyRange(range), range).toBe(false);
     }
   });
@@ -111,6 +111,7 @@ describe("public plugin, sidecar, and kit identity source", () => {
       id: "weather",
       name: "Weather",
       version: "1.0.0",
+      appVersionRequirement: "0.0.1",
       description: "Weather plugin",
       repo: "https://github.com/example/weather",
       permissions: [],
@@ -119,18 +120,19 @@ describe("public plugin, sidecar, and kit identity source", () => {
     expect(parseManifest(raw, "weather").validation.ok).toBe(false);
   });
 
-  it("uses the exact owner-release dependency range grammar in plugin.json", () => {
+  it("uses exact 0.0.1 plugin dependencies in the current owner manifest", () => {
     const manifest = (range: string) => ({
       id: "weather",
       name: "Weather",
       version: "1.0.0",
+      appVersionRequirement: "0.0.1",
       description: "Weather plugin",
       dependencies: { "weather-data": range },
       permissions: [],
       contributes: {},
     });
-    expect(parseManifest(manifest(">=1.0.0 <2.0.0"), "weather").validation.ok).toBe(true);
-    expect(parseManifest(manifest(" >=1.0.0 <2.0.0"), "weather").validation.ok).toBe(false);
+    expect(parseManifest(manifest("0.0.1"), "weather").validation.ok).toBe(true);
+    expect(parseManifest(manifest(">=0.0.1 <1.0.0"), "weather").validation.ok).toBe(false);
   });
 
   it("keeps sidecar artifact location solely in the owner release manifest", () => {
@@ -142,7 +144,7 @@ describe("public plugin, sidecar, and kit identity source", () => {
       permissions: ["sidecar"],
       sidecars: [{
         name: "weather-engine",
-        interface: { id: "soksak-spec-sidecar-weather", range: ">=0.0.1 <1.0.0" },
+        interface: { id: "soksak-spec-sidecar-weather", requirement: "0.0.1" },
         reach: {
           fetch: {
             url: { darwin: "https://example.invalid/weather.tgz" },

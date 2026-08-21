@@ -2,6 +2,7 @@
   "id": "valid-service",
   "name": "Valid Service Fixture",
   "version": "0.1.0",
+  "appVersionRequirement": "0.0.1",
   "description": "headless gate fixture — a pure contract plugin (entry: null) must pass parseManifest (PS3, PS4)",
   "entry": null,
   "permissions": [
@@ -14,7 +15,7 @@
       "name": "echo",
       "interface": {
         "id": "soksak-spec-sidecar-fixture-wire",
-        "range": ">=0.0.1 <1.0.0"
+        "requirement": "0.0.1"
       }
     }
   ],
@@ -22,7 +23,7 @@
     "sidecar": "echo",
     "interface": {
       "id": "soksak-spec-service",
-      "range": ">=0.0.1 <1.0.0"
+      "requirement": "0.0.1"
     },
     "subscribe": [
       "bus:fixture:changed"
