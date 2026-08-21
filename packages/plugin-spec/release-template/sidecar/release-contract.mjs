@@ -2,70 +2,60 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-// ROOT is the UNIT repo root, resolved by a DISCOVERABLE RULE — not cwd guessing, not a --unit-root
-// argument to carry around (DEPLOY §1: "declare or resolve by a discoverable rule"). A release always
-// runs FROM its unit (the CI checks out the unit and runs at its root; the core release command runs
-// with the working directory set to the unit). So we DISCOVER the unit by finding its identity marker
-// (release/unit.json) at or above the running directory. Works identically whether the script is
-// vendored beside the unit or single-sourced from soksak-spec — the LOGIC is always file-relative
-// (ESM imports), only the unit it operates on is discovered. Absent marker → a clear error, not a
-// silent wrong root.
-export function findUnitRoot(startDir = process.cwd(), marker = path.join("release", "unit.json")) {
+// ROOT is the sidecar repository root, resolved by a discoverable rule rather than cwd guessing
+// The sidecar.json identity marker is discovered at or above the working directory.
+export function findSidecarRoot(startDir = process.cwd(), marker = "sidecar.json") {
   let dir = path.resolve(startDir);
   for (;;) {
     if (fs.existsSync(path.join(dir, marker))) return dir;
     const parent = path.dirname(dir);
-    if (parent === dir) throw new Error(`unit root not found: no ${marker} at or above ${path.resolve(startDir)}`);
+    if (parent === dir) throw new Error(`sidecar repository root not found: no ${marker} at or above ${path.resolve(startDir)}`);
     dir = parent;
   }
 }
-export const ROOT = findUnitRoot();
+export const ROOT = findSidecarRoot();
 const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
-export function parseUnitMetadata(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("release metadata must be an object");
+export function parseSidecarManifest(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("sidecar manifest must be an object");
   const keys = Object.keys(raw).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "releaseTag", "repository", "version"])) throw new Error("release metadata keys are closed");
-  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || !SEMVER.test(raw.version)) throw new Error("invalid release identity");
-  if (raw.releaseTag !== `v${raw.version}`) throw new Error("releaseTag must derive from version");
-  if (raw.repository !== `https://github.com/soksak-ai/${raw.id}`) throw new Error("repository must match the unit id");
+  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "spec", "version"])) throw new Error("sidecar manifest keys are closed");
+  if (raw.spec !== "soksak-spec-sidecar@0.0.1" || !/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || raw.version !== "0.0.1") throw new Error("invalid sidecar identity");
+  if (raw.process !== `dist/${raw.id}`) throw new Error("sidecar process path must match its id");
   if (
     !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
     JSON.stringify(Object.keys(raw.interface).sort()) !== JSON.stringify(["id", "version"]) ||
     !/^soksak-spec-sidecar-[a-z0-9][a-z0-9-]*$/.test(raw.interface.id) ||
     raw.interface.version !== raw.version
-  ) throw new Error("interface provider must match the unit version");
+  ) throw new Error("interface provider must match the sidecar version");
   return Object.freeze({ ...raw, interface: Object.freeze({ ...raw.interface }) });
 }
 
-export function readUnitMetadata(filename = path.join(ROOT, "release", "unit.json")) {
-  return parseUnitMetadata(JSON.parse(fs.readFileSync(filename, "utf8")));
+export function readSidecarManifest(filename = path.join(ROOT, "sidecar.json")) {
+  return parseSidecarManifest(JSON.parse(fs.readFileSync(filename, "utf8")));
 }
 
-export const UNIT = readUnitMetadata();
-export const ID = UNIT.id;
-export const VERSION = UNIT.version;
-export const TAG = UNIT.releaseTag;
-export const REPOSITORY = UNIT.repository;
-export const INTERFACE = UNIT.interface;
+export const SIDECAR = readSidecarManifest();
+export const ID = SIDECAR.id;
+export const VERSION = SIDECAR.version;
+export const TAG = `v${VERSION}`;
+export const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
+export const INTERFACE = SIDECAR.interface;
 export const SPEC_SHA = JSON.parse(fs.readFileSync(path.join(ROOT, "validation", "spec-validator.json"), "utf8")).commit;
 export const RELEASE_SPEC = "soksak-spec-release@0.0.1";
 export const SIDECAR_SPEC = "soksak-spec-sidecar@0.0.1";
 export const CONFORMANCE_SPEC = "soksak-spec-conformance@0.0.1";
 
-export function releaseAssetName(target, unit = UNIT) {
-  return `${unit.id}-${unit.version}-${target}.tar.gz`;
+export function releaseAssetName(target, sidecar = SIDECAR) {
+  return `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
 }
 
-export function releaseIdentity(commit, unit = UNIT) {
+export function releaseIdentity(commit, sidecar = SIDECAR) {
   assertCommit(commit);
   return {
     spec: RELEASE_SPEC,
-    kind: "sidecar",
-    id: unit.id,
-    version: unit.version,
-    source: { repository: unit.repository, commit },
-    releaseTag: unit.releaseTag,
+    sidecar: { id: sidecar.id, version: sidecar.version },
+    source: { repository: REPOSITORY, commit },
   };
 }
 
@@ -200,7 +190,7 @@ export function jsonBytes(value) {
 }
 
 export function assertBaseline() {
-  // This unit does not link soksak-spec; the pinned public validator judges its
+  // This sidecar does not link soksak-spec; the pinned public validator judges its
   // release documents from the outside (validation/spec-validator.json).
   const cargo = fs.readFileSync(path.join(ROOT, "Cargo.toml"), "utf8");
   if (!cargo.includes(`version = "${VERSION}"`) || !cargo.includes("publish = false")) throw new Error("Cargo package must match private release metadata");

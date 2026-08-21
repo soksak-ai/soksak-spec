@@ -1,10 +1,10 @@
 {
   "spec": "soksak-spec-conformance@0.0.1",
   "subject": {
-    "kind": "sidecar",
-    "id": "weather-sidecar",
-    "version": "0.0.1",
-    "manifestSha256": "cb85e8b0e048dafad6464b1b56a84a733233e4a86b2b729f549b85a37998947b"
+    "sidecar": {
+      "id": "weather-sidecar",
+      "version": "0.0.1"
+    }
   },
   "contract": "soksak-spec-sidecar@0.0.1",
   "result": "passed",

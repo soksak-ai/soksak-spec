@@ -12,7 +12,7 @@ This repository owns only platform-wide boundaries:
 - `soksak-spec-service`: the common plugin-service handshake and frame set.
 - `soksak-spec-socket`: generic protocol compatibility judgment.
 
-Plugin-specific and sidecar-specific payloads remain with their owning unit.
+Plugin-specific and sidecar-specific payloads remain with their owning repositories.
 A domain contract moves to a separate `soksak-contract-*` repository only
 when multiple independent implementations actually share it. The private PTY
 protocol is not part of this repository.

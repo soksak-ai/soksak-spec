@@ -1,26 +1,22 @@
 #!/usr/bin/env node
-// Canonical plugin release builder — byte-identical across every plugin (vendored from the single
-// source in @soksak-ai/plugin-spec, mirrored + gated by its test). A unit declares only its own file
+// Canonical plugin release builder — byte-identical across every plugin. A plugin declares its file
 // set in release-files.json; identity, version, the boundary invariants, the archive, the release
-// manifest, and the conformance reports are derived from the unit's own manifests and produced once.
-// No unit-specific coupling lives here: a plugin's implements/consumes are validated for shape only —
+// manifest, and the conformance reports are derived from the plugin manifest and produced once.
+// No plugin-specific coupling lives here: implements and consumes are validated for shape only —
 // the manifest is the single source of truth for which contracts it relates to.
 import fs from "node:fs";
 import path from "node:path";
 
 import { createRegularFileArchive, readRegularFileArchive, sha256 } from "./archive.mjs";
 
-// The UNIT repo root, resolved by a DISCOVERABLE RULE — not cwd guessing, not a carried argument
-// (DEPLOY §1). A release always runs FROM its unit; we DISCOVER the plugin by finding its release
-// file-set marker (release-files.json) at or above the running directory. Works identically whether
-// this builder is vendored beside the unit or single-sourced from soksak-spec — ESM relative imports
-// keep the LOGIC file-relative, only the unit is discovered.
+// The plugin repository root is resolved by a discoverable rule rather than cwd guessing.
+// The release-files.json marker is found at or above the running directory.
 const root = (() => {
   let dir = path.resolve(process.cwd());
   for (;;) {
     if (fs.existsSync(path.join(dir, "release-files.json"))) return dir;
     const parent = path.dirname(dir);
-    if (parent === dir) throw new Error(`unit root not found: no release-files.json at or above ${process.cwd()}`);
+    if (parent === dir) throw new Error(`plugin repository root not found: no release-files.json at or above ${process.cwd()}`);
     dir = parent;
   }
 })();
@@ -48,7 +44,7 @@ if (!/^[a-f0-9]{40}$/.test(commit ?? "")) {
   process.exit(2);
 }
 
-// The unit's own declaration: the exact, ordered file set it ships.
+// The plugin's exact ordered release file set.
 const FILES = JSON.parse(fs.readFileSync(path.join(root, "release-files.json")));
 if (!Array.isArray(FILES) || FILES.length === 0) {
   throw new Error("release-files.json must declare a non-empty ordered file set");
@@ -88,8 +84,8 @@ for (const [index, consumer] of (plugin.consumes ?? []).entries()) {
 const dependencies = Object.entries(plugin.dependencies ?? {})
   .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
   .map(([id, range]) => {
-    if (typeof range !== "string") throw new Error(`plugin dependency range must be a string: ${id}`);
-    return { kind: "plugin", id, range };
+    if (range !== "0.0.1") throw new Error(`plugin dependency must be exact 0.0.1: ${id}`);
+    return { plugin: { id, version: "0.0.1" }, scope: "runtime" };
   });
 const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
 const tag = `v${VERSION}`;
@@ -110,32 +106,35 @@ const artifact = {
   url: `${REPOSITORY}/releases/download/${tag}/${archiveName}`,
   sha256: artifactSha256,
   format: "tgz",
-  entrypoint: { kind: "plugin", manifest: "plugin.json" },
+  manifest: "plugin.json",
 };
-const release = {
-  spec: "soksak-spec-release@0.0.1",
-  kind: "plugin",
-  id: ID,
-  version: VERSION,
-  source: { repository: REPOSITORY, commit },
-  releaseTag: tag,
-  dependencies,
-  artifacts: [artifact],
-};
-const releaseBytes = Buffer.from(`${JSON.stringify(release, null, 2)}\n`);
-const manifestSha256 = sha256(releaseBytes);
 const report = (contract) => ({
   spec: "soksak-spec-conformance@0.0.1",
-  subject: { kind: "plugin", id: ID, version: VERSION, manifestSha256 },
+  subject: { plugin: { id: ID, version: VERSION } },
   contract,
   result: "passed",
-  validator: { name: "soksak-unit-conformance", version: VERSION },
+  validator: { name: "soksak-conformance", version: VERSION },
   artifacts: [{ target: "any", sha256: artifactSha256 }],
 });
+const reports = [
+  ["conformance-plugin.json", report("soksak-spec-plugin@0.0.1")],
+  ["conformance-release.json", report("soksak-spec-release@0.0.1")],
+].map(([name, value]) => {
+  const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+  return { name, value, bytes, reference: { url: `${REPOSITORY}/releases/download/${tag}/${name}`, sha256: sha256(bytes) } };
+});
+const release = {
+  spec: "soksak-spec-release@0.0.1",
+  plugin: { id: ID, version: VERSION },
+  source: { repository: REPOSITORY, commit },
+  dependencies,
+  artifacts: [artifact],
+  reports: reports.map(({ reference }) => reference),
+};
+const releaseBytes = Buffer.from(`${JSON.stringify(release, null, 2)}\n`);
 
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, archiveName), archive);
 fs.writeFileSync(path.join(outDir, "release.json"), releaseBytes);
-fs.writeFileSync(path.join(outDir, "conformance-release.json"), `${JSON.stringify(report("soksak-spec-release@0.0.1"), null, 2)}\n`);
-fs.writeFileSync(path.join(outDir, "conformance-plugin.json"), `${JSON.stringify(report("soksak-spec-plugin@0.0.1"), null, 2)}\n`);
+for (const item of reports) fs.writeFileSync(path.join(outDir, item.name), item.bytes);
 console.log(JSON.stringify({ archive: archiveName, sha256: artifactSha256 }));

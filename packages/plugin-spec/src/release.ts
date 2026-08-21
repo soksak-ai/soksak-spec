@@ -1,93 +1,80 @@
-// Unit-owner release manifest. This envelope owns install identity, dependency closure,
-// artifact bytes and declarative entrypoints; a registry may only index it by URL+digest.
 import {
-  SIDECAR_CONTRACT_ID_RE,
-  type ContractProviderRef,
-  contractProviderKey,
-  parseContractProviderRef,
-} from "./contracts.js";
-import {
-  ANY_TARGET,
+  ARTIFACT_FORMATS,
   GIT_COMMIT_RE,
+  RUST_SIDECAR_TARGETS,
   RELEASE_SPEC,
   SHA256_RE,
-  UNIT_ID_RE,
-  githubReleaseAssetBelongsTo,
-  isArtifactFormat,
-  parseCanonicalGithubRepository,
-  isRustSidecarTarget,
-  isSafeRelativeUnitPath,
-  isStrictSemver,
-  isUnitDependencyRange,
-  isUnitKind,
-  releaseTagForUnit,
+  STRICT_SEMVER_RE,
+  COMPONENT_ID_RE,
   type ArtifactFormat,
+  type ReleaseKind,
   type RustSidecarTarget,
-  type UnitKind,
-  type UnitTarget,
-} from "./unit.js";
+} from "./release-primitives.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
 export type PlatformParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; errors: string[] };
 
-export interface UnitSourceReference {
+export interface ExactReference {
+  id: string;
+  version: string;
+}
+
+export interface ReleaseSource {
   repository: string;
   commit: string;
 }
 
-export interface UnitDependency {
-  kind: UnitKind;
-  id: string;
-  /** Resolved only inside the originating registry. Cross-registry fallback is forbidden.
-   *  plugin/kit dependencies declare the author's intended range. sidecar dependencies omit
-   *  range — the signed index decides the installed version and compatibility belongs to the
-   *  interface contract pin, so a unit-version bound here would be invented information. */
-  range?: string;
-}
-
-export interface NamedUnitPath {
-  name: string;
-  path: string;
-}
-
-export interface PluginEntrypoint {
-  kind: "plugin";
-  manifest: string;
-}
-
-export interface SidecarEntrypoint {
-  kind: "sidecar";
-  interface: ContractProviderRef;
-  process?: NamedUnitPath[];
-  library?: NamedUnitPath[];
-}
-
-export interface KitEntrypoint {
-  kind: "kit";
-  packageManifest: string;
-}
-
-export type UnitEntrypoint = PluginEntrypoint | SidecarEntrypoint | KitEntrypoint;
-
-export interface UnitReleaseArtifact {
-  target: UnitTarget;
+export interface IntegrityReference {
   url: string;
   sha256: string;
-  format: ArtifactFormat;
-  entrypoint: UnitEntrypoint;
 }
 
-export interface UnitReleaseManifest {
+export interface ReleaseArtifact extends IntegrityReference {
+  target: "any" | RustSidecarTarget;
+  format: ArtifactFormat;
+  manifest: "plugin.json" | "sidecar.json" | "package.json";
+}
+
+export type ReleaseDependency =
+  | { plugin: ExactReference; scope: "runtime" | "build" }
+  | { sidecar: ExactReference; scope: "runtime" | "build" }
+  | { kit: ExactReference; scope: "runtime" | "build" };
+
+interface ReleaseFields {
   spec: typeof RELEASE_SPEC;
-  kind: UnitKind;
-  id: string;
-  version: string;
-  source: UnitSourceReference;
-  releaseTag: string;
-  dependencies: UnitDependency[];
-  artifacts: UnitReleaseArtifact[];
+  source: ReleaseSource;
+  dependencies: ReleaseDependency[];
+  artifacts: ReleaseArtifact[];
+  reports: IntegrityReference[];
+}
+
+export interface PluginRelease extends ReleaseFields {
+  plugin: ExactReference;
+}
+
+export interface SidecarRelease extends ReleaseFields {
+  sidecar: ExactReference;
+}
+
+export interface KitRelease extends ReleaseFields {
+  kit: ExactReference;
+}
+
+export type ReleaseDocument = PluginRelease | SidecarRelease | KitRelease;
+export interface ReleaseIdentity extends ExactReference { kind: ReleaseKind }
+
+export function releaseIdentity(release: ReleaseDocument): ReleaseIdentity {
+  if ("plugin" in release) return { kind: "plugin", ...release.plugin };
+  if ("sidecar" in release) return { kind: "sidecar", ...release.sidecar };
+  return { kind: "kit", ...release.kit };
+}
+
+export function dependencyIdentity(dependency: ReleaseDependency): ReleaseIdentity {
+  if ("plugin" in dependency) return { kind: "plugin", ...dependency.plugin };
+  if ("sidecar" in dependency) return { kind: "sidecar", ...dependency.sidecar };
+  return { kind: "kit", ...dependency.kit };
 }
 
 function strictObject(
@@ -109,270 +96,145 @@ function strictObject(
 function sortedUnique(values: string[], label: string, errors: string[]): void {
   if (new Set(values).size !== values.length) errors.push(`${label}: duplicate entries forbidden`);
   const sorted = [...values].sort();
-  if (values.some((value, index) => value !== sorted[index])) {
-    errors.push(`${label}: entries must be sorted`);
-  }
+  if (values.some((value, index) => value !== sorted[index])) errors.push(`${label}: entries must be sorted`);
 }
 
-function parseSource(raw: unknown, errors: string[]): UnitSourceReference | null {
+function parseReference(raw: unknown, label: string, errors: string[]): ExactReference | null {
+  const before = errors.length;
+  const value = strictObject(raw, ["id", "version"], ["id", "version"], label, errors);
+  if (!value) return null;
+  if (typeof value.id !== "string" || !COMPONENT_ID_RE.test(value.id)) errors.push(`${label}.id: component id required`);
+  if (value.version !== "0.0.1") errors.push(`${label}.version: exact 0.0.1 required`);
+  return errors.length === before ? { id: value.id as string, version: "0.0.1" } : null;
+}
+
+const REPOSITORY_RE = /^https:\/\/github\.com\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
+function parseSource(raw: unknown, errors: string[]): ReleaseSource | null {
   const before = errors.length;
   const value = strictObject(raw, ["commit", "repository"], ["commit", "repository"], "release.source", errors);
   if (!value) return null;
-  const repository = typeof value.repository === "string" ? value.repository : "";
-  if (!parseCanonicalGithubRepository(repository)) {
-    errors.push("release.source.repository: canonical GitHub repository URL required");
-  }
-  if (!GIT_COMMIT_RE.test(typeof value.commit === "string" ? value.commit : "")) {
-    errors.push("release.source.commit: exact lowercase 40-character Git commit required");
-  }
-  if (errors.length !== before) return null;
-  return { repository, commit: value.commit as string };
+  if (typeof value.repository !== "string" || !REPOSITORY_RE.test(value.repository)) errors.push("release.source.repository: canonical GitHub repository required");
+  if (typeof value.commit !== "string" || !GIT_COMMIT_RE.test(value.commit)) errors.push("release.source.commit: exact commit required");
+  return errors.length === before ? { repository: value.repository as string, commit: value.commit as string } : null;
 }
 
-function parseDependencies(raw: unknown, owner: { kind: UnitKind; id: string }, errors: string[]): UnitDependency[] {
-  const dependencies: UnitDependency[] = [];
+function releaseAssetBelongsTo(url: unknown, repository: string): url is string {
+  return typeof url === "string" && url.startsWith(`${repository}/releases/download/v0.0.1/`) && !/[?#]/.test(url);
+}
+
+function parseIntegrity(raw: unknown, label: string, repository: string, errors: string[]): IntegrityReference | null {
+  const before = errors.length;
+  const value = strictObject(raw, ["sha256", "url"], ["sha256", "url"], label, errors);
+  if (!value) return null;
+  if (!releaseAssetBelongsTo(value.url, repository)) errors.push(`${label}.url: v0.0.1 asset in source repository required`);
+  if (typeof value.sha256 !== "string" || !SHA256_RE.test(value.sha256)) errors.push(`${label}.sha256: exact SHA-256 required`);
+  return errors.length === before ? { url: value.url as string, sha256: value.sha256 as string } : null;
+}
+
+function parseDependencies(raw: unknown, owner: ReleaseIdentity, errors: string[]): ReleaseDependency[] {
+  const result: ReleaseDependency[] = [];
   if (!Array.isArray(raw)) {
     errors.push("release.dependencies: array required");
-    return dependencies;
+    return result;
   }
   raw.forEach((item, index) => {
     const label = `release.dependencies[${index}]`;
     const before = errors.length;
-    const value = strictObject(item, ["id", "kind", "range"], ["id", "kind"], label, errors);
+    const value = strictObject(item, ["kit", "plugin", "scope", "sidecar"], ["scope"], label, errors);
     if (!value) return;
-    if (!isUnitKind(value.kind)) errors.push(`${label}.kind: kit|plugin|sidecar required`);
-    if (typeof value.id !== "string" || !UNIT_ID_RE.test(value.id)) errors.push(`${label}.id: flat unit id required`);
-    // sidecar 의존은 range 를 선언하지 않는다(버전=인덱스, 호환성=interface 계약-핀). 있으면 문법만 검증(기존 발행물 수용).
-    if (value.kind === "sidecar") {
-      if (value.range !== undefined && !isUnitDependencyRange(value.range)) {
-        errors.push(`${label}.range: strict supported SemVer range required`);
-      }
-    } else if (!isUnitDependencyRange(value.range)) {
-      errors.push(`${label}.range: strict supported SemVer range required`);
+    if (value.scope !== "runtime" && value.scope !== "build") errors.push(`${label}.scope: runtime|build required`);
+    const kinds = (["plugin", "sidecar", "kit"] as const).filter((kind) => value[kind] !== undefined);
+    if (kinds.length !== 1) {
+      errors.push(`${label}: exactly one plugin, sidecar, or kit required`);
+      return;
     }
-    if (value.kind === owner.kind && value.id === owner.id) errors.push(`${label}: self dependency forbidden`);
-    if (errors.length === before) {
-      dependencies.push({
-        kind: value.kind as UnitKind,
-        id: value.id as string,
-        ...(value.range !== undefined ? { range: value.range as string } : {}),
-      });
-    }
+    const kind = kinds[0];
+    const reference = parseReference(value[kind], `${label}.${kind}`, errors);
+    if (!reference || errors.length !== before) return;
+    if (kind === owner.kind && reference.id === owner.id) errors.push(`${label}: self dependency forbidden`);
+    else result.push({ [kind]: reference, scope: value.scope } as ReleaseDependency);
   });
-  sortedUnique(dependencies.map((dep) => `${dep.kind}\u0000${dep.id}`), "release.dependencies", errors);
-  return dependencies;
-}
-
-function parseNamedPaths(raw: unknown, label: string, errors: string[]): NamedUnitPath[] | undefined {
-  if (raw === undefined) return undefined;
-  if (!Array.isArray(raw) || raw.length === 0) {
-    errors.push(`${label}: non-empty array required when declared`);
-    return undefined;
-  }
-  const result: NamedUnitPath[] = [];
-  raw.forEach((item, index) => {
-    const itemLabel = `${label}[${index}]`;
-    const before = errors.length;
-    const value = strictObject(item, ["name", "path"], ["name", "path"], itemLabel, errors);
-    if (!value) return;
-    if (typeof value.name !== "string" || !UNIT_ID_RE.test(value.name)) {
-      errors.push(`${itemLabel}.name: flat entrypoint name required`);
-    }
-    if (!isSafeRelativeUnitPath(value.path)) errors.push(`${itemLabel}.path: safe explicit relative path required`);
-    if (errors.length === before) result.push({ name: value.name as string, path: value.path as string });
-  });
-  sortedUnique(result.map((item) => item.name), label, errors);
+  sortedUnique(result.map((dependency) => {
+    const identity = dependencyIdentity(dependency);
+    return `${identity.kind}\0${identity.id}\0${identity.version}`;
+  }), "release.dependencies", errors);
   return result;
 }
 
-function parseEntrypoint(raw: unknown, kind: UnitKind, label: string, errors: string[]): UnitEntrypoint | null {
-  const before = errors.length;
-  if (kind === "plugin") {
-    const value = strictObject(raw, ["kind", "manifest"], ["kind", "manifest"], label, errors);
-    if (!value) return null;
-    if (value.kind !== "plugin") errors.push(`${label}.kind: plugin required`);
-    if (!isSafeRelativeUnitPath(value.manifest)) errors.push(`${label}.manifest: safe explicit relative path required`);
-    return errors.length === before ? { kind: "plugin", manifest: value.manifest as string } : null;
-  }
-  if (kind === "kit") {
-    const value = strictObject(raw, ["kind", "packageManifest"], ["kind", "packageManifest"], label, errors);
-    if (!value) return null;
-    if (value.kind !== "kit") errors.push(`${label}.kind: kit required`);
-    if (!isSafeRelativeUnitPath(value.packageManifest)) {
-      errors.push(`${label}.packageManifest: safe explicit relative path required`);
-    }
-    return errors.length === before ? { kind: "kit", packageManifest: value.packageManifest as string } : null;
-  }
-  const value = strictObject(
-    raw,
-    ["interface", "kind", "library", "process"],
-    ["interface", "kind"],
-    label,
-    errors,
-  );
-  if (!value) return null;
-  if (value.kind !== "sidecar") errors.push(`${label}.kind: sidecar required`);
-  const interfaceRef = parseContractProviderRef(
-    value.interface,
-    `${label}.interface`,
-    errors,
-    SIDECAR_CONTRACT_ID_RE,
-  );
-  const process = parseNamedPaths(value.process, `${label}.process`, errors);
-  const library = parseNamedPaths(value.library, `${label}.library`, errors);
-  if (!process && !library) errors.push(`${label}: at least one process or library path required`);
-  const names = [...(process ?? []), ...(library ?? [])].map((item) => item.name);
-  if (new Set(names).size !== names.length) errors.push(`${label}.entrypoint names: duplicate names forbidden`);
-  if (errors.length !== before) return null;
-  const result: SidecarEntrypoint = { kind: "sidecar", interface: interfaceRef! };
-  if (process) result.process = process;
-  if (library) result.library = library;
-  return result;
+function expectedManifest(kind: ReleaseKind): ReleaseArtifact["manifest"] {
+  if (kind === "plugin") return "plugin.json";
+  if (kind === "sidecar") return "sidecar.json";
+  return "package.json";
 }
 
-function formatMatchesUrl(format: ArtifactFormat, url: string): boolean {
-  if (format === "tar.gz") return url.endsWith(".tar.gz");
-  return url.endsWith(".tgz");
-}
-
-function parseArtifacts(
-  raw: unknown,
-  owner: { kind: UnitKind; source: UnitSourceReference; releaseTag: string },
-  errors: string[],
-): UnitReleaseArtifact[] {
-  const artifacts: UnitReleaseArtifact[] = [];
+function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, errors: string[]): ReleaseArtifact[] {
+  const result: ReleaseArtifact[] = [];
   if (!Array.isArray(raw) || raw.length === 0) {
     errors.push("release.artifacts: non-empty array required");
-    return artifacts;
+    return result;
   }
   raw.forEach((item, index) => {
     const label = `release.artifacts[${index}]`;
     const before = errors.length;
-    const value = strictObject(
-      item,
-      ["entrypoint", "format", "sha256", "target", "url"],
-      ["entrypoint", "format", "sha256", "target", "url"],
-      label,
-      errors,
-    );
+    const value = strictObject(item, ["format", "manifest", "sha256", "target", "url"], ["format", "manifest", "sha256", "target", "url"], label, errors);
     if (!value) return;
-    let target: UnitTarget | null = null;
-    if (owner.kind === "sidecar") {
-      if (!isRustSidecarTarget(value.target)) errors.push(`${label}.target: canonical Rust sidecar target required`);
-      else target = value.target;
-    } else if (value.target !== ANY_TARGET) {
-      errors.push(`${label}.target: ${owner.kind} releases require target any`);
-    } else {
-      target = ANY_TARGET;
-    }
-    if (typeof value.url !== "string" || !githubReleaseAssetBelongsTo(value.url, owner.source.repository, owner.releaseTag)) {
-      errors.push(`${label}.url: canonical same-repository GitHub Release asset URL required`);
-    }
-    if (!SHA256_RE.test(typeof value.sha256 === "string" ? value.sha256 : "")) {
-      errors.push(`${label}.sha256: exact lowercase SHA-256 required`);
-    }
-    if (!isArtifactFormat(value.format)) errors.push(`${label}.format: tar.gz|tgz required`);
-    if (isArtifactFormat(value.format) && typeof value.url === "string" && !formatMatchesUrl(value.format, value.url)) {
-      errors.push(`${label}.format: must match release asset suffix`);
-    }
-    const entrypoint = parseEntrypoint(value.entrypoint, owner.kind, `${label}.entrypoint`, errors);
-    if (errors.length === before && target && entrypoint) {
-      artifacts.push({
-        target,
-        url: value.url as string,
-        sha256: value.sha256 as string,
-        format: value.format as ArtifactFormat,
-        entrypoint,
-      });
-    }
+    if (!releaseAssetBelongsTo(value.url, repository)) errors.push(`${label}.url: v0.0.1 asset in source repository required`);
+    if (typeof value.sha256 !== "string" || !SHA256_RE.test(value.sha256)) errors.push(`${label}.sha256: exact SHA-256 required`);
+    if (!(ARTIFACT_FORMATS as readonly unknown[]).includes(value.format)) errors.push(`${label}.format: tar.gz|tgz required`);
+    if (value.manifest !== expectedManifest(kind)) errors.push(`${label}.manifest: ${expectedManifest(kind)} required`);
+    if (kind === "sidecar") {
+      if (!(RUST_SIDECAR_TARGETS as readonly unknown[]).includes(value.target)) errors.push(`${label}.target: native target required`);
+    } else if (value.target !== "any") errors.push(`${label}.target: any required for ${kind}`);
+    if (errors.length === before) result.push({
+      url: value.url as string,
+      sha256: value.sha256 as string,
+      target: value.target as ReleaseArtifact["target"],
+      format: value.format as ArtifactFormat,
+      manifest: value.manifest as ReleaseArtifact["manifest"],
+    });
   });
-  sortedUnique(artifacts.map((artifact) => artifact.target), "release.artifacts.target", errors);
-  if (owner.kind === "sidecar") {
-    const interfaces = artifacts.map((artifact) =>
-      artifact.entrypoint.kind === "sidecar" ? contractProviderKey(artifact.entrypoint.interface) : "",
-    );
-    if (new Set(interfaces).size !== 1) {
-      errors.push("release.artifacts: every sidecar target must expose the same interface");
-    }
-  }
-  if (owner.kind !== "sidecar" && artifacts.length !== 1) {
-    errors.push(`release.artifacts: ${owner.kind} release requires exactly one any artifact`);
-  }
-  return artifacts;
+  sortedUnique(result.map((artifact) => artifact.target), "release.artifacts", errors);
+  if (kind !== "sidecar" && result.length !== 1) errors.push(`release.artifacts: ${kind} requires one any artifact`);
+  return result;
 }
 
-export function parseReleaseManifest(raw: unknown): PlatformParseResult<UnitReleaseManifest> {
+export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseDocument> {
   const errors: string[] = [];
-  const value = strictObject(
-    raw,
-    ["artifacts", "dependencies", "id", "kind", "releaseTag", "source", "spec", "version"],
-    ["artifacts", "dependencies", "id", "kind", "releaseTag", "source", "spec", "version"],
-    "release",
-    errors,
-  );
+  const value = strictObject(raw, ["artifacts", "dependencies", "kit", "plugin", "reports", "sidecar", "source", "spec"], ["artifacts", "dependencies", "reports", "source", "spec"], "release", errors);
   if (!value) return { ok: false, errors };
   if (value.spec !== RELEASE_SPEC) errors.push(`release.spec: ${RELEASE_SPEC} required`);
-  if (!isUnitKind(value.kind)) errors.push("release.kind: kit|plugin|sidecar required");
-  if (typeof value.id !== "string" || !UNIT_ID_RE.test(value.id)) errors.push("release.id: flat unit id required");
-  if (!isStrictSemver(value.version)) errors.push("release.version: strict semantic version required");
-  if (
-    typeof value.id === "string" &&
-    typeof value.version === "string" &&
-    !releaseTagForUnit(value.id, value.version, value.releaseTag)
-  ) {
-    errors.push("release.releaseTag: v<version> or <unit-id>-v<version> required");
-  }
+  const kinds = (["plugin", "sidecar", "kit"] as const).filter((kind) => value[kind] !== undefined);
+  if (kinds.length !== 1) errors.push("release: exactly one plugin, sidecar, or kit identity required");
+  const kind = kinds[0];
+  const reference = kind ? parseReference(value[kind], `release.${kind}`, errors) : null;
   const source = parseSource(value.source, errors);
-  const kind = isUnitKind(value.kind) ? value.kind : null;
-  const id = typeof value.id === "string" ? value.id : "";
-  const releaseTag = typeof value.releaseTag === "string" ? value.releaseTag : "";
-  const dependencies = kind ? parseDependencies(value.dependencies, { kind, id }, errors) : [];
-  const artifacts = kind && source
-    ? parseArtifacts(value.artifacts, { kind, source, releaseTag }, errors)
-    : [];
-  if (errors.length > 0 || !kind || !source) return { ok: false, errors };
-  return {
-    ok: true,
-    value: {
-      spec: RELEASE_SPEC,
-      kind,
-      id,
-      version: value.version as string,
-      source,
-      releaseTag,
-      dependencies,
-      artifacts,
-    },
-  };
+  if (!kind || !reference || !source) return { ok: false, errors };
+  const identity = { kind, ...reference };
+  const dependencies = parseDependencies(value.dependencies, identity, errors);
+  const artifacts = parseArtifacts(value.artifacts, kind, source.repository, errors);
+  const reports: IntegrityReference[] = [];
+  if (!Array.isArray(value.reports) || value.reports.length === 0) errors.push("release.reports: non-empty array required");
+  else value.reports.forEach((item, index) => {
+    const report = parseIntegrity(item, `release.reports[${index}]`, source.repository, errors);
+    if (report) reports.push(report);
+  });
+  sortedUnique(reports.map((report) => report.url), "release.reports", errors);
+  if (errors.length > 0) return { ok: false, errors };
+  const fields = { spec: RELEASE_SPEC, source, dependencies, artifacts, reports };
+  if (kind === "plugin") return { ok: true, value: { ...fields, plugin: reference } };
+  if (kind === "sidecar") return { ok: true, value: { ...fields, sidecar: reference } };
+  return { ok: true, value: { ...fields, kit: reference } };
 }
 
-export type PluginDependencyProjectionResult =
-  | { ok: true }
-  | { ok: false; errors: string[] };
-
-// plugin.json.dependencies is the runtime authorization relationship. The owner
-// release manifest is the only install closure. Equality prevents either boundary
-// from silently granting or installing a plugin relationship the other did not name.
 export function verifyPluginRuntimeDependencyProjection(
   runtimeDependencies: Readonly<Record<string, string>> | undefined,
-  release: UnitReleaseManifest,
-): PluginDependencyProjectionResult {
-  if (release.kind !== "plugin") {
-    return { ok: false, errors: ["runtime plugin dependencies require a plugin owner release"] };
-  }
-  const runtime = Object.entries(runtimeDependencies ?? {})
-    .map(([id, range]) => ({ kind: "plugin" as const, id, range }))
-    .sort((left, right) => left.id === right.id ? 0 : left.id < right.id ? -1 : 1);
-  const install = release.dependencies
-    .filter((dependency) => dependency.kind === "plugin")
-    .sort((left, right) => left.id === right.id ? 0 : left.id < right.id ? -1 : 1);
-  if (JSON.stringify(runtime) !== JSON.stringify(install)) {
-    return {
-      ok: false,
-      errors: [
-        "plugin runtime dependencies must exactly equal release plugin dependencies; sidecar/kit closure remains release-only",
-      ],
-    };
-  }
-  return { ok: true };
+  release: ReleaseDocument,
+): { ok: true } | { ok: false; errors: string[] } {
+  if (!("plugin" in release)) return { ok: false, errors: ["plugin dependencies require a plugin release"] };
+  const runtime = Object.entries(runtimeDependencies ?? {}).map(([id, version]) => ({ id, version })).sort((a, b) => a.id.localeCompare(b.id));
+  const declared = release.dependencies.flatMap((dependency) => "plugin" in dependency && dependency.scope === "runtime" ? [dependency.plugin] : []).sort((a, b) => a.id.localeCompare(b.id));
+  return JSON.stringify(runtime) === JSON.stringify(declared)
+    ? { ok: true }
+    : { ok: false, errors: ["plugin runtime dependencies must equal release runtime plugin dependencies"] };
 }

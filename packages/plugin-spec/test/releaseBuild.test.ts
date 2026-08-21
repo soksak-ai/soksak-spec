@@ -1,8 +1,6 @@
 // The canonical plugin release builder (release-template/build-release.mjs) is the single source every
-// plugin vendors byte-identical and runs to cut its release. These run the real artifact as a unit
-// would — a fixture unit that declares only its file set — and fix the contract: identity/version
-// derive from the unit's own manifests, outputs are deterministic, and the boundary invariants refuse
-// a malformed unit. Testing the vendored .mjs directly keeps it the single source (no parallel copy).
+// plugin runs to create its release. The fixture plugin declares only its file set; identity and
+// version derive from plugin manifests, outputs are deterministic, and malformed plugins fail.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -51,7 +49,7 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
 }
 
 function build(out = outDir): { status: number | null; stdout: string; stderr: string } {
-  // Run FROM the unit (fixture root) — ROOT is discovered by the release-files.json marker, not cwd-guessed.
+  // Run from the fixture plugin root discovered by release-files.json.
   const r = spawnSync("node", [path.join(root, "scripts", "build-release.mjs"), "--commit", COMMIT, "--out", out], {
     encoding: "utf8",
     cwd: root,
@@ -70,7 +68,7 @@ afterEach(() => {
 });
 
 describe("release-template/build-release.mjs — canonical plugin release", () => {
-  it("derives identity/version from the unit manifests and emits the declared artifacts", () => {
+  it("derives plugin identity and emits the declared artifacts", () => {
     writeFixture();
     const r = build();
     expect(r.status).toBe(0);
@@ -80,10 +78,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json")).toString());
     expect(release).toMatchObject({
       spec: "soksak-spec-release@0.0.1",
-      kind: "plugin",
-      id: "soksak-plugin-example",
-      version: "0.0.1",
-      releaseTag: "v0.0.1",
+      plugin: { id: "soksak-plugin-example", version: "0.0.1" },
       source: { repository: "https://github.com/soksak-ai/soksak-plugin-example", commit: COMMIT },
     });
     expect(release.artifacts[0]).toMatchObject({ target: "any", format: "tgz", sha256: out.sha256 });
@@ -104,7 +99,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(a.sha256).toBe(b.sha256);
   });
 
-  it("does not pin which contracts a unit relates to — any well-formed consumes passes", () => {
+  it("does not pin which contracts a plugin relates to", () => {
     writeFixture({ plugin: { consumes: [{ id: "soksak-spec-plugin-git", range: "0.0.1" }] } });
     expect(build().status).toBe(0);
   });

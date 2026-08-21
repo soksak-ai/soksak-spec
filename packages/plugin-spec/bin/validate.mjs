@@ -2,7 +2,6 @@
 // Public, headless validation boundary. Every mode calls the same parser/verifier that
 // consumers import from dist/spec.js; the CLI does not maintain a second wire grammar.
 
-import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
@@ -12,6 +11,7 @@ import {
   parseManifest,
   parseRegistryPublicKey,
   parseReleaseManifest,
+  releaseIdentity,
   transparencyViolations,
   verifyConformanceReport,
   verifyPluginRuntimeDependencyProjection,
@@ -23,7 +23,6 @@ const USAGE = `사용:
   soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json>]
   soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id> [--at <ISO-8601>] [--high-water <sequence>:<sha256>]
 
-호환: 모드 없는 경로는 plugin 모드로 해석합니다.
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
 const MODES = new Set(["plugin", "release", "conformance", "registry"]);
@@ -47,10 +46,6 @@ function readDocument(path, label = path) {
 function printErrors(path, errors) {
   console.error(`✗ ${path}`);
   for (const error of errors) console.error(`  - ${error}`);
-}
-
-function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function parseOptions(args, known) {
@@ -133,7 +128,8 @@ function validateReleases(paths) {
       failed++;
       continue;
     }
-    console.log(`✓ ${path} (${parsed.value.kind}:${parsed.value.id}@${parsed.value.version})`);
+    const identity = releaseIdentity(parsed.value);
+    console.log(`✓ ${path} (${identity.kind}:${identity.id}@${identity.version})`);
   }
   return failed > 0 ? 1 : 0;
 }
@@ -152,21 +148,21 @@ function validateConformance(args) {
     printErrors(releasePath, release.errors);
     return 1;
   }
-  const manifestSha256 = sha256(releaseDocument.bytes);
+  const identity = releaseIdentity(release.value);
   const pluginManifestPath = parsedArgs.options.get("--plugin-manifest");
   let ownerPlugin;
   if (pluginManifestPath !== undefined) {
     const document = readDocument(pluginManifestPath, `plugin manifest ${pluginManifestPath}`);
     if (!document) return 1;
-    const parsed = parseManifest(document.raw, release.value.id);
+    const parsed = parseManifest(document.raw, identity.id);
     if (!parsed.validation.ok || !parsed.manifest) {
       printErrors(pluginManifestPath, parsed.validation.errors);
       return 1;
     }
     if (
-      release.value.kind !== "plugin" ||
-      parsed.manifest.id !== release.value.id ||
-      parsed.manifest.version !== release.value.version
+      identity.kind !== "plugin" ||
+      parsed.manifest.id !== identity.id ||
+      parsed.manifest.version !== identity.version
     ) {
       printErrors(pluginManifestPath, ["plugin manifest identity must exactly match the owner plugin release"]);
       return 1;
@@ -197,7 +193,6 @@ function validateConformance(args) {
     const verified = verifyConformanceReport(
       report.value,
       release.value,
-      manifestSha256,
       ownerPlugin?.implements ?? [],
     );
     if (!verified.ok) {
@@ -268,7 +263,7 @@ async function validateRegistry(args) {
     return 1;
   }
   console.log(
-    `✓ ${registryPath} (registry=${certified.value.index.registryId} sequence=${certified.value.index.sequence} digest=${certified.value.digest} continuity=${certified.value.continuity})`,
+    `✓ ${registryPath} (registry=${certified.value.index.id} sequence=${certified.value.index.sequence} digest=${certified.value.digest} continuity=${certified.value.continuity})`,
   );
   return 0;
 }
@@ -279,9 +274,9 @@ async function main(argv) {
     return 0;
   }
   if (argv.length === 0) return usageExit();
-  const explicitMode = MODES.has(argv[0]);
-  const mode = explicitMode ? argv[0] : "plugin";
-  const args = explicitMode ? argv.slice(1) : argv;
+  if (!MODES.has(argv[0])) return usageExit(`unknown mode: ${argv[0]}`);
+  const mode = argv[0];
+  const args = argv.slice(1);
   if (args.length === 0) return usageExit(`${mode}: 입력 경로가 필요합니다`);
   if (mode === "plugin") return validatePlugins(args);
   if (mode === "release") return validateReleases(args);

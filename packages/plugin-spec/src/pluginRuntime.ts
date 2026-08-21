@@ -32,12 +32,12 @@ export const PLUGIN_RUNTIME_BOOTSTRAP_CSP = [
  * Confidentiality/integrity and availability are independent boundaries.
  * A sandbox iframe is useful for both real UI and preview, but it cannot make a
  * JavaScript infinite loop preemptible. Plugin bytes therefore never enter the
- * main shell renderer: a killable per-unit native runtime owns the trusted
+ * main shell renderer: a killable per-plugin native runtime owns the trusted
  * wrapper and its opaque child frames.
  */
 export const PLUGIN_RUNTIME_FRAME_POLICY = {
   hostShellPluginImport: "forbidden",
-  nativeRuntime: "dedicated-killable-per-unit",
+  nativeRuntime: "dedicated-killable-per-plugin",
   confidentialityIntegrityBoundary: "opaque-origin-sandbox-frame",
   availabilityBoundary: "native-runtime-process-or-webview-pool",
   document: "about:srcdoc",
@@ -2056,7 +2056,7 @@ export function certifyPluginRuntimeNativeConformance(
   const topology = strictObject(value.topology, ["hostShellPluginImport", "nativeRuntime", "sandboxFrame"], ["hostShellPluginImport", "nativeRuntime", "sandboxFrame"], "report.topology", errors);
   if (topology) {
     if (topology.hostShellPluginImport !== "never") errors.push("report.topology.hostShellPluginImport: never required");
-    if (topology.nativeRuntime !== "dedicated-per-unit") errors.push("report.topology.nativeRuntime: dedicated-per-unit required");
+    if (topology.nativeRuntime !== "dedicated-per-plugin") errors.push("report.topology.nativeRuntime: dedicated-per-plugin required");
     if (topology.sandboxFrame !== "opaque-origin-allow-scripts") errors.push("report.topology.sandboxFrame: opaque-origin-allow-scripts required");
   }
   const availability = strictObject(value.availability, ["infiniteLoopInjected", "hostHeartbeatAdvanced", "cliRemainedResponsive", "terminatedOnlyFaultingUnit"], ["infiniteLoopInjected", "hostHeartbeatAdvanced", "cliRemainedResponsive", "terminatedOnlyFaultingUnit"], "report.availability", errors);

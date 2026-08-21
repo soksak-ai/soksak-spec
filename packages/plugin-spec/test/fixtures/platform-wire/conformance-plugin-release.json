@@ -1,10 +1,10 @@
 {
   "spec": "soksak-spec-conformance@0.0.1",
   "subject": {
-    "kind": "plugin",
-    "id": "weather-plugin",
-    "version": "0.0.1",
-    "manifestSha256": "8e85d25ce14f348183ea3b352371e96c496d3c8d210f260cc33c443db27c5f43"
+    "plugin": {
+      "id": "weather-plugin",
+      "version": "0.0.1"
+    }
   },
   "contract": "soksak-spec-release@0.0.1",
   "result": "passed",

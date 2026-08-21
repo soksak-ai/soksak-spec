@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parsePlatformReleaseManifest } from "../packages/plugin-spec/dist/spec.js";
+import { parseSpecReleaseManifest } from "./spec-release.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const API_VERSION = "2026-03-10";
@@ -97,7 +97,7 @@ export function collectReleaseAssets({ repository, commit, artifacts, manifest }
   }
   const manifestBytes = readRegularFile(manifestPath, "release manifest");
   const value = JSON.parse(manifestBytes.toString("utf8"));
-  const parsed = parsePlatformReleaseManifest(value);
+  const parsed = parseSpecReleaseManifest(value);
   if (!parsed.ok) throw new Error(`release manifest is invalid:\n${parsed.errors.join("\n")}`);
   if (
     value.kind !== owner.kind ||

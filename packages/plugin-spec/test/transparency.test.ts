@@ -217,7 +217,7 @@ const CLI = join(PKG, "bin", "validate.mjs");
 function runValidate(fixture: string): { status: number | null; out: string } {
   const r = spawnSync(
     process.execPath,
-    [CLI, join(PKG, "test", "fixtures", fixture, "plugin.json")],
+    [CLI, "plugin", join(PKG, "test", "fixtures", fixture, "plugin.json")],
     { encoding: "utf8" },
   );
   return { status: r.status, out: `${r.stdout}\n${r.stderr}` };

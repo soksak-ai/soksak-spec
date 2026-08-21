@@ -25,13 +25,13 @@
 // 8. 기준 불변. 테스트/검증 기준 미달이면 코드를 고친다. 기준 자체가 잘못이면
 //    기준을 낮추는 대신 열린 질문으로 기록해 정정한다.
 //
-// ── 배포 모델 — unit 소유권·release·registry 분리 (P1~P5, 불변) ──────────────
+// Distribution keeps plugin, sidecar, kit, release, and registry ownership explicit.
 // 플러그인 = 독립 repo 하나. repo 는 plugin.json, 구현, 문서, 테스트와 owner release
 // manifest를 소유한다. entry는 release artifact 안의 plugin.json이 선언하며, 설치기가
 // checkout/branch/추측 경로로 대체하지 않는다.
 //
-// P1. 코어는 개별 unit을 모른다. unit 목록·소스·발행 도구를 보유하지 않고 공개 wire만 안다.
-// P2. registry는 여러 개일 수 있는 서명된 발견/신뢰 색인이다. unit 내용을 복제하지 않고
+// P1. The core owns no plugin-, sidecar-, or kit-specific source or publication tool.
+// P2. Registries are signed discovery and trust indexes. They do not copy owner content.
 //     owner release manifest와 conformance report의 GitHub Release URL+SHA-256만 가리킨다.
 // P3. plugin/sidecar/kit의 repo가 자기 identity/source/dependency/artifact/entrypoint와
 //     고유 계약·문서·테스트의 최종 책임을 진다. 공유 domain 계약은 실제 다중 구현 때만 분리한다.
@@ -66,8 +66,8 @@ export * from "./service.js";
 // semver 비교 유틸 — 단일진실은 semver.ts(공개 API 는 여기서 재수출).
 import { SEMVER_RE } from "./semver.js";
 export * from "./semver.js";
-import { UNIT_ID_RE, UNIT_SPEC_BY_KIND, isUnitDependencyRange } from "./unit.js";
-export * from "./unit.js";
+import { COMPONENT_ID_RE, MANIFEST_SPEC_BY_RELEASE_KIND, isDependencyRange } from "./release-primitives.js";
+export * from "./release-primitives.js";
 export * from "./release.js";
 export * from "./conformanceWire.js";
 export * from "./pluginRuntime.js";
@@ -100,7 +100,7 @@ export * from "./transparency.js";
 // §1 권한 — 권한 어휘·동의 고지문의 단일진실은 permissions.ts.
 import { PERMISSIONS, type PluginPermission } from "./permissions.js";
 export * from "./permissions.js";
-// 서명된 다중 registry 설치 색인 — unit 고유 manifest/docs는 복제하지 않는 공개 wire 계약.
+// Signed multi-registry install index. Owner manifests and documentation are not copied.
 export * from "./registry.js";
 // 크롬 표준 게이트(호스트 크롬 토큰·entry 정적 스캔) — 단일진실은 hostChrome.ts.
 export * from "./hostChrome.js";
@@ -248,7 +248,7 @@ export function programPathSegments(path: string): string[] {
 
 // ── §3 매니페스트 ────────────────────────────────────────────────────────────
 
-export const SPEC_VERSION = UNIT_SPEC_BY_KIND.plugin;
+export const SPEC_VERSION = MANIFEST_SPEC_BY_RELEASE_KIND.plugin;
 export const DEFAULT_ENTRY = "main.js";
 
 // 외부 CLI/라이브러리 종속성 — 플러그인이 process 로 실행하는 외부 도구(npm 글로벌 CLI 등).
@@ -456,7 +456,7 @@ export function validateSettingValue(
   }
 }
 
-export const PLUGIN_ID_RE = UNIT_ID_RE;
+export const PLUGIN_ID_RE = COMPONENT_ID_RE;
 const VIEW_ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 // 뷰 상태 코드(ViewStatus.code — 기계 식별자) — id 와 같은 lexical 계열.
 const STATUS_CODE_RE = /^[a-z0-9][a-z0-9-]*$/;
@@ -658,9 +658,9 @@ export function parseManifest(
           errors.push(`dependencies: 키 "${depId}" 는 플러그인 id 형식(^[a-z0-9][a-z0-9-]*$)`);
         } else if (isNonEmptyString(raw.id) && depId === raw.id) {
           errors.push(`dependencies: 자기 자신("${depId}") 의존 금지`);
-        } else if (typeof range !== "string" || !isUnitDependencyRange(range)) {
+        } else if (typeof range !== "string" || !isDependencyRange(range)) {
           errors.push(
-            `dependencies["${depId}"]: 공통 unit semver 범위(예: ^0.1.0, >=1.0.0 <2.0.0, 1.2.3, *)`,
+            `dependencies["${depId}"]: semantic version range required (for example 0.0.1)`,
           );
         } else {
           dependencies[depId] = range;

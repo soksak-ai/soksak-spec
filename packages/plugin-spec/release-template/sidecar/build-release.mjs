@@ -3,14 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   CONFORMANCE_SPEC, ID, INTERFACE, RELEASE_SPEC, REPOSITORY, SIDECAR_SPEC, TAG, VERSION,
-  assertBaseline, assertCommit, assertNoLinkPath, assertTag, binaryName, ensureEmptyDirectory, jsonBytes,
+  assertBaseline, assertCommit, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
   parseOptions, readRegularFile, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
 } from "./release-contract.mjs";
 
 // --emit-summary is an additive boolean flag: the core release.build handler passes it to read the
 // manifest + per-target digests off stdout instead of re-hashing in TS. Stripped before the strict
-// --name value parser; without it stdout stays silent. The unit ROOT is discovered (release-contract),
-// so no --unit-root argument is carried here.
+// --name value parser; without it stdout stays silent. The sidecar root is discovered by release-contract,
+// so no repository-root argument is carried here.
 const rawArgs = process.argv.slice(2);
 const emitSummary = rawArgs.includes("--emit-summary");
 const options = parseOptions(rawArgs.filter((arg) => arg !== "--emit-summary"), ["commit", "tag", "artifacts", "out"]);
@@ -38,42 +38,42 @@ const artifacts = readTargetMatrix().map(({ target }) => {
     url: `${REPOSITORY}/releases/download/${TAG}/${asset}`,
     sha256: digest,
     format: "tar.gz",
-    // The archive carries the contents of dist/ at top level (SIDECARS.md §6):
-    // the service binary is the archive root entry, not bin/<id>.
-    entrypoint: {
-      kind: "sidecar",
-      interface: INTERFACE,
-      process: [{ name: ID, path: binaryName(target) }],
-    },
+    manifest: "sidecar.json",
   };
 });
 const actualNames = fs.readdirSync(artifactsDir).sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
 expectedNames.sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
 if (JSON.stringify(actualNames) !== JSON.stringify(expectedNames)) throw new Error("artifact directory must contain exactly the declared release matrix");
 
-const release = {
-  ...releaseIdentity(options.commit),
-  dependencies: [],
-  artifacts,
-};
-const releaseBytes = jsonBytes(release);
-const manifestSha256 = sha256(releaseBytes);
 const evidence = artifacts.map(({ target, sha256: digest }) => ({ target, sha256: digest }));
 const report = (contract) => ({
   spec: CONFORMANCE_SPEC,
-  subject: { kind: "sidecar", id: ID, version: VERSION, manifestSha256 },
+  subject: { sidecar: { id: ID, version: VERSION } },
   contract,
   result: "passed",
   validator: { name: "soksak-validate", version: VERSION },
   artifacts: evidence,
 });
+const reports = [
+  ["conformance-interface.json", report(INTERFACE)],
+  ["conformance-release.json", report(RELEASE_SPEC)],
+  ["conformance-sidecar.json", report(SIDECAR_SPEC)],
+].map(([name, value]) => {
+  const bytes = jsonBytes(value);
+  return { name, bytes, reference: { url: `${REPOSITORY}/releases/download/${TAG}/${name}`, sha256: sha256(bytes) } };
+});
+const release = {
+  ...releaseIdentity(options.commit),
+  dependencies: [],
+  artifacts,
+  reports: reports.map(({ reference }) => reference),
+};
+const releaseBytes = jsonBytes(release);
 writeRegularFile(path.join(out, "release.json"), releaseBytes);
-writeRegularFile(path.join(out, "conformance-release.json"), jsonBytes(report(RELEASE_SPEC)));
-writeRegularFile(path.join(out, "conformance-sidecar.json"), jsonBytes(report(SIDECAR_SPEC)));
-writeRegularFile(path.join(out, "conformance-interface.json"), jsonBytes(report(INTERFACE)));
+for (const item of reports) writeRegularFile(path.join(out, item.name), item.bytes);
 
 // The one machine-readable line — a sentinel prefix so the caller extracts it regardless of any
 // other output. Carries exactly what the handler would otherwise re-derive from the written files.
 if (emitSummary) {
-  process.stdout.write(`@@RELEASE_SUMMARY@@ ${JSON.stringify({ releaseJson: release, manifestSha256, matrix: artifacts })}\n`);
+  process.stdout.write(`@@RELEASE_SUMMARY@@ ${JSON.stringify({ releaseJson: release, matrix: artifacts })}\n`);
 }

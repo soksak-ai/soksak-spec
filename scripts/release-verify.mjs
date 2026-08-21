@@ -12,14 +12,11 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import {
-  PLATFORM_RELEASE_SPEC,
-  parsePlatformReleaseManifest,
-} from "../packages/plugin-spec/dist/spec.js";
-
+import { parseSpecReleaseManifest, SPEC_RELEASE_SPEC } from "./spec-release.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STRICT_SEMVER_RE = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const RUST_CRATES = ["soksak-spec-contract", "soksak-spec-service", "soksak-spec-socket"];
+
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -180,7 +177,7 @@ export function buildPlatformRelease({ commit, archiveName, archiveDigest, ident
   const version = strictSemver(identity?.version, "release identity version");
   const releaseTag = `${identity.id}-v${version}`;
   return {
-    spec: PLATFORM_RELEASE_SPEC,
+    spec: SPEC_RELEASE_SPEC,
     kind: identity.kind,
     id: identity.id,
     version,
@@ -240,7 +237,7 @@ export function verifyRelease(argv = process.argv.slice(2)) {
     }
     const archiveDigest = sha256(first);
     const manifest = buildPlatformRelease({ commit, archiveName, archiveDigest, identity });
-    const parsed = parsePlatformReleaseManifest(manifest);
+    const parsed = parseSpecReleaseManifest(manifest);
     if (!parsed.ok) {
       throw new Error(`generated platform release is invalid:\n${parsed.errors.join("\n")}`);
     }
@@ -249,11 +246,6 @@ export function verifyRelease(argv = process.argv.slice(2)) {
     const manifestPath = join(artifacts, identity.manifest);
     copyFileSync(first, finalArchive);
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-    run(process.execPath, [
-      "packages/plugin-spec/bin/validate.mjs",
-      "platform-release",
-      manifestPath,
-    ]);
     if (sha256(finalArchive) !== archiveDigest) {
       throw new Error("copied release archive digest changed");
     }

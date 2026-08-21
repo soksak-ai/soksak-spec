@@ -1,10 +1,9 @@
 // The canonical sidecar release builder (release-template/sidecar/) is the single source every
 // sidecar vendors byte-identical (scripts/{release-contract,build-release,validate-with-spec}.mjs)
 // and runs in its publish job to emit the owner manifest + conformance reports the signed registry
-// requires. These run the real artifacts as a unit would — a fixture unit with release/unit.json,
+// requires. These run the real artifacts from a fixture sidecar repository with sidecar.json,
 // release/targets.json, the validator pin, and a five-target archive set — and fix the contract:
-// identity derives from the unit's own metadata, the emitted release.json carries per-target
-// artifacts with the interface entrypoint, and the boundary invariants refuse a malformed unit.
+// identity derives from sidecar.json and the emitted release carries per-target archives.
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -32,14 +31,14 @@ function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function writeFixture(overrides: { unit?: Record<string, unknown>; cargoVersion?: string } = {}): void {
-  const unit = {
+function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string } = {}): void {
+  const sidecar = {
+    spec: "soksak-spec-sidecar@0.0.1",
     id: "soksak-sidecar-example",
     version: "0.0.1",
-    releaseTag: "v0.0.1",
-    repository: "https://github.com/soksak-ai/soksak-sidecar-example",
     interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
-    ...overrides.unit,
+    process: "dist/soksak-sidecar-example",
+    ...overrides.sidecar,
   };
   fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
   fs.mkdirSync(path.join(root, "release"), { recursive: true });
@@ -47,7 +46,7 @@ function writeFixture(overrides: { unit?: Record<string, unknown>; cargoVersion?
   for (const name of ["release-contract.mjs", "build-release.mjs", "validate-with-spec.mjs"]) {
     fs.copyFileSync(path.join(TEMPLATE, name), path.join(root, "scripts", name));
   }
-  fs.writeFileSync(path.join(root, "release", "unit.json"), `${JSON.stringify(unit, null, 2)}\n`);
+  fs.writeFileSync(path.join(root, "sidecar.json"), `${JSON.stringify(sidecar, null, 2)}\n`);
   fs.writeFileSync(
     path.join(root, "release", "targets.json"),
     `${JSON.stringify(TARGETS.map((target) => ({ target, runner: "runner" })), null, 2)}\n`,
@@ -58,19 +57,17 @@ function writeFixture(overrides: { unit?: Record<string, unknown>; cargoVersion?
   );
   fs.writeFileSync(
     path.join(root, "Cargo.toml"),
-    `[package]\nname = "${unit.id}"\nversion = "${overrides.cargoVersion ?? unit.version}"\npublish = false\n`,
+    `[package]\nname = "${sidecar.id}"\nversion = "${overrides.cargoVersion ?? sidecar.version}"\npublish = false\n`,
   );
   for (const target of TARGETS) {
-    const asset = `${unit.id}-${unit.version}-${target}.tar.gz`;
+    const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
     const bytes = Buffer.from(`archive-bytes-${target}`);
     fs.writeFileSync(path.join(artifactsDir, asset), bytes);
     fs.writeFileSync(path.join(artifactsDir, `${asset}.sha256`), `${sha256(bytes)}  ${asset}\n`);
   }
 }
 
-// A release runs FROM its unit. deVendored runs the CANONICAL template script, vendored runs the copy
-// beside the unit — either way the unit ROOT is DISCOVERED by its marker from the run directory
-// (the fixture root), never cwd-guessed or passed as an argument (DEPLOY §1).
+// The canonical script discovers sidecar.json from the fixture repository.
 function build(tag = "v0.0.1", emitSummary = false, deVendored = false): { status: number | null; stdout: string; stderr: string } {
   const script = deVendored
     ? path.join(TEMPLATE, "build-release.mjs")
@@ -99,7 +96,7 @@ afterEach(() => {
 });
 
 describe("release-template/sidecar — canonical sidecar release documents", () => {
-  it("emits the owner manifest and three conformance reports from the unit's own metadata", () => {
+  it("emits a sidecar release and three conformance reports from sidecar.json", () => {
     writeFixture();
     const r = build();
     expect(r.stderr).toBe("");
@@ -108,26 +105,15 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
     expect(release).toMatchObject({
       spec: "soksak-spec-release@0.0.1",
-      kind: "sidecar",
-      id: "soksak-sidecar-example",
-      version: "0.0.1",
-      releaseTag: "v0.0.1",
+      sidecar: { id: "soksak-sidecar-example", version: "0.0.1" },
       source: { repository: "https://github.com/soksak-ai/soksak-sidecar-example", commit: COMMIT },
     });
     expect(release.artifacts).toHaveLength(5);
     expect(release.artifacts.map((a: { target: string }) => a.target)).toEqual(TARGETS);
     for (const artifact of release.artifacts) {
       expect(artifact.format).toBe("tar.gz");
-      expect(artifact.entrypoint).toMatchObject({
-        kind: "sidecar",
-        interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
-      });
-      expect(artifact.entrypoint.process[0].name).toBe("soksak-sidecar-example");
+      expect(artifact.manifest).toBe("sidecar.json");
     }
-    const windows = release.artifacts.find((a: { target: string }) => a.target.includes("windows"));
-    expect(windows.entrypoint.process[0].path).toBe("soksak-sidecar-example.exe");
-
-    const manifestSha256 = sha256(fs.readFileSync(path.join(outDir, "release.json")));
     const contracts: Record<string, unknown> = {
       "conformance-release.json": "soksak-spec-release@0.0.1",
       "conformance-sidecar.json": "soksak-spec-sidecar@0.0.1",
@@ -137,7 +123,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
       const report = JSON.parse(fs.readFileSync(path.join(outDir, name), "utf8"));
       expect(report).toMatchObject({
         spec: "soksak-spec-conformance@0.0.1",
-        subject: { kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1", manifestSha256 },
+        subject: { sidecar: { id: "soksak-sidecar-example", version: "0.0.1" } },
         contract,
         result: "passed",
       });
@@ -157,7 +143,6 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(line, "a @@RELEASE_SUMMARY@@ line must be printed").toBeDefined();
     const summary = JSON.parse(line!.slice(SUMMARY_MARK.length));
     const releaseBytes = fs.readFileSync(path.join(outDir, "release.json"));
-    expect(summary.manifestSha256).toBe(sha256(releaseBytes));
     expect(summary.releaseJson).toEqual(JSON.parse(releaseBytes.toString("utf8")));
     expect(summary.matrix).toHaveLength(5);
     expect(summary.matrix.map((m: { target: string }) => m.target)).toEqual(TARGETS);
@@ -170,15 +155,13 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(r.stdout).toBe("");
   });
 
-  it("discovers the unit by its marker when run de-vendored from the single source (never cwd-guessed)", () => {
-    // The core release command runs the CANONICAL script (from soksak-spec) at the unit's directory;
-    // the builder discovers this unit by release/unit.json and produces its manifest without a copy.
+  it("discovers sidecar.json when run from the canonical source", () => {
     writeFixture();
     const r = build("v0.0.1", false, true);
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    expect(release.id).toBe("soksak-sidecar-example");
+    expect(release.sidecar.id).toBe("soksak-sidecar-example");
     expect(release.artifacts).toHaveLength(5);
   });
 
@@ -199,7 +182,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(r.stderr).toMatch(/exactly the declared release matrix/);
   });
 
-  it("refuses a dispatch tag that does not equal the unit's releaseTag", () => {
+  it("refuses a dispatch tag that does not equal v0.0.1", () => {
     writeFixture();
     const r = build("v9.9.9");
     expect(r.status).not.toBe(0);
@@ -214,9 +197,9 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
   });
 
   it("refuses an interface id outside the sidecar contract namespace", () => {
-    writeFixture({ unit: { interface: { id: "soksak-browser-spec", version: "0.0.1" } } });
+    writeFixture({ sidecar: { interface: { id: "soksak-browser-spec", version: "0.0.1" } } });
     const r = build();
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toMatch(/interface provider must match the unit version/);
+    expect(r.stderr).toMatch(/interface provider must match the sidecar version/);
   });
 });

@@ -7,43 +7,43 @@ cryptographic results.
 
 ## 1. Ownership is not aggregation
 
-A plugin, sidecar, or kit is an independent unit. Its own repository has final
-responsibility for its implementation, unit-specific manifest or protocol, documentation,
+A plugin, sidecar, or kit is independently released. Its own repository has final
+responsibility for its implementation, kind-specific manifest or protocol, documentation,
 tests, source commit, dependency closure, artifacts, and release history. Creating a new
 plugin does not require a change to `soksak-spec` or to the core.
 
-`soksak-spec` owns only the common platform boundary: unit identity grammar, owner release
+`soksak-spec` owns only the common platform boundary: component identity grammar, owner release
 envelope, signed registry projection, portable conformance evidence, and validation tools.
 A domain contract is split into `soksak-contract-<domain>` only after two or more independent
 implementations genuinely share that domain protocol. It is never split merely to collect
 files in one place.
 
-A registry owns discovery and trust continuity, not unit truth. It may index a unit only as:
+A registry owns discovery, exact release metadata, profiles, and trust continuity. It does not own
+plugin, sidecar, or kit implementation source.
 
 ```text
-kind + id + version
-owner release manifest URL + SHA-256
-conformance report URL + SHA-256[]
+plugins[] + sidecars[] + kits[]
+profiles[]
+conformance report URL + SHA-256[] per release
 ```
 
-It must not copy source, dependencies, artifacts, entrypoints, names, commands, or docs from
-the owner. Official and third-party registries use the same contract. A unit may be listed by
+It contains the signed release fields required for installation but never copies owner source,
+commands, or documentation. Official and third-party registries use the same contract. A release may be listed by
 neither, one, or several registries without changing its implementation.
 
 ## 2. Identity and immutable transport
 
-- `kind` is exactly `plugin`, `sidecar`, or `kit`.
-- `id` is flat, at most 128 ASCII characters, and matches
+- A release contains exactly one `plugin`, `sidecar`, or `kit` identity object.
+- Each identity `id` is flat, at most 128 ASCII characters, and matches
   `^[a-z0-9][a-z0-9-]{0,127}$`. A third party is not forced into a
   soksak-branded namespace.
-- Versions are strict SemVer 2.0.0. Registry resolution uses full SemVer precedence;
-  build metadata does not create a second selectable precedence value.
+- Every 0.0.1 identity reference has exact version `0.0.1`.
 - Source is a canonical `https://github.com/<owner>/<repository>` URL plus one lowercase
   40-character commit SHA.
 - Distribution uses immutable GitHub Release assets plus lowercase SHA-256. A branch,
   `latest`, git checkout, npm/crates registry lookup, or guessed filesystem path is not an
   installation source.
-- The release tag is exactly `v<version>` or `<unit-id>-v<version>`. The owner manifest,
+- The 0.0.1 release tag is exactly `v0.0.1`. Every archive,
   every install artifact, and every report must be assets of that repository and tag.
 
 The package itself is `private: true`; its deterministic tarball is a GitHub Release asset.
@@ -55,29 +55,25 @@ for soksak installation.
 
 `soksak-spec-release@0.0.1` is the sole install manifest. It owns:
 
-- `kind`, `id`, `version`;
+- exactly one `plugin`, `sidecar`, or `kit` `{id, version}` identity;
 - exact source repository and commit;
-- exact release tag;
-- generic `plugin|sidecar|kit` dependency ranges;
+- exact plugin, sidecar, and kit dependency references with `runtime|build` scope;
 - the complete artifact matrix;
-- SHA-256, archive format, and declarative entrypoint for every artifact.
+- SHA-256, archive format, and kind-specific manifest name for every artifact;
+- conformance report URL and SHA-256 references.
 
-Plugin and kit releases contain exactly one portable `any` artifact. A plugin entrypoint is
-`{kind:"plugin", manifest:<relative path>}`; a kit entrypoint is
-`{kind:"kit", packageManifest:<relative path>}`. A sidecar uses canonical Rust target
-triples and declares one or more named `process`/`library` paths plus one
-exact `{id: "soksak-spec-sidecar-<domain>", version}` interface provider. All sidecar targets expose the same
-interface. Paths are lexical, relative, non-empty, and traversal-free. Installers do not
-search for default filenames and do not use symlinks.
+Plugin and kit releases contain exactly one portable `any` artifact with `plugin.json` or
+`package.json`. A sidecar uses canonical native target triples and every archive declares
+`sidecar.json`. The manifest inside the verified archive owns process/library paths and the exact
+sidecar interface. Installers open only that kind-specific manifest and reject links.
 
 `plugin.json.dependencies` is only the runtime plugin relationship/authorization surface.
-It is not a locator. Its `(plugin id, range)` set must exactly equal the release manifest's
-`kind:"plugin"` dependency set. Sidecar and kit dependencies exist only in the release
+It is not a locator. Its exact plugin dependency set must equal the release's runtime `plugin`
+dependency set. Sidecar and kit dependencies exist only in the release
 closure. `sidecars[].reach` and `plugin.json.repo` do not exist.
 
 Dependencies are resolved only against the certified registry that supplied the parent
-release. The resolver filters by exact kind/id and range, then selects the greatest SemVer
-precedence. No match is a hard failure. It must not retry an official registry, another
+release. The resolver matches the exact plugin, sidecar, or kit reference. No match is a hard failure. It must not retry an official registry, another
 private registry, a package registry, or a git branch. A release consumer detects dependency
 cycles and fails with the cycle path; it never drops an edge to make the graph installable.
 
@@ -115,8 +111,8 @@ plugin may put in `implements`, `consumes`, `viewContract`, or a sidecar interfa
 
 `soksak-spec-conformance@0.0.1` is immutable evidence for one contract. A platform-schema
 report keeps the exact schema-id string; a domain report uses the exact `{id, version}` provider
-object and is valid only when that owner declared the same provider. It binds the exact
-owner manifest SHA-256 and every `(target, artifact SHA-256)` in the release matrix. Only a
+object and is valid only when that plugin or sidecar manifest declared the same provider. It binds
+every `(target, artifact SHA-256)` in the release matrix. Only a
 `passed` result can be indexed. Every release requires evidence for
 `soksak-spec-release@0.0.1` and its kind schema. A sidecar additionally requires evidence for
 its declared runtime interface. Plugin-kind evidence includes the exact runtime-dependency
@@ -125,7 +121,7 @@ a runtime dependency, command, or call surface.
 
 An evidence producer tests the bytes named by the release: it downloads each artifact,
 verifies its SHA-256, extracts it with traversal/link rejection, opens the declared
-entrypoint, and runs the relevant conformance suite. It must not certify a convenient local
+kind-specific manifest, and runs the relevant conformance suite. It must not certify a convenient local
 working copy as though it were the release artifact. `soksak-validate conformance` checks
 the supplied report/owner documents for authoring and audit; trust for installation exists
 only after the registry operator has independently produced or accepted that evidence and
@@ -134,7 +130,7 @@ signed its exact digest into a certified index.
 ## 5. Signed registry certification
 
 `soksak-spec-registry@0.0.1` is signed with Ed25519. Trust configuration pins the expected
-`registryId`, expected `keyId`, and the 32-byte public key independently of the downloaded
+registry `id`, expected `keyId`, and the 32-byte public key independently of the downloaded
 index. Shape validation alone never makes an index trusted.
 
 The signature input is the registry payload with `signature` omitted, serialized using RFC
@@ -157,23 +153,23 @@ Certification is one fail-closed boundary:
    - same sequence with another digest: equivocation failure.
 6. Persist the returned high-water only after the whole certification succeeds.
 
-Downstream code receives `CertifiedRegistryIndex`, not a structurally parsed index. Unit
-installation then verifies owner-manifest bytes, exact indexed identity, same-repository/tag
-URLs, every report digest, complete required evidence, and finally every artifact digest
+Downstream code receives `CertifiedRegistryIndex`, not a structurally parsed index. Plugin, sidecar, and kit
+installation then verifies exact signed release identity, same-repository/tag URLs, every report
+digest, complete required evidence, and every artifact digest
 before extraction.
 
 ## 6. Portable files and CLI
 
 The schemas are:
 
-- `schema/unit-release.schema.json`
+- `schema/release.schema.json`
 - `schema/conformance-report.schema.json`
 - `schema/registry-index.schema.json`
 - `schema/registry-public-key.schema.json`
 
 The corpus is under `test/fixtures/platform-wire/`. Consumers in another language should
 first reproduce the canonical registry bytes/digest/signature, then accept every valid
-plugin/sidecar/kit fixture and reject mutations of identity, URL, digest, target, entrypoint,
+plugin/sidecar/kit fixture and reject mutations of identity, URL, digest, target, manifest,
 unknown fields, continuity, and evidence coverage.
 
 The installed GitHub Release package provides:

@@ -1,24 +1,11 @@
 {
   "spec": "soksak-spec-release@0.0.1",
-  "kind": "kit",
-  "id": "terminal-common",
-  "version": "0.0.1",
-  "source": {
-    "repository": "https://github.com/example/terminal-common",
-    "commit": "cccccccccccccccccccccccccccccccccccccccc"
-  },
-  "releaseTag": "terminal-common-v0.0.1",
+  "kit": { "id": "terminal-common", "version": "0.0.1" },
+  "source": { "repository": "https://github.com/example/terminal-common", "commit": "cccccccccccccccccccccccccccccccccccccccc" },
   "dependencies": [],
-  "artifacts": [
-    {
-      "target": "any",
-      "url": "https://github.com/example/terminal-common/releases/download/terminal-common-v0.0.1/terminal-common-0.0.1.tgz",
-      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
-      "format": "tgz",
-      "entrypoint": {
-        "kind": "kit",
-        "packageManifest": "package.json"
-      }
-    }
+  "artifacts": [{ "target": "any", "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz", "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "format": "tgz", "manifest": "package.json" }],
+  "reports": [
+    { "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit-kind.conformance.json", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+    { "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit-release.conformance.json", "sha256": "9999999999999999999999999999999999999999999999999999999999999999" }
   ]
 }

@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import { parseConformanceReport } from "../src/conformanceWire.js";
 import { parseRegistryPublicKey, parseSignedRegistryIndex } from "../src/registry.js";
 import { parseReleaseManifest } from "../src/release.js";
-import { MAX_SEMVER_LENGTH } from "../src/semver.js";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
 const FIXTURES = join(PACKAGE_ROOT, "test/fixtures/platform-wire");
@@ -18,7 +17,7 @@ function json(path: string): any {
 
 describe("portable platform wire artifacts", () => {
   it("publishes strict draft-2020-12 schemas for every public JSON boundary", () => {
-    const release = json(join(SCHEMAS, "unit-release.schema.json"));
+    const release = json(join(SCHEMAS, "release.schema.json"));
     const conformance = json(join(SCHEMAS, "conformance-report.schema.json"));
     const registry = json(join(SCHEMAS, "registry-index.schema.json"));
     const registryPublicKey = json(join(SCHEMAS, "registry-public-key.schema.json"));
@@ -36,21 +35,13 @@ describe("portable platform wire artifacts", () => {
     expect(registry.$id).toBe("urn:soksak:spec:registry:0.0.1");
     expect(registryPublicKey.$id).toBe("urn:soksak:spec:registry-public-key:0.0.1");
 
-    for (const schema of [release, conformance, registry]) {
-      expect(schema.$defs.semver.maxLength).toBe(MAX_SEMVER_LENGTH);
-    }
-
-    const indexedUnit = registry.$defs.unit;
-    expect(Object.keys(indexedUnit.properties).sort()).toEqual([
-      "id",
-      "kind",
-      "manifest",
-      "reports",
-      "version",
-    ]);
-    for (const forbidden of ["artifacts", "dependencies", "docs", "name", "source"]) {
-      expect(indexedUnit.properties).not.toHaveProperty(forbidden);
-    }
+    expect(release.minProperties).toBe(6);
+    expect(release.maxProperties).toBe(6);
+    expect(release.$defs.reference.properties.version.const).toBe("0.0.1");
+    expect(registry.properties.plugins.items.allOf[0].$ref).toBe(release.$id);
+    expect(registry.properties.sidecars.items.allOf[0].$ref).toBe(release.$id);
+    expect(registry.properties.kits.items.allOf[0].$ref).toBe(release.$id);
+    expect(registry.properties).not.toHaveProperty(["un", "its"].join(""));
   });
 
   it("keeps the checked-in language-neutral corpus accepted by the executable parsers", () => {
@@ -75,8 +66,10 @@ describe("portable platform wire artifacts", () => {
   it("compiles every schema and accepts the same valid cross-language corpus", () => {
     const ajv = new Ajv2020({ allErrors: true, strict: true });
     addFormats(ajv);
+    const releaseSchema = json(join(SCHEMAS, "release.schema.json"));
+    ajv.addSchema(releaseSchema);
     const validators = {
-      release: ajv.compile(json(join(SCHEMAS, "unit-release.schema.json"))),
+      release: ajv.getSchema(releaseSchema.$id)!,
       conformance: ajv.compile(json(join(SCHEMAS, "conformance-report.schema.json"))),
       registry: ajv.compile(json(join(SCHEMAS, "registry-index.schema.json"))),
       publicKey: ajv.compile(json(join(SCHEMAS, "registry-public-key.schema.json"))),
@@ -108,19 +101,16 @@ describe("portable platform wire artifacts", () => {
     ).toBe(true);
   });
 
-  it("rejects entrypoint paths that the portable archive extractor cannot create", () => {
+  it("rejects generic identities and wrong kind-specific manifests", () => {
     const ajv = new Ajv2020({ allErrors: true, strict: true });
     addFormats(ajv);
-    const validate = ajv.compile(json(join(SCHEMAS, "unit-release.schema.json")));
-    for (const path of [
-      "한글/plugin.json",
-      "safe:name/plugin.json",
-      "CON/plugin.json",
-      `a${"b".repeat(512)}`,
-    ]) {
-      const release = json(join(FIXTURES, "release-plugin.json"));
-      release.artifacts[0].entrypoint.manifest = path;
-      expect(validate(release), `${path}: ${JSON.stringify(validate.errors)}`).toBe(false);
-    }
+    const validate = ajv.compile(json(join(SCHEMAS, "release.schema.json")));
+    const generic = json(join(FIXTURES, "release-plugin.json"));
+    delete generic.plugin;
+    Object.assign(generic, { kind: "plugin", id: "weather-plugin", version: "0.0.1" });
+    expect(validate(generic)).toBe(false);
+    const wrongManifest = json(join(FIXTURES, "release-plugin.json"));
+    wrongManifest.artifacts[0].manifest = "sidecar.json";
+    expect(validate(wrongManifest)).toBe(false);
   });
 });

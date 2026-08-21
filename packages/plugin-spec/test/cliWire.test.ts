@@ -14,13 +14,18 @@ function run(...args: string[]) {
 }
 
 describe("soksak-validate public wire modes", () => {
+  it("requires an explicit validation mode", () => {
+    const result = run(join(FIXTURES, "plugin.json"));
+    expect(result.status).toBe(2);
+  });
+
   it("validates an owner release manifest without the app", () => {
     const result = run("release", join(FIXTURES, "release-plugin.json"));
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("release-plugin.json");
   });
 
-  it("binds conformance evidence to the exact owner release bytes", () => {
+  it("binds conformance evidence to the exact plugin release identity and artifacts", () => {
     const valid = run(
       "conformance",
       join(FIXTURES, "conformance-plugin-kind.json"),

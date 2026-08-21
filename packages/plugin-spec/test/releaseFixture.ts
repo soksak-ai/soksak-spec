@@ -1,86 +1,46 @@
 const SHA = "1".repeat(64);
+const COMMIT = "a".repeat(40);
 
-function asset(repository: string, tag: string, name: string): string {
-  return `${repository}/releases/download/${tag}/${name}`;
-}
+const integrity = (url: string, sha256 = SHA) => ({ url, sha256 });
+const artifact = (target: string, url: string, manifest: string, sha256 = SHA) => ({
+  target, url, sha256, format: url.endsWith(".tgz") ? "tgz" : "tar.gz", manifest,
+});
 
 export function pluginRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
-  const repository = "https://github.com/example/weather-plugin";
-  const releaseTag = "v0.0.1";
   return {
     spec: "soksak-spec-release@0.0.1",
-    kind: "plugin",
-    id: "weather-plugin",
-    version: "0.0.1",
-    source: { repository, commit: "a".repeat(40) },
-    releaseTag,
-    dependencies: [{ kind: "kit", id: "terminal-common", range: ">=0.0.1 <1.0.0" }],
-    artifacts: [{
-      target: "any",
-      url: asset(repository, releaseTag, "weather-plugin-0.0.1.tgz"),
-      sha256: SHA,
-      format: "tgz",
-      entrypoint: { kind: "plugin", manifest: "plugin.json" },
-    }],
+    plugin: { id: "weather-plugin", version: "0.0.1" },
+    source: { repository: "https://github.com/example/weather-plugin", commit: COMMIT },
+    dependencies: [{ kit: { id: "terminal-common", version: "0.0.1" }, scope: "runtime" }],
+    artifacts: [artifact("any", "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz", "plugin.json")],
+    reports: [integrity("https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.conformance.json")],
     ...over,
   };
 }
 
 export function sidecarRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
-  const repository = "https://github.com/example/weather-sidecar";
-  const releaseTag = "weather-sidecar-v0.0.1";
-  const entrypoint = (suffix: string) => ({
-    kind: "sidecar",
-    interface: { id: "soksak-spec-sidecar-weather", version: "0.0.1" },
-    process: [{ name: "weather-service", path: "bin/weather-service" }],
-    library: [{ name: "weather-engine", path: `lib/libweather_engine.${suffix}` }],
-  });
   return {
     spec: "soksak-spec-release@0.0.1",
-    kind: "sidecar",
-    id: "weather-sidecar",
-    version: "0.0.1",
-    source: { repository, commit: "b".repeat(40) },
-    releaseTag,
+    sidecar: { id: "weather-sidecar", version: "0.0.1" },
+    source: { repository: "https://github.com/example/weather-sidecar", commit: COMMIT },
     dependencies: [],
     artifacts: [
-      {
-        target: "aarch64-apple-darwin",
-        url: asset(repository, releaseTag, "weather-sidecar-aarch64-apple-darwin.tar.gz"),
-        sha256: "2".repeat(64),
-        format: "tar.gz",
-        entrypoint: entrypoint("dylib"),
-      },
-      {
-        target: "x86_64-unknown-linux-gnu",
-        url: asset(repository, releaseTag, "weather-sidecar-x86_64-unknown-linux-gnu.tar.gz"),
-        sha256: "3".repeat(64),
-        format: "tar.gz",
-        entrypoint: entrypoint("so"),
-      },
+      artifact("aarch64-apple-darwin", "https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-aarch64-apple-darwin.tar.gz", "sidecar.json", "2".repeat(64)),
+      artifact("x86_64-unknown-linux-gnu", "https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-x86_64-unknown-linux-gnu.tar.gz", "sidecar.json", "3".repeat(64)),
     ],
+    reports: [integrity("https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-0.0.1.conformance.json")],
     ...over,
   };
 }
 
 export function kitRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
-  const repository = "https://github.com/example/terminal-common";
-  const releaseTag = "terminal-common-v0.0.1";
   return {
     spec: "soksak-spec-release@0.0.1",
-    kind: "kit",
-    id: "terminal-common",
-    version: "0.0.1",
-    source: { repository, commit: "c".repeat(40) },
-    releaseTag,
+    kit: { id: "terminal-common", version: "0.0.1" },
+    source: { repository: "https://github.com/example/terminal-common", commit: COMMIT },
     dependencies: [],
-    artifacts: [{
-      target: "any",
-      url: asset(repository, releaseTag, "terminal-common-0.0.1.tgz"),
-      sha256: "4".repeat(64),
-      format: "tgz",
-      entrypoint: { kind: "kit", packageManifest: "package.json" },
-    }],
+    artifacts: [artifact("any", "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz", "package.json", "4".repeat(64))],
+    reports: [integrity("https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.conformance.json")],
     ...over,
   };
 }

@@ -13,12 +13,7 @@ const WEATHER = { id: "soksak-spec-plugin-weather", version: "0.0.1" };
 function report(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     spec: "soksak-spec-conformance@0.0.1",
-    subject: {
-      kind: "plugin",
-      id: "weather-plugin",
-      version: "0.0.1",
-      manifestSha256: "a".repeat(64),
-    },
+    subject: { plugin: { id: "weather-plugin", version: "0.0.1" } },
     contract: "soksak-spec-release@0.0.1",
     result: "passed",
     validator: { name: "soksak-conformance", version: "0.0.1" },
@@ -39,26 +34,26 @@ describe("conformance contract applicability", () => {
     const parsed = parseConformanceReport(report({ contract: WEATHER }));
     expect(release.ok && parsed.ok).toBe(true);
     if (!release.ok || !parsed.ok) return;
-    expect(verifyConformanceReport(parsed.value, release.value, "a".repeat(64), [WEATHER])).toEqual({ ok: true });
-    expect(verifyConformanceReport(parsed.value, release.value, "a".repeat(64), [])).toEqual({
+    expect(verifyConformanceReport(parsed.value, release.value, [WEATHER])).toEqual({ ok: true });
+    expect(verifyConformanceReport(parsed.value, release.value, [])).toEqual({
       ok: false,
-      errors: ["conformance domain contract is not declared by the owner"],
+      errors: ["conformance domain contract is not declared by the plugin or sidecar manifest"],
     });
   });
 
-  it("derives a sidecar provider from its release entrypoint", () => {
+  it("accepts a sidecar domain contract declared by the sidecar manifest", () => {
     const release = parseReleaseManifest(sidecarRelease());
     expect(release.ok).toBe(true);
     if (!release.ok) return;
     const contract = { id: "soksak-spec-sidecar-weather", version: "0.0.1" };
     const parsed = parseConformanceReport(report({
-      subject: { kind: "sidecar", id: "weather-sidecar", version: "0.0.1", manifestSha256: "a".repeat(64) },
+      subject: { sidecar: { id: "weather-sidecar", version: "0.0.1" } },
       contract,
       artifacts: release.value.artifacts.map(({ target, sha256 }) => ({ target, sha256 })),
     }));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(verifyConformanceReport(parsed.value, release.value, "a".repeat(64))).toEqual({ ok: true });
+    expect(verifyConformanceReport(parsed.value, release.value, [contract])).toEqual({ ok: true });
   });
 
   it("has collision-free keys for platform and object contracts", () => {
@@ -68,19 +63,21 @@ describe("conformance contract applicability", () => {
 });
 
 describe("common report binding", () => {
-  it("requires the release and unit-kind platform schemas", () => {
+  it("requires the release and plugin manifest schemas", () => {
     expect(requiredConformanceContracts("plugin")).toEqual([
       "soksak-spec-plugin@0.0.1",
       "soksak-spec-release@0.0.1",
     ]);
   });
 
-  it("binds identity, manifest digest and artifact matrix", () => {
+  it("binds explicit identity and artifact matrix", () => {
     const release = parseReleaseManifest(pluginRelease());
     const parsed = parseConformanceReport(report());
     expect(release.ok && parsed.ok).toBe(true);
     if (!release.ok || !parsed.ok) return;
-    expect(verifyConformanceReport(parsed.value, release.value, "a".repeat(64))).toEqual({ ok: true });
-    expect(verifyConformanceReport(parsed.value, release.value, "b".repeat(64)).ok).toBe(false);
+    expect(verifyConformanceReport(parsed.value, release.value)).toEqual({ ok: true });
+    const generic = report();
+    generic.subject = { kind: "plugin", id: "weather-plugin", version: "0.0.1" };
+    expect(parseConformanceReport(generic).ok).toBe(false);
   });
 });

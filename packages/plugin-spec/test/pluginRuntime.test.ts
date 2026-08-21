@@ -696,7 +696,7 @@ describe("plugin runtime 0.0.1 closed wire", () => {
       htmlSha256: sha("a"), htmlBytes: 1_024, moduleSha256: sha("b"), moduleBytes: 4_096,
     }).ok).toBe(false);
     expect(PLUGIN_RUNTIME_FRAME_POLICY.hostShellPluginImport).toBe("forbidden");
-    expect(PLUGIN_RUNTIME_FRAME_POLICY.nativeRuntime).toBe("dedicated-killable-per-unit");
+    expect(PLUGIN_RUNTIME_FRAME_POLICY.nativeRuntime).toBe("dedicated-killable-per-plugin");
   });
 
   it("requires complete negative, positive, and infinite-loop live conformance", () => {
@@ -710,7 +710,7 @@ describe("plugin runtime 0.0.1 closed wire", () => {
       artifact,
       topology: {
         hostShellPluginImport: "never",
-        nativeRuntime: "dedicated-per-unit",
+        nativeRuntime: "dedicated-per-plugin",
         sandboxFrame: "opaque-origin-allow-scripts",
       },
       availability: {

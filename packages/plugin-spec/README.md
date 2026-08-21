@@ -2,7 +2,7 @@
 
 The public soksak platform boundary for independently released plugins, sidecars, kits,
 conformance reports, and signed registries. It is a validation library and CLI, not a
-runtime implementation and not a central home for unit-specific contracts.
+runtime implementation and not a central home for plugin-, sidecar-, or kit-specific contracts.
 
 ## Distribution
 
@@ -10,7 +10,7 @@ This package is `private: true` and is not published to npm. CI builds one deter
 npm-compatible tarball and publishes it as an immutable GitHub Release asset:
 
 ```text
-tag:   plugin-spec-v<version>
+tag:   soksak-spec-v<version>
 asset: soksak-ai-plugin-spec-<version>.tgz
 url:   https://github.com/soksak-ai/soksak-spec/releases/download/<tag>/<asset>
 ```
@@ -41,7 +41,6 @@ soksak-validate registry ./registry.json \
 Registry mode performs Ed25519 signature, identity, validity-window, and optional high-water
 continuity checks. It never reports success from shape validation alone. Exit codes are
 `0` for pass, `1` for a rejected document or integrity check, and `2` for invalid CLI use.
-For compatibility, a path without an explicit mode is treated as `plugin` mode.
 
 ## Programmatic API
 
@@ -51,17 +50,15 @@ import {
   parseManifest,
   parseReleaseManifest,
   resolveRegistryDependency,
-  verifyRegistryUnitRelease,
 } from "@soksak-ai/plugin-spec";
 ```
 
 All external input starts as `unknown` and must cross the relevant parser. Only
-`certifyRegistryIndex` returns a `CertifiedRegistryIndex` usable by dependency resolution
-and owner-release verification.
+`certifyRegistryIndex` returns a `CertifiedRegistryIndex` usable by exact dependency resolution.
 
 `parseManifest(raw, dirName)` remains the plugin-specific parser. Its manifest id must equal
 `dirName`. `plugin.json` owns runtime declarations; source, install dependencies, artifacts,
-and entrypoints are owned by `soksak-spec-release@0.0.1`.
+and archive manifest selection are owned by `soksak-spec-release@0.0.1`.
 
 ## Plugin UI surfaces
 

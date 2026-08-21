@@ -6,7 +6,7 @@
 // The base id never embeds a version. `name@version` discovery is forbidden because it
 // collapses identity and compatibility into exact string equality. Platform schema ids
 // such as `soksak-spec-plugin@0.0.1` are a different namespace and remain exact strings.
-import { isStrictSemver, isUnitDependencyRange, semverSatisfies } from "./semver.js";
+import { isStrictSemver, isDependencyRange, semverSatisfies } from "./semver.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
 export const CONTRACT_ID_RE =
@@ -44,7 +44,7 @@ function parseContractObject(
   }
   if (valueKey === "version") {
     if (!isStrictSemver(raw.version)) errors.push(`${label}.version: strict SemVer required`);
-  } else if (!isUnitDependencyRange(raw.range)) {
+  } else if (!isDependencyRange(raw.range)) {
     errors.push(`${label}.range: supported SemVer range required`);
   }
   if (errors.length !== before) return null;

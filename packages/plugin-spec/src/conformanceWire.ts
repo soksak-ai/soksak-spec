@@ -1,42 +1,35 @@
-// Portable conformance evidence. Reports are immutable release assets and bind one
-// enacted contract to the exact owner manifest plus every artifact in its matrix.
 import {
   type ContractProviderRef,
   contractProviderKey,
   parseContractProviderRef,
 } from "./contracts.js";
-import { type PlatformParseResult, type UnitReleaseManifest } from "./release.js";
 import {
+  type ExactReference,
+  type PlatformParseResult,
+  type ReleaseDocument,
+  releaseIdentity,
+} from "./release.js";
+import {
+  ANY_TARGET,
   CONFORMANCE_REPORT_SPEC,
   RELEASE_SPEC,
+  RUST_SIDECAR_TARGETS,
   SHA256_RE,
   STRICT_SEMVER_RE,
-  UNIT_ID_RE,
-  UNIT_SPEC_BY_KIND,
-  isStrictSemver,
-  isUnitKind,
-  isUnitTarget,
-  type UnitKind,
-  type UnitTarget,
-} from "./unit.js";
+  COMPONENT_ID_RE,
+  MANIFEST_SPEC_BY_RELEASE_KIND,
+  type ReleaseKind,
+} from "./release-primitives.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
-export interface ConformanceSubject {
-  kind: UnitKind;
-  id: string;
-  version: string;
-  manifestSha256: string;
-}
+export type ConformanceSubject =
+  | { plugin: ExactReference }
+  | { sidecar: ExactReference }
+  | { kit: ExactReference };
 
-export interface ConformanceArtifactSubject {
-  target: UnitTarget;
-  sha256: string;
-}
-
-export interface ConformanceValidator {
-  name: string;
-  version: string;
-}
+export interface ConformanceArtifactSubject { target: "any" | (typeof RUST_SIDECAR_TARGETS)[number]; sha256: string }
+export interface ConformanceValidator { name: string; version: string }
+export type PlatformConformanceContract = typeof RELEASE_SPEC | (typeof MANIFEST_SPEC_BY_RELEASE_KIND)[ReleaseKind];
 
 export interface ConformanceReport {
   spec: typeof CONFORMANCE_REPORT_SPEC;
@@ -47,182 +40,99 @@ export interface ConformanceReport {
   artifacts: ConformanceArtifactSubject[];
 }
 
-function strictObject(
-  raw: unknown,
-  allowed: readonly string[],
-  required: readonly string[],
-  label: string,
-  errors: string[],
-): Record<string, unknown> | null {
-  if (!isRecord(raw)) {
-    errors.push(`${label}: object required`);
-    return null;
-  }
+function strictObject(raw: unknown, allowed: readonly string[], required: readonly string[], label: string, errors: string[]): Record<string, unknown> | null {
+  if (!isRecord(raw)) { errors.push(`${label}: object required`); return null; }
   checkKnownKeys(raw, allowed, label, errors);
   for (const key of required) if (!(key in raw)) errors.push(`${label}.${key}: required`);
   return raw;
 }
 
-export type PlatformConformanceContract =
-  | typeof RELEASE_SPEC
-  | (typeof UNIT_SPEC_BY_KIND)[UnitKind];
-
 function isPlatformConformanceContract(value: unknown): value is PlatformConformanceContract {
-  return typeof value === "string" && (
-    value === RELEASE_SPEC ||
-    value === UNIT_SPEC_BY_KIND.kit ||
-    value === UNIT_SPEC_BY_KIND.plugin ||
-    value === UNIT_SPEC_BY_KIND.sidecar
-  );
+  return typeof value === "string" && (value === RELEASE_SPEC || Object.values(MANIFEST_SPEC_BY_RELEASE_KIND).includes(value as never));
 }
 
-export function conformanceContractKey(
-  contract: PlatformConformanceContract | ContractProviderRef,
-): string {
-  return typeof contract === "string"
-    ? `schema\u0000${contract}`
-    : `domain\u0000${contractProviderKey(contract)}`;
+export function conformanceContractKey(contract: PlatformConformanceContract | ContractProviderRef): string {
+  return typeof contract === "string" ? `schema\0${contract}` : `domain\0${contractProviderKey(contract)}`;
 }
 
-export function requiredConformanceContracts(kind: UnitKind): PlatformConformanceContract[] {
-  return [RELEASE_SPEC, UNIT_SPEC_BY_KIND[kind]].sort();
+export function requiredConformanceContracts(kind: ReleaseKind): PlatformConformanceContract[] {
+  return [RELEASE_SPEC, MANIFEST_SPEC_BY_RELEASE_KIND[kind]].sort();
+}
+
+function parseExactReference(raw: unknown, label: string, errors: string[]): ExactReference | null {
+  const before = errors.length;
+  const value = strictObject(raw, ["id", "version"], ["id", "version"], label, errors);
+  if (!value) return null;
+  if (typeof value.id !== "string" || !COMPONENT_ID_RE.test(value.id)) errors.push(`${label}.id: component id required`);
+  if (value.version !== "0.0.1") errors.push(`${label}.version: exact 0.0.1 required`);
+  return errors.length === before ? { id: value.id as string, version: "0.0.1" } : null;
+}
+
+function parseSubject(raw: unknown, errors: string[]): ConformanceSubject | null {
+  const value = strictObject(raw, ["kit", "plugin", "sidecar"], [], "conformance.subject", errors);
+  if (!value) return null;
+  const kinds = (["plugin", "sidecar", "kit"] as const).filter((kind) => value[kind] !== undefined);
+  if (kinds.length !== 1) { errors.push("conformance.subject: exactly one plugin, sidecar, or kit required"); return null; }
+  const kind = kinds[0];
+  const reference = parseExactReference(value[kind], `conformance.subject.${kind}`, errors);
+  return reference ? { [kind]: reference } as ConformanceSubject : null;
+}
+
+function subjectIdentity(subject: ConformanceSubject): { kind: ReleaseKind; id: string; version: string } {
+  if ("plugin" in subject) return { kind: "plugin", ...subject.plugin };
+  if ("sidecar" in subject) return { kind: "sidecar", ...subject.sidecar };
+  return { kind: "kit", ...subject.kit };
 }
 
 export function parseConformanceReport(raw: unknown): PlatformParseResult<ConformanceReport> {
   const errors: string[] = [];
-  const value = strictObject(
-    raw,
-    ["artifacts", "contract", "result", "spec", "subject", "validator"],
-    ["artifacts", "contract", "result", "spec", "subject", "validator"],
-    "conformance",
-    errors,
-  );
+  const value = strictObject(raw, ["artifacts", "contract", "result", "spec", "subject", "validator"], ["artifacts", "contract", "result", "spec", "subject", "validator"], "conformance", errors);
   if (!value) return { ok: false, errors };
-  if (value.spec !== CONFORMANCE_REPORT_SPEC) {
-    errors.push(`conformance.spec: ${CONFORMANCE_REPORT_SPEC} required`);
-  }
-  let contract: PlatformConformanceContract | ContractProviderRef | null = null;
-  if (isPlatformConformanceContract(value.contract)) {
-    contract = value.contract;
-  } else {
-    contract = parseContractProviderRef(value.contract, "conformance.contract", errors);
-  }
-  if (value.result !== "passed") errors.push("conformance.result: passed required for install evidence");
-
-  const subjectRaw = strictObject(
-    value.subject,
-    ["id", "kind", "manifestSha256", "version"],
-    ["id", "kind", "manifestSha256", "version"],
-    "conformance.subject",
-    errors,
-  );
-  let subject: ConformanceSubject | null = null;
-  if (subjectRaw) {
-    const before = errors.length;
-    if (!isUnitKind(subjectRaw.kind)) errors.push("conformance.subject.kind: kit|plugin|sidecar required");
-    if (typeof subjectRaw.id !== "string" || !UNIT_ID_RE.test(subjectRaw.id)) {
-      errors.push("conformance.subject.id: flat unit id required");
-    }
-    if (!isStrictSemver(subjectRaw.version)) errors.push("conformance.subject.version: strict SemVer required");
-    if (!SHA256_RE.test(typeof subjectRaw.manifestSha256 === "string" ? subjectRaw.manifestSha256 : "")) {
-      errors.push("conformance.subject.manifestSha256: exact lowercase SHA-256 required");
-    }
-    if (errors.length === before) {
-      subject = {
-        kind: subjectRaw.kind as UnitKind,
-        id: subjectRaw.id as string,
-        version: subjectRaw.version as string,
-        manifestSha256: subjectRaw.manifestSha256 as string,
-      };
-    }
-  }
-
-  const validatorRaw = strictObject(
-    value.validator,
-    ["name", "version"],
-    ["name", "version"],
-    "conformance.validator",
-    errors,
-  );
+  if (value.spec !== CONFORMANCE_REPORT_SPEC) errors.push(`conformance.spec: ${CONFORMANCE_REPORT_SPEC} required`);
+  const contract = isPlatformConformanceContract(value.contract)
+    ? value.contract
+    : parseContractProviderRef(value.contract, "conformance.contract", errors);
+  if (value.result !== "passed") errors.push("conformance.result: passed required");
+  const subject = parseSubject(value.subject, errors);
+  const validatorRaw = strictObject(value.validator, ["name", "version"], ["name", "version"], "conformance.validator", errors);
   let validator: ConformanceValidator | null = null;
   if (validatorRaw) {
-    const before = errors.length;
-    if (typeof validatorRaw.name !== "string" || !UNIT_ID_RE.test(validatorRaw.name)) {
-      errors.push("conformance.validator.name: flat tool id required");
-    }
-    if (typeof validatorRaw.version !== "string" || !STRICT_SEMVER_RE.test(validatorRaw.version)) {
-      errors.push("conformance.validator.version: strict SemVer required");
-    }
-    if (errors.length === before) {
-      validator = { name: validatorRaw.name as string, version: validatorRaw.version as string };
-    }
+    if (typeof validatorRaw.name !== "string" || !COMPONENT_ID_RE.test(validatorRaw.name)) errors.push("conformance.validator.name: tool id required");
+    if (typeof validatorRaw.version !== "string" || !STRICT_SEMVER_RE.test(validatorRaw.version)) errors.push("conformance.validator.version: semantic version required");
+    if (typeof validatorRaw.name === "string" && typeof validatorRaw.version === "string") validator = { name: validatorRaw.name, version: validatorRaw.version };
   }
-
   const artifacts: ConformanceArtifactSubject[] = [];
-  if (!Array.isArray(value.artifacts) || value.artifacts.length === 0) {
-    errors.push("conformance.artifacts: non-empty array required");
-  } else {
-    value.artifacts.forEach((item, index) => {
-      const label = `conformance.artifacts[${index}]`;
-      const before = errors.length;
-      const artifact = strictObject(item, ["sha256", "target"], ["sha256", "target"], label, errors);
-      if (!artifact) return;
-      if (!isUnitTarget(artifact.target)) errors.push(`${label}.target: canonical unit target required`);
-      if (!SHA256_RE.test(typeof artifact.sha256 === "string" ? artifact.sha256 : "")) {
-        errors.push(`${label}.sha256: exact lowercase SHA-256 required`);
-      }
-      if (errors.length === before) {
-        artifacts.push({ target: artifact.target as UnitTarget, sha256: artifact.sha256 as string });
-      }
-    });
-    const keys = artifacts.map((artifact) => artifact.target);
-    if (new Set(keys).size !== keys.length) errors.push("conformance.artifacts: duplicate targets forbidden");
-    const sorted = [...keys].sort();
-    if (keys.some((key, index) => key !== sorted[index])) errors.push("conformance.artifacts: targets must be sorted");
-  }
-
+  if (!Array.isArray(value.artifacts) || value.artifacts.length === 0) errors.push("conformance.artifacts: non-empty array required");
+  else value.artifacts.forEach((item, index) => {
+    const label = `conformance.artifacts[${index}]`;
+    const before = errors.length;
+    const artifact = strictObject(item, ["sha256", "target"], ["sha256", "target"], label, errors);
+    if (!artifact) return;
+    if (artifact.target !== ANY_TARGET && !(RUST_SIDECAR_TARGETS as readonly unknown[]).includes(artifact.target)) errors.push(`${label}.target: artifact target required`);
+    if (typeof artifact.sha256 !== "string" || !SHA256_RE.test(artifact.sha256)) errors.push(`${label}.sha256: exact SHA-256 required`);
+    if (errors.length === before) artifacts.push({ target: artifact.target as ConformanceArtifactSubject["target"], sha256: artifact.sha256 as string });
+  });
+  const targets = artifacts.map((artifact) => artifact.target);
+  if (new Set(targets).size !== targets.length) errors.push("conformance.artifacts: duplicate targets forbidden");
+  if (targets.some((target, index) => target !== [...targets].sort()[index])) errors.push("conformance.artifacts: targets must be sorted");
   if (errors.length > 0 || !subject || !validator || !contract) return { ok: false, errors };
-  return {
-    ok: true,
-    value: {
-      spec: CONFORMANCE_REPORT_SPEC,
-      subject,
-      contract,
-      result: "passed",
-      validator,
-      artifacts,
-    },
-  };
+  return { ok: true, value: { spec: CONFORMANCE_REPORT_SPEC, subject, contract, result: "passed", validator, artifacts } };
 }
-
-export type ConformanceVerificationResult = { ok: true } | { ok: false; errors: string[] };
 
 export function verifyConformanceReport(
   report: ConformanceReport,
-  release: UnitReleaseManifest,
-  manifestSha256: string,
-  ownerProviders: readonly ContractProviderRef[] = [],
-): ConformanceVerificationResult {
+  release: ReleaseDocument,
+  declaredContracts: readonly ContractProviderRef[] = [],
+): { ok: true } | { ok: false; errors: string[] } {
   const errors: string[] = [];
-  if (report.subject.kind !== release.kind) errors.push("conformance subject kind mismatch");
-  if (report.subject.id !== release.id) errors.push("conformance subject id mismatch");
-  if (report.subject.version !== release.version) errors.push("conformance subject version mismatch");
-  if (report.subject.manifestSha256 !== manifestSha256) errors.push("conformance manifest digest mismatch");
+  const subject = subjectIdentity(report.subject);
+  const identity = releaseIdentity(release);
+  if (subject.kind !== identity.kind || subject.id !== identity.id || subject.version !== identity.version) errors.push("conformance subject identity mismatch");
   const expected = release.artifacts.map(({ target, sha256 }) => ({ target, sha256 }));
-  if (JSON.stringify(report.artifacts) !== JSON.stringify(expected)) {
-    errors.push("conformance artifact coverage must exactly match the owner release matrix");
-  }
+  if (JSON.stringify(report.artifacts) !== JSON.stringify(expected)) errors.push("conformance artifact coverage must equal the release matrix");
   if (typeof report.contract !== "string") {
-    const declaredProviders = [...ownerProviders];
-    if (release.kind === "sidecar") {
-      for (const artifact of release.artifacts) {
-        if (artifact.entrypoint.kind === "sidecar") declaredProviders.push(artifact.entrypoint.interface);
-      }
-    }
     const wanted = contractProviderKey(report.contract);
-    if (!declaredProviders.some((provider) => contractProviderKey(provider) === wanted)) {
-      errors.push("conformance domain contract is not declared by the owner");
-    }
+    if (!declaredContracts.some((contract) => contractProviderKey(contract) === wanted)) errors.push("conformance domain contract is not declared by the plugin or sidecar manifest");
   }
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
 }
