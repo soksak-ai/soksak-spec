@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { parseReleaseManifest } from "../src/release.js";
-import { kitRelease, pluginRelease, sidecarRelease } from "./releaseFixture.js";
+import { contractRelease, kitRelease, pluginRelease, sidecarRelease, specRelease } from "./releaseFixture.js";
 
 describe("plugin, sidecar, and kit release documents", () => {
   it("keeps each release identity explicit", () => {
     const plugin = parseReleaseManifest(pluginRelease());
     const sidecar = parseReleaseManifest(sidecarRelease());
     const kit = parseReleaseManifest(kitRelease());
+    const contract = parseReleaseManifest(contractRelease());
+    const spec = parseReleaseManifest(specRelease());
     expect(plugin, JSON.stringify(plugin)).toMatchObject({ ok: true });
     expect(sidecar, JSON.stringify(sidecar)).toMatchObject({ ok: true });
     expect(kit, JSON.stringify(kit)).toMatchObject({ ok: true });
-    if (!plugin.ok || !sidecar.ok || !kit.ok) return;
+    expect(contract, JSON.stringify(contract)).toMatchObject({ ok: true });
+    expect(spec, JSON.stringify(spec)).toMatchObject({ ok: true });
+    if (!plugin.ok || !sidecar.ok || !kit.ok || !contract.ok || !spec.ok) return;
     expect(plugin.value.plugin.id).toBe("weather-plugin");
     expect(sidecar.value.sidecar.id).toBe("weather-sidecar");
     expect(kit.value.kit.id).toBe("terminal-common");
+    expect(contract.value.contract.id).toBe("terminal-contract");
+    expect(spec.value.spec.id).toBe("soksak-spec");
   });
 
   it("keeps dependency kinds explicit and versions exact", () => {

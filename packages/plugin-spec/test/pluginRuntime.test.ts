@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   PLUGIN_RUNTIME_BOOTSTRAP_CSP,
-  PLUGIN_RUNTIME_BOOTSTRAP_SPEC,
-  PLUGIN_RUNTIME_CONFORMANCE_SPEC,
   PLUGIN_RUNTIME_FRAME_POLICY,
   PLUGIN_RUNTIME_LIMITS,
   PLUGIN_RUNTIME_METHODS,
   PLUGIN_RUNTIME_REQUIRED_ATTACK_PROBES,
   PLUGIN_RUNTIME_REQUIRED_POSITIVE_PROBES,
-  PLUGIN_RUNTIME_WIRE_SPEC,
+  PLUGIN_RUNTIME_PROTOCOL,
   PluginRuntimePendingTracker,
   PluginRuntimeSessionValidator,
   authorizePluginRuntimeEnvelope,
@@ -28,7 +26,6 @@ import { parseManifest } from "../src/spec.js";
 const sha = (digit: string): string => digit.repeat(64);
 
 const artifact: PluginRuntimeBootstrapArtifact = {
-  spec: "soksak-spec-plugin-runtime@0.0.1",
   document: "about:srcdoc",
   sandboxTokens: ["allow-scripts"],
   csp: PLUGIN_RUNTIME_BOOTSTRAP_CSP,
@@ -64,7 +61,7 @@ function envelope(
   requestId = `request.${method}.1`,
   seq = 1,
 ): Record<string, unknown> {
-  return { spec: PLUGIN_RUNTIME_WIRE_SPEC, kind, seq, requestId, method, params };
+  return { protocol: PLUGIN_RUNTIME_PROTOCOL, kind, seq, requestId, method, params };
 }
 
 function result(
@@ -73,7 +70,7 @@ function result(
   requestId = `request.${responseTo}.1`,
   seq = 2,
 ): Record<string, unknown> {
-  return { spec: PLUGIN_RUNTIME_WIRE_SPEC, kind: "result", seq, requestId, responseTo, value };
+  return { protocol: PLUGIN_RUNTIME_PROTOCOL, kind: "result", seq, requestId, responseTo, value };
 }
 
 function bootstrap(
@@ -143,7 +140,6 @@ function authorize(
 describe("plugin runtime 0.0.1 closed wire", () => {
   it("parses declared iframe, navigation and WebRTC capabilities without granting them implicitly", () => {
     const base = {
-      spec: "soksak-spec-plugin@0.0.1",
       id: "runtime-policy",
       name: "Runtime policy",
       version: "0.0.1",
@@ -179,16 +175,14 @@ describe("plugin runtime 0.0.1 closed wire", () => {
     expect(unsafe.manifest).toBeNull();
     expect(unsafe.validation.errors.join("\n")).toMatch(/runtime\.navigationOrigins/);
   });
-  it("uses one 0.0.1 identity without compatibility aliases", () => {
-    expect(PLUGIN_RUNTIME_WIRE_SPEC).toBe("soksak-spec-plugin-runtime@0.0.1");
-    expect(PLUGIN_RUNTIME_BOOTSTRAP_SPEC).toBe(PLUGIN_RUNTIME_WIRE_SPEC);
-    expect(PLUGIN_RUNTIME_CONFORMANCE_SPEC).toBe(PLUGIN_RUNTIME_WIRE_SPEC);
+  it("uses one runtime protocol without compatibility aliases", () => {
+    expect(PLUGIN_RUNTIME_PROTOCOL).toBe("soksak-spec-plugin-runtime@0.0.1");
     for (const incompatible of [
       "soksak-spec-plugin-runtime@0.0.2",
       "soksak-spec-plugin-runtime@0.4",
       "soksak-spec-plugin-runtime@1",
     ]) {
-      expect(parsePluginRuntimeEnvelope({ ...bootstrap(), spec: incompatible }).ok).toBe(false);
+      expect(parsePluginRuntimeEnvelope({ ...bootstrap(), protocol: incompatible }).ok).toBe(false);
     }
   });
   it("keeps domain functionality in the public Command Registry, not the wire", () => {
@@ -704,7 +698,6 @@ describe("plugin runtime 0.0.1 closed wire", () => {
       htmlSha256: sha("a"), htmlBytes: 1_024, moduleSha256: sha("b"), moduleBytes: 4_096,
     };
     const report = {
-      spec: "soksak-spec-plugin-runtime@0.0.1",
       platform: "darwin-aarch64",
       tauriRevision: "a370f653330506c2a5f59b643645a15b4cc30c18",
       artifact,

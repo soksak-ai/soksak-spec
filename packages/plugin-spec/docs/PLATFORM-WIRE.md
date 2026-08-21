@@ -7,7 +7,7 @@ cryptographic results.
 
 ## 1. Ownership is not aggregation
 
-A plugin, sidecar, or kit is independently released. Its own repository has final
+A plugin, sidecar, kit, contract, or spec is independently released. Its own repository has final
 responsibility for its implementation, kind-specific manifest or protocol, documentation,
 tests, source commit, dependency closure, artifacts, and release history. Creating a new
 plugin does not require a change to `soksak-spec` or to the core.
@@ -19,10 +19,10 @@ implementations genuinely share that domain protocol. It is never split merely t
 files in one place.
 
 A registry owns discovery, exact release metadata, profiles, and trust continuity. It does not own
-plugin, sidecar, or kit implementation source.
+plugin, sidecar, kit, contract, or spec implementation source.
 
 ```text
-plugins[] + sidecars[] + kits[]
+plugins[] + sidecars[] + kits[] + contracts[] + specs[]
 profiles[]
 conformance report URL + SHA-256[] per release
 ```
@@ -33,7 +33,7 @@ neither, one, or several registries without changing its implementation.
 
 ## 2. Identity and immutable transport
 
-- A release contains exactly one `plugin`, `sidecar`, or `kit` identity object.
+- A release contains exactly one `plugin`, `sidecar`, `kit`, `contract`, or `spec` identity object.
 - Each identity `id` is flat, at most 128 ASCII characters, and matches
   `^[a-z0-9][a-z0-9-]{0,127}$`. A third party is not forced into a
   soksak-branded namespace.
@@ -53,42 +53,36 @@ for soksak installation.
 
 ## 3. Owner release manifest
 
-`soksak-spec-release@0.0.1` is the sole install manifest. It owns:
+`release.schema.json` defines the sole release document. A release owns:
 
-- exactly one `plugin`, `sidecar`, or `kit` `{id, version}` identity;
+- exactly one `plugin`, `sidecar`, `kit`, `contract`, or `spec` `{id, version}` identity;
 - exact source repository and commit;
-- exact plugin, sidecar, and kit dependency references with `runtime|build` scope;
+- exact plugin, sidecar, kit, contract, and spec dependency references with `runtime|build` scope;
 - the complete artifact matrix;
 - SHA-256, archive format, and kind-specific manifest name for every artifact;
 - conformance report URL and SHA-256 references.
 
-Plugin and kit releases contain exactly one portable `any` artifact with `plugin.json` or
-`package.json`. A sidecar uses canonical native target triples and every archive declares
+Plugin, kit, contract, and spec releases contain exactly one portable `any` artifact with
+`plugin.json`, `kit.json`, `contract.json`, or `spec.json`. A sidecar uses canonical native target triples and every archive declares
 `sidecar.json`. The manifest inside the verified archive owns process/library paths and the exact
 sidecar interface. Installers open only that kind-specific manifest and reject links.
 
 `plugin.json.dependencies` is only the runtime plugin relationship/authorization surface.
 It is not a locator. Its exact plugin dependency set must equal the release's runtime `plugin`
-dependency set. Sidecar and kit dependencies exist only in the release
+dependency set. Sidecar, kit, contract, and spec dependencies exist only in the release
 closure. `sidecars[].reach` and `plugin.json.repo` do not exist.
 
 Dependencies are resolved only against the certified registry that supplied the parent
-release. The resolver matches the exact plugin, sidecar, or kit reference. No match is a hard failure. It must not retry an official registry, another
+release. The resolver matches the exact plugin, sidecar, kit, contract, or spec reference. No match is a hard failure. It must not retry an official registry, another
 private registry, a package registry, or a git branch. A release consumer detects dependency
 cycles and fails with the cycle path; it never drops an edge to make the graph installable.
 
-## 4. Platform schemas, runtime contracts, and evidence
+## 4. Schemas, runtime contracts, and evidence
 
-Platform schema ids describe documents:
-
-```text
-soksak-spec-release@0.0.1
-soksak-spec-registry@0.0.1
-soksak-spec-conformance@0.0.1
-soksak-spec-plugin@0.0.1
-soksak-spec-sidecar@0.0.1
-soksak-spec-kit@0.0.1
-```
+JSON Schema files identify document structures through their own `$id`. Payloads do not repeat a
+schema name. Parser selection comes from the API or declared manifest filename. `spec` is reserved
+for an installed spec identity object, `protocol` for runtime framing, and `format` for archive
+serialization. See [SCHEMA-AND-IDENTITY.md](SCHEMA-AND-IDENTITY.md).
 
 Runtime declaration contracts describe independently implemented behavior:
 
@@ -105,16 +99,11 @@ The id is version-free. A provider and conformance report carry exact evidence a
 evaluates the provider version against the consumer range. Concatenated
 `name@version` strings are not accepted as runtime contract references.
 
-The two vocabularies are checked separately. In particular, bare
-`soksak-spec-plugin@0.0.1` and `soksak-spec-sidecar@0.0.1` are platform schema ids, not values a
-plugin may put in `implements`, `consumes`, `viewContract`, or a sidecar interface.
-
-`soksak-spec-conformance@0.0.1` is immutable evidence for one contract. A platform-schema
-report keeps the exact schema-id string; a domain report uses the exact `{id, version}` provider
-object and is valid only when that plugin or sidecar manifest declared the same provider. It binds
+Conformance evidence names one direct claim: `{release:true}`, `{manifest:true}`, or
+`{contract:{id,version}}`. A domain contract claim is valid only when that plugin or sidecar
+manifest declared the same provider. The report binds
 every `(target, artifact SHA-256)` in the release matrix. Only a
-`passed` result can be indexed. Every release requires evidence for
-`soksak-spec-release@0.0.1` and its kind schema. A sidecar additionally requires evidence for
+`passed` result can be indexed. Every release requires release and manifest claims. A sidecar additionally requires evidence for
 its declared runtime interface. Plugin-kind evidence includes the exact runtime-dependency
 projection rule in §3. Registry report references are an evidence surface; they do not add
 a runtime dependency, command, or call surface.
@@ -129,7 +118,7 @@ signed its exact digest into a certified index.
 
 ## 5. Signed registry certification
 
-`soksak-spec-registry@0.0.1` is signed with Ed25519. Trust configuration pins the expected
+The registry document is signed with Ed25519. Trust configuration pins the expected
 registry `id`, expected `keyId`, and the 32-byte public key independently of the downloaded
 index. Shape validation alone never makes an index trusted.
 
@@ -153,7 +142,7 @@ Certification is one fail-closed boundary:
    - same sequence with another digest: equivocation failure.
 6. Persist the returned high-water only after the whole certification succeeds.
 
-Downstream code receives `CertifiedRegistryIndex`, not a structurally parsed index. Plugin, sidecar, and kit
+Downstream code receives `CertifiedRegistryIndex`, not a structurally parsed index. Plugin, sidecar, kit, contract, and spec
 installation then verifies exact signed release identity, same-repository/tag URLs, every report
 digest, complete required evidence, and every artifact digest
 before extraction.
@@ -169,7 +158,7 @@ The schemas are:
 
 The corpus is under `test/fixtures/platform-wire/`. Consumers in another language should
 first reproduce the canonical registry bytes/digest/signature, then accept every valid
-plugin/sidecar/kit fixture and reject mutations of identity, URL, digest, target, manifest,
+plugin/sidecar/kit/contract/spec fixture and reject mutations of identity, URL, digest, target, manifest,
 unknown fields, continuity, and evidence coverage.
 
 The installed GitHub Release package provides:

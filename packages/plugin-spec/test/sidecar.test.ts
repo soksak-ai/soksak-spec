@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseSidecarManifest } from "../src/sidecar.js";
 
 const manifest = () => ({
-  spec: "soksak-spec-sidecar@0.0.1", id: "soksak-sidecar-terminal-vt100", version: "0.0.1",
+  id: "soksak-sidecar-terminal-vt100", version: "0.0.1",
   interface: { id: "soksak-spec-sidecar-terminal", version: "0.0.1" },
   process: "dist/soksak-sidecar-terminal-vt100",
 });

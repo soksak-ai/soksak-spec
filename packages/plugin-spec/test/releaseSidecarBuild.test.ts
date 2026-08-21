@@ -33,7 +33,6 @@ function sha256(bytes: Buffer): string {
 function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string; targets?: string[] } = {}): void {
   const targets = overrides.targets ?? TARGETS;
   const sidecar = {
-    spec: "soksak-spec-sidecar@0.0.1",
     id: "soksak-sidecar-example",
     version: "0.0.1",
     interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
@@ -99,7 +98,6 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
 
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
     expect(release).toMatchObject({
-      spec: "soksak-spec-release@0.0.1",
       sidecar: { id: "soksak-sidecar-example", version: "0.0.1" },
       source: { repository: "https://github.com/soksak-ai/soksak-sidecar-example", commit: COMMIT },
     });
@@ -109,17 +107,16 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
       expect(artifact.format).toBe("tar.gz");
       expect(artifact.manifest).toBe("sidecar.json");
     }
-    const contracts: Record<string, unknown> = {
-      "conformance-release.json": "soksak-spec-release@0.0.1",
-      "conformance-sidecar.json": "soksak-spec-sidecar@0.0.1",
-      "conformance-interface.json": { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+    const claims: Record<string, unknown> = {
+      "conformance-release.json": { release: true },
+      "conformance-sidecar.json": { manifest: true },
+      "conformance-interface.json": { contract: { id: "soksak-spec-sidecar-example", version: "0.0.1" } },
     };
-    for (const [name, contract] of Object.entries(contracts)) {
+    for (const [name, claim] of Object.entries(claims)) {
       const report = JSON.parse(fs.readFileSync(path.join(outDir, name), "utf8"));
       expect(report).toMatchObject({
-        spec: "soksak-spec-conformance@0.0.1",
         subject: { sidecar: { id: "soksak-sidecar-example", version: "0.0.1" } },
-        contract,
+        claim,
         result: "passed",
       });
       expect(report.artifacts).toHaveLength(5);

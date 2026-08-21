@@ -12,7 +12,7 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { parseSpecReleaseManifest, SPEC_RELEASE_SPEC } from "./spec-release.mjs";
+import { parseReleaseManifest, releaseIdentity } from "../packages/plugin-spec/dist/spec.js";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const STRICT_SEMVER_RE = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const RUST_CRATES = ["soksak-spec-contract", "soksak-spec-service", "soksak-spec-socket"];
@@ -56,10 +56,9 @@ export function specReleaseIdentity(workspace, pluginSpec) {
   const release = workspace?.soksakRelease;
   if (
     release === null || typeof release !== "object" || Array.isArray(release) ||
-    release.kind !== "spec" ||
-    typeof release.id !== "string" || !/^soksak-[a-z0-9-]+$/.test(release.id) ||
+    !release.spec || typeof release.spec !== "object" || release.spec.id !== "soksak-spec" || release.spec.version !== workspace.version ||
     typeof release.repository !== "string" ||
-    typeof release.manifest !== "string" || release.manifest !== `${release.id}-release.json`
+    typeof release.manifest !== "string" || release.manifest !== `${release.spec.id}-release.json`
   ) {
     throw new Error("workspace soksakRelease metadata is invalid");
   }
@@ -68,8 +67,7 @@ export function specReleaseIdentity(workspace, pluginSpec) {
     throw new Error("workspace and plugin-spec versions must both equal the same SemVer");
   }
   return {
-    kind: release.kind,
-    id: release.id,
+    id: release.spec.id,
     repository: release.repository,
     manifest: release.manifest,
     version,
@@ -175,28 +173,34 @@ function verifyArchive(path, identity) {
 
 export function buildPlatformRelease({ commit, archiveName, archiveDigest, identity }) {
   const version = strictSemver(identity?.version, "release identity version");
-  const releaseTag = `${identity.id}-v${version}`;
+  const releaseTag = `v${version}`;
+  const repository = identity.repository;
+  const artifact = {
+    target: "any",
+    url: `${repository}/releases/download/${releaseTag}/${archiveName}`,
+    sha256: archiveDigest,
+    format: "tgz",
+    manifest: "spec.json",
+  };
+  const report = (claim) => ({
+    subject: { spec: { id: identity.id, version } }, claim, result: "passed",
+    validator: { name: "soksak-conformance", version },
+    artifacts: [{ target: "any", sha256: archiveDigest }],
+  });
+  const reports = [
+    ["conformance-manifest.json", report({ manifest: true })],
+    ["conformance-release.json", report({ release: true })],
+  ].map(([name, value]) => {
+    const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+    return { name, bytes, reference: { url: `${repository}/releases/download/${releaseTag}/${name}`, sha256: createHash("sha256").update(bytes).digest("hex") } };
+  });
   return {
-    spec: SPEC_RELEASE_SPEC,
-    kind: identity.kind,
-    id: identity.id,
-    version,
+    spec: { id: identity.id, version },
     source: { repository: identity.repository, commit },
-    releaseTag,
     dependencies: [],
-    packages: [
-      {
-        ecosystem: "javascript",
-        name: identity.packageName,
-        version,
-        artifact: {
-          url: `${identity.repository}/releases/download/${releaseTag}/${archiveName}`,
-          sha256: archiveDigest,
-          format: "tgz",
-        },
-      },
-      ...RUST_CRATES.map((name) => ({ ecosystem: "rust", name, version })),
-    ],
+    artifacts: [artifact],
+    reports: reports.map(({ reference }) => reference),
+    reportFiles: reports,
   };
 }
 
@@ -236,8 +240,9 @@ export function verifyRelease(argv = process.argv.slice(2)) {
       throw new Error(`unexpected archive name: ${archiveName}`);
     }
     const archiveDigest = sha256(first);
-    const manifest = buildPlatformRelease({ commit, archiveName, archiveDigest, identity });
-    const parsed = parseSpecReleaseManifest(manifest);
+    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, identity });
+    const { reportFiles, ...manifest } = built;
+    const parsed = parseReleaseManifest(manifest);
     if (!parsed.ok) {
       throw new Error(`generated platform release is invalid:\n${parsed.errors.join("\n")}`);
     }
@@ -246,6 +251,7 @@ export function verifyRelease(argv = process.argv.slice(2)) {
     const manifestPath = join(artifacts, identity.manifest);
     copyFileSync(first, finalArchive);
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    for (const report of reportFiles) writeFileSync(join(artifacts, report.name), report.bytes);
     if (sha256(finalArchive) !== archiveDigest) {
       throw new Error("copied release archive digest changed");
     }

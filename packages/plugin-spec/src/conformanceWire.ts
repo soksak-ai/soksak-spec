@@ -11,13 +11,10 @@ import {
 } from "./release.js";
 import {
   ANY_TARGET,
-  CONFORMANCE_REPORT_SPEC,
-  RELEASE_SPEC,
   RUST_SIDECAR_TARGETS,
   SHA256_RE,
   STRICT_SEMVER_RE,
   COMPONENT_ID_RE,
-  MANIFEST_SPEC_BY_RELEASE_KIND,
   type ReleaseKind,
 } from "./release-primitives.js";
 import { checkKnownKeys, isRecord } from "./util.js";
@@ -25,16 +22,17 @@ import { checkKnownKeys, isRecord } from "./util.js";
 export type ConformanceSubject =
   | { plugin: ExactReference }
   | { sidecar: ExactReference }
-  | { kit: ExactReference };
+  | { kit: ExactReference }
+  | { contract: ExactReference }
+  | { spec: ExactReference };
 
 export interface ConformanceArtifactSubject { target: "any" | (typeof RUST_SIDECAR_TARGETS)[number]; sha256: string }
 export interface ConformanceValidator { name: string; version: string }
-export type PlatformConformanceContract = typeof RELEASE_SPEC | (typeof MANIFEST_SPEC_BY_RELEASE_KIND)[ReleaseKind];
+export type ConformanceClaim = { release: true } | { manifest: true } | { contract: ContractProviderRef };
 
 export interface ConformanceReport {
-  spec: typeof CONFORMANCE_REPORT_SPEC;
   subject: ConformanceSubject;
-  contract: PlatformConformanceContract | ContractProviderRef;
+  claim: ConformanceClaim;
   result: "passed";
   validator: ConformanceValidator;
   artifacts: ConformanceArtifactSubject[];
@@ -47,16 +45,25 @@ function strictObject(raw: unknown, allowed: readonly string[], required: readon
   return raw;
 }
 
-function isPlatformConformanceContract(value: unknown): value is PlatformConformanceContract {
-  return typeof value === "string" && (value === RELEASE_SPEC || Object.values(MANIFEST_SPEC_BY_RELEASE_KIND).includes(value as never));
+export function conformanceClaimKey(claim: ConformanceClaim): string {
+  if ("release" in claim) return "release";
+  if ("manifest" in claim) return "manifest";
+  return `contract\0${contractProviderKey(claim.contract)}`;
 }
 
-export function conformanceContractKey(contract: PlatformConformanceContract | ContractProviderRef): string {
-  return typeof contract === "string" ? `schema\0${contract}` : `domain\0${contractProviderKey(contract)}`;
+export function requiredConformanceClaims(_kind: ReleaseKind): ConformanceClaim[] {
+  return [{ manifest: true }, { release: true }];
 }
 
-export function requiredConformanceContracts(kind: ReleaseKind): PlatformConformanceContract[] {
-  return [RELEASE_SPEC, MANIFEST_SPEC_BY_RELEASE_KIND[kind]].sort();
+function parseClaim(raw: unknown, errors: string[]): ConformanceClaim | null {
+  const value = strictObject(raw, ["contract", "manifest", "release"], [], "conformance.claim", errors);
+  if (!value) return null;
+  const kinds = (["release", "manifest", "contract"] as const).filter((kind) => value[kind] !== undefined);
+  if (kinds.length !== 1) { errors.push("conformance.claim: exactly one release, manifest, or contract claim required"); return null; }
+  if (kinds[0] === "release") return value.release === true ? { release: true } : (errors.push("conformance.claim.release: true required"), null);
+  if (kinds[0] === "manifest") return value.manifest === true ? { manifest: true } : (errors.push("conformance.claim.manifest: true required"), null);
+  const contract = parseContractProviderRef(value.contract, "conformance.claim.contract", errors);
+  return contract ? { contract } : null;
 }
 
 function parseExactReference(raw: unknown, label: string, errors: string[]): ExactReference | null {
@@ -69,10 +76,10 @@ function parseExactReference(raw: unknown, label: string, errors: string[]): Exa
 }
 
 function parseSubject(raw: unknown, errors: string[]): ConformanceSubject | null {
-  const value = strictObject(raw, ["kit", "plugin", "sidecar"], [], "conformance.subject", errors);
+  const value = strictObject(raw, ["contract", "kit", "plugin", "sidecar", "spec"], [], "conformance.subject", errors);
   if (!value) return null;
-  const kinds = (["plugin", "sidecar", "kit"] as const).filter((kind) => value[kind] !== undefined);
-  if (kinds.length !== 1) { errors.push("conformance.subject: exactly one plugin, sidecar, or kit required"); return null; }
+  const kinds = (["plugin", "sidecar", "kit", "contract", "spec"] as const).filter((kind) => value[kind] !== undefined);
+  if (kinds.length !== 1) { errors.push("conformance.subject: exactly one plugin, sidecar, kit, contract, or spec required"); return null; }
   const kind = kinds[0];
   const reference = parseExactReference(value[kind], `conformance.subject.${kind}`, errors);
   return reference ? { [kind]: reference } as ConformanceSubject : null;
@@ -81,17 +88,16 @@ function parseSubject(raw: unknown, errors: string[]): ConformanceSubject | null
 function subjectIdentity(subject: ConformanceSubject): { kind: ReleaseKind; id: string; version: string } {
   if ("plugin" in subject) return { kind: "plugin", ...subject.plugin };
   if ("sidecar" in subject) return { kind: "sidecar", ...subject.sidecar };
+  if ("contract" in subject) return { kind: "contract", ...subject.contract };
+  if ("spec" in subject) return { kind: "spec", ...subject.spec };
   return { kind: "kit", ...subject.kit };
 }
 
 export function parseConformanceReport(raw: unknown): PlatformParseResult<ConformanceReport> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["artifacts", "contract", "result", "spec", "subject", "validator"], ["artifacts", "contract", "result", "spec", "subject", "validator"], "conformance", errors);
+  const value = strictObject(raw, ["artifacts", "claim", "result", "subject", "validator"], ["artifacts", "claim", "result", "subject", "validator"], "conformance", errors);
   if (!value) return { ok: false, errors };
-  if (value.spec !== CONFORMANCE_REPORT_SPEC) errors.push(`conformance.spec: ${CONFORMANCE_REPORT_SPEC} required`);
-  const contract = isPlatformConformanceContract(value.contract)
-    ? value.contract
-    : parseContractProviderRef(value.contract, "conformance.contract", errors);
+  const claim = parseClaim(value.claim, errors);
   if (value.result !== "passed") errors.push("conformance.result: passed required");
   const subject = parseSubject(value.subject, errors);
   const validatorRaw = strictObject(value.validator, ["name", "version"], ["name", "version"], "conformance.validator", errors);
@@ -115,8 +121,8 @@ export function parseConformanceReport(raw: unknown): PlatformParseResult<Confor
   const targets = artifacts.map((artifact) => artifact.target);
   if (new Set(targets).size !== targets.length) errors.push("conformance.artifacts: duplicate targets forbidden");
   if (targets.some((target, index) => target !== [...targets].sort()[index])) errors.push("conformance.artifacts: targets must be sorted");
-  if (errors.length > 0 || !subject || !validator || !contract) return { ok: false, errors };
-  return { ok: true, value: { spec: CONFORMANCE_REPORT_SPEC, subject, contract, result: "passed", validator, artifacts } };
+  if (errors.length > 0 || !subject || !validator || !claim) return { ok: false, errors };
+  return { ok: true, value: { subject, claim, result: "passed", validator, artifacts } };
 }
 
 export function verifyConformanceReport(
@@ -130,8 +136,8 @@ export function verifyConformanceReport(
   if (subject.kind !== identity.kind || subject.id !== identity.id || subject.version !== identity.version) errors.push("conformance subject identity mismatch");
   const expected = release.artifacts.map(({ target, sha256 }) => ({ target, sha256 }));
   if (JSON.stringify(report.artifacts) !== JSON.stringify(expected)) errors.push("conformance artifact coverage must equal the release matrix");
-  if (typeof report.contract !== "string") {
-    const wanted = contractProviderKey(report.contract);
+  if ("contract" in report.claim) {
+    const wanted = contractProviderKey(report.claim.contract);
     if (!declaredContracts.some((contract) => contractProviderKey(contract) === wanted)) errors.push("conformance domain contract is not declared by the plugin or sidecar manifest");
   }
   return errors.length === 0 ? { ok: true } : { ok: false, errors };

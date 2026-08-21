@@ -1,8 +1,8 @@
 # @soksak-ai/plugin-spec
 
-The public soksak platform boundary for independently released plugins, sidecars, kits,
+The public soksak platform boundary for independently released plugins, sidecars, kits, contracts, specs,
 conformance reports, and signed registries. It is a validation library and CLI, not a
-runtime implementation and not a central home for plugin-, sidecar-, or kit-specific contracts.
+runtime implementation and not a central home for component-specific domain contracts.
 
 ## Distribution
 
@@ -58,7 +58,7 @@ All external input starts as `unknown` and must cross the relevant parser. Only
 
 `parseManifest(raw, dirName)` remains the plugin-specific parser. Its manifest id must equal
 `dirName`. `plugin.json` owns runtime declarations; source, install dependencies, artifacts,
-and archive manifest selection are owned by `soksak-spec-release@0.0.1`.
+and archive manifest selection are owned by the release document.
 
 ## Plugin UI surfaces
 
@@ -84,7 +84,7 @@ binding, or input eligibility.
 ## Language-neutral contract
 
 JSON Schemas ship in `schema/`. Cross-language canonical/signature fixtures and valid
-plugin/sidecar/kit closures ship in `test/fixtures/platform-wire/`. The normative ownership,
+plugin/sidecar/kit/contract/spec closures ship in `test/fixtures/platform-wire/`. The normative ownership,
 dependency, evidence, and certification rules are in
 [`docs/PLATFORM-WIRE.md`](docs/PLATFORM-WIRE.md).
 

@@ -27,17 +27,14 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
     ...overrides.pkg,
   };
   const plugin = {
-    spec: "soksak-spec-plugin@0.0.1",
     id: "soksak-plugin-example",
     name: { en: "Example", ko: "예제" },
     version: "0.0.1",
+    description: { en: "Example plugin", ko: "예제 플러그인" },
     entry: "main.js",
     permissions: ["data"],
     ...overrides.plugin,
   };
-  fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
-  fs.copyFileSync(path.join(TEMPLATE, "build-release.mjs"), path.join(root, "scripts", "build-release.mjs"));
-  fs.copyFileSync(path.join(TEMPLATE, "archive.mjs"), path.join(root, "scripts", "archive.mjs"));
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(FILES)}\n`);
   if (overrides.releaseDependencies) {
     fs.mkdirSync(path.join(root, "release"), { recursive: true });
@@ -56,7 +53,7 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
 
 function build(out = outDir): { status: number | null; stdout: string; stderr: string } {
   // Run from the fixture plugin root discovered by release-files.json.
-  const r = spawnSync("node", [path.join(root, "scripts", "build-release.mjs"), "--commit", COMMIT, "--out", out], {
+  const r = spawnSync("node", [path.join(TEMPLATE, "build-release.mjs"), "--commit", COMMIT, "--out", out], {
     encoding: "utf8",
     cwd: root,
   });
@@ -83,7 +80,6 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
 
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json")).toString());
     expect(release).toMatchObject({
-      spec: "soksak-spec-release@0.0.1",
       plugin: { id: "soksak-plugin-example", version: "0.0.1" },
       source: { repository: "https://github.com/soksak-ai/soksak-plugin-example", commit: COMMIT },
     });
@@ -127,7 +123,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     writeFixture({ plugin: { consumes: [{ id: "soksak-spec-plugin-git" }] } });
     const r = build();
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toMatch(/consumes\[0\] has invalid keys/);
+    expect(r.stderr).toMatch(/consumes\[0\]\.range/);
   });
 
   it("refuses a non-private plugin package", () => {
@@ -137,16 +133,16 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(r.stderr).toMatch(/must be private/);
   });
 
-  it("refuses a stale spec id (public plugin boundary)", () => {
-    writeFixture({ plugin: { spec: "soksak-spec-plugin@1" } });
+  it("refuses an obsolete schema discriminator", () => {
+    writeFixture({ plugin: { schema: "soksak-spec-plugin@0.0.1" } });
     const r = build();
     expect(r.status).not.toBe(0);
-    expect(r.stderr).toMatch(/public plugin boundary/);
+    expect(r.stderr).toMatch(/plugin manifest is invalid/);
   });
 
   it("refuses a non-SHA commit", () => {
     writeFixture();
-    const r = spawnSync("node", [path.join(root, "scripts", "build-release.mjs"), "--commit", "v0.0.1", "--out", outDir], {
+    const r = spawnSync("node", [path.join(TEMPLATE, "build-release.mjs"), "--commit", "v0.0.1", "--out", outDir], {
       encoding: "utf8",
       cwd: root,
     });

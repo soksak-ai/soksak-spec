@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseManifest, SPEC_VERSION } from "../src/spec";
+import { parseManifest } from "../src/spec";
 import {
   C2_STATIC_ENFORCEMENT,
   isContentView,
@@ -17,7 +17,6 @@ import {
 
 function base(views: unknown[]): Record<string, unknown> {
   return {
-    spec: SPEC_VERSION,
     id: "demo",
     name: "데모",
     version: "1.0.0",

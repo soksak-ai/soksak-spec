@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  CONFORMANCE_SPEC, ID, INTERFACE, RELEASE_SPEC, REPOSITORY, SIDECAR_SPEC, TAG, VERSION,
+  ID, INTERFACE, REPOSITORY, TAG, VERSION,
   assertBaseline, assertCommit, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
   parseOptions, readRegularFile, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
 } from "./release-contract.mjs";
@@ -46,18 +46,17 @@ expectedNames.sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.fro
 if (JSON.stringify(actualNames) !== JSON.stringify(expectedNames)) throw new Error("artifact directory must contain exactly the declared release matrix");
 
 const evidence = artifacts.map(({ target, sha256: digest }) => ({ target, sha256: digest }));
-const report = (contract) => ({
-  spec: CONFORMANCE_SPEC,
+const report = (claim) => ({
   subject: { sidecar: { id: ID, version: VERSION } },
-  contract,
+  claim,
   result: "passed",
   validator: { name: "soksak-validate", version: VERSION },
   artifacts: evidence,
 });
 const reports = [
-  ["conformance-interface.json", report(INTERFACE)],
-  ["conformance-release.json", report(RELEASE_SPEC)],
-  ["conformance-sidecar.json", report(SIDECAR_SPEC)],
+  ["conformance-interface.json", report({ contract: INTERFACE })],
+  ["conformance-release.json", report({ release: true })],
+  ["conformance-sidecar.json", report({ manifest: true })],
 ].map(([name, value]) => {
   const bytes = jsonBytes(value);
   return { name, bytes, reference: { url: `${REPOSITORY}/releases/download/${TAG}/${name}`, sha256: sha256(bytes) } };

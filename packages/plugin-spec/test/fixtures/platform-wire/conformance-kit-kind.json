@@ -1,12 +1,10 @@
 {
-  "spec": "soksak-spec-conformance@0.0.1",
   "subject": {
     "kit": {
       "id": "terminal-common",
       "version": "0.0.1"
     }
   },
-  "contract": "soksak-spec-kit@0.0.1",
   "result": "passed",
   "validator": {
     "name": "soksak-conformance",
@@ -17,5 +15,8 @@
       "target": "any",
       "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     }
-  ]
+  ],
+  "claim": {
+    "manifest": true
+  }
 }

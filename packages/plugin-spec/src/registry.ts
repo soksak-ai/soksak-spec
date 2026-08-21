@@ -9,8 +9,10 @@ import {
   type ReleaseIdentity,
   type SidecarRelease,
   type KitRelease,
+  type ContractRelease,
+  type SpecRelease,
 } from "./release.js";
-import { REGISTRY_SPEC, SHA256_RE } from "./release-primitives.js";
+import { SHA256_RE } from "./release-primitives.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
 export interface RegistryProfile {
@@ -20,12 +22,13 @@ export interface RegistryProfile {
 }
 
 export interface RegistryPayload {
-  spec: typeof REGISTRY_SPEC;
   id: string;
   sequence: number;
   plugins: PluginRelease[];
   sidecars: SidecarRelease[];
   kits: KitRelease[];
+  contracts: ContractRelease[];
+  specs: SpecRelease[];
   profiles: RegistryProfile[];
 }
 
@@ -78,7 +81,7 @@ function identityKey(identity: ReleaseIdentity): string {
 }
 
 export function registryReleases(registry: RegistryPayload): ReleaseDocument[] {
-  return [...registry.plugins, ...registry.sidecars, ...registry.kits];
+  return [...registry.plugins, ...registry.sidecars, ...registry.kits, ...registry.contracts, ...registry.specs];
 }
 
 function parseReleaseArray<T extends ReleaseDocument>(raw: unknown, label: string, kind: ReleaseIdentity["kind"], errors: string[]): T[] {
@@ -108,32 +111,33 @@ function parseProfile(raw: unknown, index: number, errors: string[]): RegistryPr
 
 export function parseRegistryPayload(raw: unknown): PlatformParseResult<RegistryPayload> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["id", "kits", "plugins", "profiles", "sequence", "sidecars", "spec"], ["id", "kits", "plugins", "profiles", "sequence", "sidecars", "spec"], "registry", errors);
+  const value = strictObject(raw, ["contracts", "id", "kits", "plugins", "profiles", "sequence", "sidecars", "specs"], ["contracts", "id", "kits", "plugins", "profiles", "sequence", "sidecars", "specs"], "registry", errors);
   if (!value) return { ok: false, errors };
-  if (value.spec !== REGISTRY_SPEC) errors.push("registry.spec: " + REGISTRY_SPEC + " required");
   if (typeof value.id !== "string" || !REGISTRY_ID_RE.test(value.id)) errors.push("registry.id: registry id required");
   if (!Number.isSafeInteger(value.sequence) || (value.sequence as number) < 1) errors.push("registry.sequence: positive integer required");
   const plugins = parseReleaseArray<PluginRelease>(value.plugins, "registry.plugins", "plugin", errors);
   const sidecars = parseReleaseArray<SidecarRelease>(value.sidecars, "registry.sidecars", "sidecar", errors);
   const kits = parseReleaseArray<KitRelease>(value.kits, "registry.kits", "kit", errors);
+  const contracts = parseReleaseArray<ContractRelease>(value.contracts, "registry.contracts", "contract", errors);
+  const specs = parseReleaseArray<SpecRelease>(value.specs, "registry.specs", "spec", errors);
   const profiles: RegistryProfile[] = [];
   if (!Array.isArray(value.profiles)) errors.push("registry.profiles: array required");
   else value.profiles.forEach((item, index) => { const profile = parseProfile(item, index, errors); if (profile) profiles.push(profile); });
   sortedUnique(profiles.map((profile) => profile.id), "registry.profiles", errors);
-  const index = new Map(registryReleases({ spec: REGISTRY_SPEC, id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, profiles }).map((release) => [identityKey(releaseIdentity(release)), release]));
+  const index = new Map(registryReleases({ id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, contracts, specs, profiles }).map((release) => [identityKey(releaseIdentity(release)), release]));
   for (const release of index.values()) for (const dependency of release.dependencies) if (!index.has(identityKey(dependencyIdentity(dependency)))) errors.push("registry dependency absent: " + identityKey(dependencyIdentity(dependency)));
   for (const profile of profiles) if (!index.has("plugin:" + profile.plugin.id + "@" + profile.plugin.version)) errors.push("registry profile plugin absent: " + profile.id);
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, value: { spec: REGISTRY_SPEC, id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, profiles } };
+  return { ok: true, value: { id: value.id as string, sequence: value.sequence as number, plugins, sidecars, kits, contracts, specs, profiles } };
 }
 
 export function parseSignedRegistryIndex(raw: unknown): PlatformParseResult<SignedRegistryIndex> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["algorithm", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "profiles", "sequence", "sidecars", "signature", "spec"], ["algorithm", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "profiles", "sequence", "sidecars", "signature", "spec"], "registry", errors);
+  const value = strictObject(raw, ["algorithm", "contracts", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "profiles", "sequence", "sidecars", "signature", "specs"], ["algorithm", "contracts", "expiresAt", "id", "issuedAt", "keyId", "kits", "plugins", "profiles", "sequence", "sidecars", "signature", "specs"], "registry", errors);
   if (!value) return { ok: false, errors };
   const payload = parseRegistryPayload({
-    spec: value.spec, id: value.id, sequence: value.sequence,
-    plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, profiles: value.profiles,
+    id: value.id, sequence: value.sequence,
+    plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, contracts: value.contracts, specs: value.specs, profiles: value.profiles,
   });
   if (!payload.ok) errors.push(...payload.errors);
   if (!validTimestamp(value.issuedAt)) errors.push("registry.issuedAt: canonical timestamp required");
@@ -167,15 +171,15 @@ export function canonicalRegistryPayload(raw: unknown): Uint8Array {
   const source = { ...raw };
   delete source.signature;
   const registry = parseRegistryPayload({
-    spec: source.spec, id: source.id, sequence: source.sequence,
-    plugins: source.plugins, sidecars: source.sidecars, kits: source.kits, profiles: source.profiles,
+    id: source.id, sequence: source.sequence,
+    plugins: source.plugins, sidecars: source.sidecars, kits: source.kits, contracts: source.contracts, specs: source.specs, profiles: source.profiles,
   });
   if (!registry.ok) throw new Error("invalid registry payload: " + registry.errors.join("; "));
   if (!validTimestamp(source.issuedAt) || !validTimestamp(source.expiresAt) || source.algorithm !== "ed25519" || typeof source.keyId !== "string" || !KEY_ID_RE.test(source.keyId)) {
     throw new Error("invalid registry signing envelope");
   }
   const value = registry.value;
-  const registryPayload: RegistryPayload = { spec: value.spec, id: value.id, sequence: value.sequence, plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, profiles: value.profiles };
+  const registryPayload: RegistryPayload = { id: value.id, sequence: value.sequence, plugins: value.plugins, sidecars: value.sidecars, kits: value.kits, contracts: value.contracts, specs: value.specs, profiles: value.profiles };
   const payload = { registry: registryPayload, issuedAt: source.issuedAt, expiresAt: source.expiresAt, algorithm: "ed25519", keyId: source.keyId };
   return new TextEncoder().encode(canonicalJson(payload));
 }

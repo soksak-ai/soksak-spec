@@ -1,12 +1,10 @@
 {
-  "spec": "soksak-spec-conformance@0.0.1",
   "subject": {
     "plugin": {
       "id": "weather-plugin",
       "version": "0.0.1"
     }
   },
-  "contract": "soksak-spec-release@0.0.1",
   "result": "passed",
   "validator": {
     "name": "soksak-conformance",
@@ -17,5 +15,8 @@
       "target": "any",
       "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
     }
-  ]
+  ],
+  "claim": {
+    "release": true
+  }
 }

@@ -220,19 +220,19 @@ function validateConformance(args) {
       failed++;
       continue;
     }
-    if (report.value.contract === "soksak-spec-plugin@0.0.1" && !ownerPlugin) {
+    if ("manifest" in report.value.claim && identity.kind === "plugin" && !ownerPlugin) {
       printErrors(path, [
         "soksak-spec-plugin@0.0.1 evidence requires --plugin-manifest so runtime plugin dependencies can be matched to the release closure",
       ]);
       failed++;
       continue;
     }
-    if (typeof report.value.contract === "object" && identity.kind === "sidecar" && !ownerSidecar) {
+    if ("contract" in report.value.claim && identity.kind === "sidecar" && !ownerSidecar) {
       printErrors(path, ["sidecar domain evidence requires --sidecar-manifest"]);
       failed++;
       continue;
     }
-    console.log(`✓ ${path} (${report.value.contract})`);
+    console.log(`✓ ${path} (${JSON.stringify(report.value.claim)})`);
   }
   return failed > 0 ? 1 : 0;
 }

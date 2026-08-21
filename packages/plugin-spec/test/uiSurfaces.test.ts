@@ -2,7 +2,7 @@
 // The manifest owns static placement/labels/command bindings; runtime code supplies only
 // declared overlay providers and state updates. Callback/function-shaped declarations are invalid.
 import { describe, expect, it } from "vitest";
-import { parseManifest, SERVICE_CONTRACT_REQUIREMENT, SPEC_VERSION } from "../src/spec";
+import { parseManifest, SERVICE_CONTRACT_REQUIREMENT } from "../src/spec";
 
 function base(
   contributes: Record<string, unknown>,
@@ -10,7 +10,6 @@ function base(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
-    spec: SPEC_VERSION,
     id: "demo",
     name: "Demo",
     version: "1.0.0",

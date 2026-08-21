@@ -4,11 +4,10 @@
   "title": "soksak conformance report 0.0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["spec", "subject", "contract", "result", "validator", "artifacts"],
+  "required": ["subject", "claim", "result", "validator", "artifacts"],
   "properties": {
-    "spec": { "const": "soksak-spec-conformance@0.0.1" },
     "subject": { "$ref": "#/$defs/subject" },
-    "contract": { "anyOf": [{ "enum": ["soksak-spec-kit@0.0.1", "soksak-spec-plugin@0.0.1", "soksak-spec-release@0.0.1", "soksak-spec-sidecar@0.0.1"] }, { "$ref": "#/$defs/contractProvider" }] },
+    "claim": { "$ref": "#/$defs/claim" },
     "result": { "const": "passed" },
     "validator": { "$ref": "#/$defs/validator" },
     "artifacts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/artifact" } }
@@ -16,8 +15,9 @@
   "$defs": {
     "componentId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
     "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "$ref": "#/$defs/componentId" }, "version": { "const": "0.0.1" } } },
-    "subject": { "type": "object", "additionalProperties": false, "minProperties": 1, "maxProperties": 1, "properties": { "plugin": { "$ref": "#/$defs/reference" }, "sidecar": { "$ref": "#/$defs/reference" }, "kit": { "$ref": "#/$defs/reference" } } },
+    "subject": { "type": "object", "additionalProperties": false, "minProperties": 1, "maxProperties": 1, "properties": { "plugin": { "$ref": "#/$defs/reference" }, "sidecar": { "$ref": "#/$defs/reference" }, "kit": { "$ref": "#/$defs/reference" }, "contract": { "$ref": "#/$defs/reference" }, "spec": { "$ref": "#/$defs/reference" } } },
     "contractProvider": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "type": "string", "pattern": "^soksak-spec-(?:(?:sidecar|plugin)-[a-z0-9][a-z0-9-]*|service(?:-[a-z0-9][a-z0-9-]*)?)$" }, "version": { "const": "0.0.1" } } },
+    "claim": { "type": "object", "additionalProperties": false, "minProperties": 1, "maxProperties": 1, "properties": { "release": { "const": true }, "manifest": { "const": true }, "contract": { "$ref": "#/$defs/contractProvider" } } },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "target": { "enum": ["any", "aarch64-apple-darwin", "aarch64-pc-windows-msvc", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"] },
     "validator": { "type": "object", "additionalProperties": false, "required": ["name", "version"], "properties": { "name": { "$ref": "#/$defs/componentId" }, "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" } } },

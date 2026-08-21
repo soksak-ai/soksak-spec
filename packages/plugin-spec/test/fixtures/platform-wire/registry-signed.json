@@ -1,10 +1,8 @@
 {
-  "spec": "soksak-spec-registry@0.0.1",
   "id": "fixture",
   "sequence": 42,
   "plugins": [
     {
-      "spec": "soksak-spec-release@0.0.1",
       "plugin": {
         "id": "weather-plugin",
         "version": "0.0.1"
@@ -45,7 +43,6 @@
   ],
   "sidecars": [
     {
-      "spec": "soksak-spec-release@0.0.1",
       "sidecar": {
         "id": "weather-sidecar",
         "version": "0.0.1"
@@ -89,7 +86,6 @@
   ],
   "kits": [
     {
-      "spec": "soksak-spec-release@0.0.1",
       "kit": {
         "id": "terminal-common",
         "version": "0.0.1"
@@ -105,7 +101,7 @@
           "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz",
           "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
           "format": "tgz",
-          "manifest": "package.json"
+          "manifest": "kit.json"
         }
       ],
       "reports": [
@@ -116,6 +112,70 @@
         {
           "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit-release.conformance.json",
           "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+        }
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "contract": {
+        "id": "terminal-contract",
+        "version": "0.0.1"
+      },
+      "source": {
+        "repository": "https://github.com/example/terminal-contract",
+        "commit": "dddddddddddddddddddddddddddddddddddddddd"
+      },
+      "dependencies": [
+        {
+          "spec": {
+            "id": "soksak-spec",
+            "version": "0.0.1"
+          },
+          "scope": "build"
+        }
+      ],
+      "artifacts": [
+        {
+          "target": "any",
+          "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.tgz",
+          "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "format": "tgz",
+          "manifest": "contract.json"
+        }
+      ],
+      "reports": [
+        {
+          "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.conformance.json",
+          "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      ]
+    }
+  ],
+  "specs": [
+    {
+      "spec": {
+        "id": "soksak-spec",
+        "version": "0.0.1"
+      },
+      "source": {
+        "repository": "https://github.com/example/soksak-spec",
+        "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "dependencies": [],
+      "artifacts": [
+        {
+          "target": "any",
+          "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.tgz",
+          "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "format": "tgz",
+          "manifest": "spec.json"
+        }
+      ],
+      "reports": [
+        {
+          "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.conformance.json",
+          "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
         }
       ]
     }
@@ -134,5 +194,5 @@
   "expiresAt": "2026-07-15T00:00:00Z",
   "algorithm": "ed25519",
   "keyId": "fixture-2026",
-  "signature": "IFJk8GssY+n5xdq6ACp/0VncG08NPBHt6fytH+DGv4CJZaRz6QMB+xJxgLD6Jdlm0i8gLDsiLqGxcJGvrzH9Cw=="
+  "signature": "oCskngJnATSsN/xOI6e83/SRoRaFlfT5Gufwj14p3F7iPR2cpC7MUX9+GkR7FYFrh/UmdHvOcfk0U6Zln4gSBw=="
 }

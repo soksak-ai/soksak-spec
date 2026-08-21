@@ -19,8 +19,8 @@ const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9]
 export function parseSidecarManifest(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("sidecar manifest must be an object");
   const keys = Object.keys(raw).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "spec", "version"])) throw new Error("sidecar manifest keys are closed");
-  if (raw.spec !== "soksak-spec-sidecar@0.0.1" || !/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || raw.version !== "0.0.1") throw new Error("invalid sidecar identity");
+  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "version"])) throw new Error("sidecar manifest keys are closed");
+  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || raw.version !== "0.0.1") throw new Error("invalid sidecar identity");
   if (raw.process !== `dist/${raw.id}`) throw new Error("sidecar process path must match its id");
   if (
     !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
@@ -41,10 +41,6 @@ export const VERSION = SIDECAR.version;
 export const TAG = `v${VERSION}`;
 export const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
 export const INTERFACE = SIDECAR.interface;
-export const RELEASE_SPEC = "soksak-spec-release@0.0.1";
-export const SIDECAR_SPEC = "soksak-spec-sidecar@0.0.1";
-export const CONFORMANCE_SPEC = "soksak-spec-conformance@0.0.1";
-
 export function releaseAssetName(target, sidecar = SIDECAR) {
   return `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
 }
@@ -52,7 +48,6 @@ export function releaseAssetName(target, sidecar = SIDECAR) {
 export function releaseIdentity(commit, sidecar = SIDECAR) {
   assertCommit(commit);
   return {
-    spec: RELEASE_SPEC,
     sidecar: { id: sidecar.id, version: sidecar.version },
     source: { repository: REPOSITORY, commit },
   };

@@ -7,18 +7,19 @@ import {
   resolveRegistryDependency,
   type RegistryPublicKey,
 } from "../src/registry.js";
-import { kitRelease, pluginRelease, sidecarRelease } from "./releaseFixture.js";
+import { contractRelease, kitRelease, pluginRelease, sidecarRelease, specRelease } from "./releaseFixture.js";
 
 const AT = Date.parse("2026-08-22T00:00:00Z");
 
 function unsigned(sequence = 1): Record<string, unknown> {
   return {
-    spec: "soksak-spec-registry@0.0.1",
     id: "official",
     sequence,
     plugins: [pluginRelease()],
     sidecars: [sidecarRelease()],
     kits: [kitRelease()],
+    contracts: [contractRelease()],
+    specs: [specRelease()],
     profiles: [{
       id: "weather",
       plugin: { id: "weather-plugin", version: "0.0.1" },
@@ -47,13 +48,15 @@ function trust(publicKey: RegistryPublicKey, highWater?: { sequence: number; dig
 }
 
 describe("signed plugin registry", () => {
-  it("parses direct plugin, sidecar, kit, and profile arrays", () => {
+  it("parses all five direct release arrays and profiles", () => {
     const parsed = parseSignedRegistryIndex(signer().signed(unsigned()));
     expect(parsed, JSON.stringify(parsed)).toMatchObject({ ok: true });
     if (!parsed.ok) return;
     expect(parsed.value.plugins[0].plugin.id).toBe("weather-plugin");
     expect(parsed.value.sidecars[0].sidecar.id).toBe("weather-sidecar");
     expect(parsed.value.kits[0].kit.id).toBe("terminal-common");
+    expect(parsed.value.contracts[0].contract.id).toBe("terminal-contract");
+    expect(parsed.value.specs[0].spec.id).toBe("soksak-spec");
     expect(parsed.value.profiles[0].plugin.id).toBe("weather-plugin");
   });
 
@@ -61,7 +64,7 @@ describe("signed plugin registry", () => {
     const oldArray = ["un", "its"].join("");
     const oldRegistryId = ["registry", "Id"].join("");
     const old = {
-      spec: "soksak-spec-registry@0.0.1", [oldRegistryId]: "official", sequence: 1,
+      [oldRegistryId]: "official", sequence: 1,
       [oldArray]: [], issuedAt: "2026-08-21T00:00:00Z", expiresAt: "2026-09-21T00:00:00Z",
       algorithm: "ed25519", keyId: "fixture-key", signature: Buffer.alloc(64).toString("base64"),
     };

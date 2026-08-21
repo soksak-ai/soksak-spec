@@ -11,7 +11,7 @@ export {
   isDependencyRange,
 } from "./semver.js";
 
-export const RELEASE_KINDS = ["kit", "plugin", "sidecar"] as const;
+export const RELEASE_KINDS = ["contract", "kit", "plugin", "sidecar", "spec"] as const;
 export type ReleaseKind = (typeof RELEASE_KINDS)[number];
 
 // Component identity is flat because registry identity is qualified separately.
@@ -41,25 +41,6 @@ export type ArtifactTarget = (typeof ARTIFACT_TARGETS)[number];
 // regular-file, portable-path, collision, and size invariants.
 export const ARTIFACT_FORMATS = ["tar.gz", "tgz"] as const;
 export type ArtifactFormat = (typeof ARTIFACT_FORMATS)[number];
-
-export const RELEASE_SPEC = "soksak-spec-release@0.0.1" as const;
-export const REGISTRY_SPEC = "soksak-spec-registry@0.0.1" as const;
-export const CONFORMANCE_REPORT_SPEC = "soksak-spec-conformance@0.0.1" as const;
-export const MANIFEST_SPEC_BY_RELEASE_KIND = {
-  kit: "soksak-spec-kit@0.0.1",
-  plugin: "soksak-spec-plugin@0.0.1",
-  sidecar: "soksak-spec-sidecar@0.0.1",
-} as const satisfies Record<ReleaseKind, string>;
-
-export const PLATFORM_SCHEMA_IDS = [
-  CONFORMANCE_REPORT_SPEC,
-  REGISTRY_SPEC,
-  RELEASE_SPEC,
-  MANIFEST_SPEC_BY_RELEASE_KIND.kit,
-  MANIFEST_SPEC_BY_RELEASE_KIND.plugin,
-  MANIFEST_SPEC_BY_RELEASE_KIND.sidecar,
-] as const;
-export type PlatformSchemaId = (typeof PLATFORM_SCHEMA_IDS)[number];
 
 export function isReleaseKind(value: unknown): value is ReleaseKind {
   return typeof value === "string" && (RELEASE_KINDS as readonly string[]).includes(value);

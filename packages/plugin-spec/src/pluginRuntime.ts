@@ -7,9 +7,7 @@
  * only the small set of mechanisms needed to cross a runtime boundary.
  */
 
-export const PLUGIN_RUNTIME_WIRE_SPEC = "soksak-spec-plugin-runtime@0.0.1";
-export const PLUGIN_RUNTIME_BOOTSTRAP_SPEC = PLUGIN_RUNTIME_WIRE_SPEC;
-export const PLUGIN_RUNTIME_CONFORMANCE_SPEC = PLUGIN_RUNTIME_WIRE_SPEC;
+export const PLUGIN_RUNTIME_PROTOCOL = "soksak-spec-plugin-runtime@0.0.1";
 
 /** Exact policy of the canonical srcdoc artifact; native builds pin its bytes separately. */
 export const PLUGIN_RUNTIME_BOOTSTRAP_CSP = [
@@ -367,7 +365,7 @@ export interface PluginRuntimeInventory {
 }
 
 export interface PluginRuntimeRequestEnvelope {
-  readonly spec: typeof PLUGIN_RUNTIME_WIRE_SPEC;
+  readonly protocol: typeof PLUGIN_RUNTIME_PROTOCOL;
   readonly kind: "request";
   readonly seq: number;
   readonly requestId: string;
@@ -376,7 +374,7 @@ export interface PluginRuntimeRequestEnvelope {
 }
 
 export interface PluginRuntimeSignalEnvelope {
-  readonly spec: typeof PLUGIN_RUNTIME_WIRE_SPEC;
+  readonly protocol: typeof PLUGIN_RUNTIME_PROTOCOL;
   readonly kind: "signal";
   readonly seq: number;
   readonly requestId: string;
@@ -389,7 +387,7 @@ export interface PluginRuntimeSignalEnvelope {
 }
 
 export interface PluginRuntimeResultEnvelope {
-  readonly spec: typeof PLUGIN_RUNTIME_WIRE_SPEC;
+  readonly protocol: typeof PLUGIN_RUNTIME_PROTOCOL;
   readonly kind: "result";
   readonly seq: number;
   readonly requestId: string;
@@ -404,7 +402,7 @@ export interface PluginRuntimeErrorBody {
 }
 
 export interface PluginRuntimeErrorEnvelope {
-  readonly spec: typeof PLUGIN_RUNTIME_WIRE_SPEC;
+  readonly protocol: typeof PLUGIN_RUNTIME_PROTOCOL;
   readonly kind: "error";
   readonly seq: number;
   readonly requestId: string;
@@ -419,7 +417,6 @@ export type PluginRuntimeEnvelope =
   | PluginRuntimeErrorEnvelope;
 
 export interface PluginRuntimeBootstrapArtifact {
-  readonly spec: typeof PLUGIN_RUNTIME_BOOTSTRAP_SPEC;
   readonly document: "about:srcdoc";
   readonly sandboxTokens: readonly ["allow-scripts"];
   readonly csp: typeof PLUGIN_RUNTIME_BOOTSTRAP_CSP;
@@ -1248,17 +1245,17 @@ export function parsePluginRuntimeEnvelope(raw: unknown): PluginRuntimeParseResu
   const errors: string[] = [];
   if (!validateJson(raw, errors)) return { ok: false, errors };
   if (!isRecord(raw)) return fail("$: envelope object required");
-  if (raw.spec !== PLUGIN_RUNTIME_WIRE_SPEC) errors.push(`$.spec: exact ${PLUGIN_RUNTIME_WIRE_SPEC} required`);
+  if (raw.protocol !== PLUGIN_RUNTIME_PROTOCOL) errors.push(`$.protocol: exact ${PLUGIN_RUNTIME_PROTOCOL} required`);
   validatePositive(raw.seq, "$.seq", errors);
   validateId(raw.requestId, "$.requestId", errors);
   if (raw.kind === "request") {
-    const value = strictObject(raw, ["spec", "kind", "seq", "requestId", "method", "params"], ["spec", "kind", "seq", "requestId", "method", "params"], "$", errors);
+    const value = strictObject(raw, ["protocol", "kind", "seq", "requestId", "method", "params"], ["protocol", "kind", "seq", "requestId", "method", "params"], "$", errors);
     if (value && isOneOf(PLUGIN_RUNTIME_REQUEST_METHODS, value.method)) validateRequest(value.method, value.params, errors);
     else if (value) errors.push("$.method: unknown runtime request method");
   } else if (raw.kind === "signal") {
     const allowed = raw.method === "stream.chunk"
-      ? ["spec", "kind", "seq", "requestId", "method", "params", "transfer"]
-      : ["spec", "kind", "seq", "requestId", "method", "params"];
+      ? ["protocol", "kind", "seq", "requestId", "method", "params", "transfer"]
+      : ["protocol", "kind", "seq", "requestId", "method", "params"];
     const value = strictObject(raw, allowed, allowed, "$", errors);
     if (value && isOneOf(PLUGIN_RUNTIME_SIGNAL_METHODS, value.method)) {
       validateSignal(value.method, value.params, errors);
@@ -1274,11 +1271,11 @@ export function parsePluginRuntimeEnvelope(raw: unknown): PluginRuntimeParseResu
       }
     } else if (value) errors.push("$.method: unknown runtime signal method");
   } else if (raw.kind === "result") {
-    const value = strictObject(raw, ["spec", "kind", "seq", "requestId", "responseTo", "value"], ["spec", "kind", "seq", "requestId", "responseTo", "value"], "$", errors);
+    const value = strictObject(raw, ["protocol", "kind", "seq", "requestId", "responseTo", "value"], ["protocol", "kind", "seq", "requestId", "responseTo", "value"], "$", errors);
     if (value && isOneOf(PLUGIN_RUNTIME_REQUEST_METHODS, value.responseTo)) validateResult(value.responseTo, value.value, errors);
     else if (value) errors.push("$.responseTo: unknown runtime request method");
   } else if (raw.kind === "error") {
-    const value = strictObject(raw, ["spec", "kind", "seq", "requestId", "responseTo", "error"], ["spec", "kind", "seq", "requestId", "responseTo", "error"], "$", errors);
+    const value = strictObject(raw, ["protocol", "kind", "seq", "requestId", "responseTo", "error"], ["protocol", "kind", "seq", "requestId", "responseTo", "error"], "$", errors);
     if (value) {
       if (!isOneOf(PLUGIN_RUNTIME_REQUEST_METHODS, value.responseTo)) errors.push("$.responseTo: unknown runtime request method");
       validateError(value.error, "$.error", errors);
@@ -1975,13 +1972,12 @@ export function certifyPluginRuntimeBootstrapArtifact(
   validateArtifactExpected(expected, "expected", errors);
   const value = strictObject(
     raw,
-    ["spec", "document", "sandboxTokens", "csp", "html", "module", "transferredPorts", "ambientPostMessage", "intrinsicsCapturedBeforePluginImport", "pluginImportRealm"],
-    ["spec", "document", "sandboxTokens", "csp", "html", "module", "transferredPorts", "ambientPostMessage", "intrinsicsCapturedBeforePluginImport", "pluginImportRealm"],
+    ["document", "sandboxTokens", "csp", "html", "module", "transferredPorts", "ambientPostMessage", "intrinsicsCapturedBeforePluginImport", "pluginImportRealm"],
+    ["document", "sandboxTokens", "csp", "html", "module", "transferredPorts", "ambientPostMessage", "intrinsicsCapturedBeforePluginImport", "pluginImportRealm"],
     "artifact",
     errors,
   );
   if (!value) return { ok: false, errors };
-  if (value.spec !== PLUGIN_RUNTIME_BOOTSTRAP_SPEC) errors.push(`artifact.spec: exact ${PLUGIN_RUNTIME_BOOTSTRAP_SPEC} required`);
   if (value.document !== "about:srcdoc") errors.push("artifact.document: about:srcdoc required");
   if (!Array.isArray(value.sandboxTokens) || value.sandboxTokens.length !== 1 || value.sandboxTokens[0] !== "allow-scripts") errors.push("artifact.sandboxTokens: exact allow-scripts tuple required");
   if (value.csp !== PLUGIN_RUNTIME_BOOTSTRAP_CSP) errors.push("artifact.csp: exact canonical CSP required");
@@ -2037,13 +2033,12 @@ export function certifyPluginRuntimeNativeConformance(
   if (!validateJson(raw, errors)) return { ok: false, errors };
   const value = strictObject(
     raw,
-    ["spec", "platform", "tauriRevision", "artifact", "topology", "availability", "attacks", "positives"],
-    ["spec", "platform", "tauriRevision", "artifact", "topology", "availability", "attacks", "positives"],
+    ["platform", "tauriRevision", "artifact", "topology", "availability", "attacks", "positives"],
+    ["platform", "tauriRevision", "artifact", "topology", "availability", "attacks", "positives"],
     "report",
     errors,
   );
   if (!value) return { ok: false, errors };
-  if (value.spec !== PLUGIN_RUNTIME_CONFORMANCE_SPEC) errors.push(`report.spec: exact ${PLUGIN_RUNTIME_CONFORMANCE_SPEC} required`);
   validateText(value.platform, "report.platform", errors);
   if (typeof value.tauriRevision !== "string" || !/^[0-9a-f]{40}$/.test(value.tauriRevision)) errors.push("report.tauriRevision: exact 40-character revision required");
   const expectedErrors: string[] = [];

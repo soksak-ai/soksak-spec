@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   CONTRACT_ID_RE,
   parseManifest,
-  SPEC_VERSION,
 } from "../src/spec";
 
 const PROVIDER = { id: "soksak-spec-plugin-fixture-tasks", version: "0.0.1" };
@@ -13,7 +12,6 @@ const REQUIREMENT = {
 
 function base(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    spec: SPEC_VERSION,
     id: "demo",
     name: "Demo",
     version: "0.0.1",

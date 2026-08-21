@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { parseSpecReleaseManifest } from "./spec-release.mjs";
+import { parseReleaseManifest, releaseIdentity } from "../packages/plugin-spec/dist/spec.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const API_VERSION = "2026-03-10";
@@ -32,10 +32,9 @@ function readOwnerConfiguration() {
   const owner = workspace.soksakRelease;
   if (
     owner === null || typeof owner !== "object" || Array.isArray(owner) ||
-    owner.kind !== "spec" ||
-    typeof owner.id !== "string" ||
+    !owner.spec || typeof owner.spec !== "object" || owner.spec.id !== "soksak-spec" || owner.spec.version !== workspace.version ||
     typeof owner.repository !== "string" ||
-    typeof owner.manifest !== "string" || owner.manifest !== `${owner.id}-release.json`
+    typeof owner.manifest !== "string" || owner.manifest !== `${owner.spec.id}-release.json`
   ) {
     throw new Error("workspace release owner metadata is invalid");
   }
@@ -97,34 +96,39 @@ export function collectReleaseAssets({ repository, commit, artifacts, manifest }
   }
   const manifestBytes = readRegularFile(manifestPath, "release manifest");
   const value = JSON.parse(manifestBytes.toString("utf8"));
-  const parsed = parseSpecReleaseManifest(value);
+  const parsed = parseReleaseManifest(value);
   if (!parsed.ok) throw new Error(`release manifest is invalid:\n${parsed.errors.join("\n")}`);
   if (
-    value.kind !== owner.kind ||
-    value.id !== owner.id ||
+    releaseIdentity(parsed.value).kind !== "spec" ||
+    releaseIdentity(parsed.value).id !== owner.spec.id ||
     value.source?.repository !== owner.repository ||
     value.source?.commit !== commit ||
-    value.releaseTag !== `${value.id}-v${value.version}`
+    releaseIdentity(parsed.value).version !== owner.spec.version
   ) {
     throw new Error("release manifest identity is invalid");
   }
 
   const artifactNames = [];
-  for (const packageEntry of value.packages) {
-    if (!packageEntry.artifact) continue;
-    const url = new URL(packageEntry.artifact.url);
+  for (const artifact of value.artifacts) {
+    const url = new URL(artifact.url);
     const name = basename(url.pathname);
     if (
       !ASSET_NAME_RE.test(name) ||
-      url.href !== exactReleaseUrl(repository, value.releaseTag, name) ||
-      packageEntry.artifact.format !== "tgz"
+      url.href !== exactReleaseUrl(repository, `v${owner.spec.version}`, name) ||
+      artifact.format !== "tgz"
     ) {
-      throw new Error(`release package artifact is invalid: ${packageEntry.name}`);
+      throw new Error(`spec release artifact is invalid: ${name}`);
     }
     const bytes = readRegularFile(join(artifactsPath, name), `package artifact ${name}`);
-    if (packageEntry.artifact.sha256 !== digest(bytes).slice("sha256:".length)) {
+    if (artifact.sha256 !== digest(bytes).slice("sha256:".length)) {
       throw new Error(`release package artifact digest mismatch: ${name}`);
     }
+    artifactNames.push(name);
+  }
+  for (const report of value.reports) {
+    const name = basename(new URL(report.url).pathname);
+    const bytes = readRegularFile(join(artifactsPath, name), `conformance report ${name}`);
+    if (report.sha256 !== digest(bytes).slice("sha256:".length)) throw new Error(`conformance report digest mismatch: ${name}`);
     artifactNames.push(name);
   }
   if (artifactNames.length === 0 || new Set(artifactNames).size !== artifactNames.length) {
@@ -145,8 +149,8 @@ export function collectReleaseAssets({ repository, commit, artifacts, manifest }
   const assets = expectedNames.map((name) => describeAsset(join(artifactsPath, name)));
   return {
     assets,
-    prerelease: value.version.includes("-"),
-    tag: value.releaseTag,
+    prerelease: owner.spec.version.includes("-"),
+    tag: `v${owner.spec.version}`,
   };
 }
 

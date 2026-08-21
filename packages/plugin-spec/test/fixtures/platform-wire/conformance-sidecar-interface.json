@@ -1,14 +1,9 @@
 {
-  "spec": "soksak-spec-conformance@0.0.1",
   "subject": {
     "sidecar": {
       "id": "weather-sidecar",
       "version": "0.0.1"
     }
-  },
-  "contract": {
-    "id": "soksak-spec-sidecar-weather",
-    "version": "0.0.1"
   },
   "result": "passed",
   "validator": {
@@ -24,5 +19,11 @@
       "target": "x86_64-unknown-linux-gnu",
       "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
     }
-  ]
+  ],
+  "claim": {
+    "contract": {
+      "id": "soksak-spec-sidecar-weather",
+      "version": "0.0.1"
+    }
+  }
 }

@@ -14,12 +14,13 @@ const publicDer = createPublicKey(privateKey).export({ type: "spki", format: "de
 const publicRaw = Buffer.from(publicDer).subarray(-32);
 
 const signingEnvelope = {
-  spec: "soksak-spec-registry@0.0.1",
   id: "fixture",
   sequence: 42,
   plugins: [read("release-plugin.json")],
   sidecars: [read("release-sidecar.json")],
   kits: [read("release-kit.json")],
+  contracts: [read("release-contract.json")],
+  specs: [read("release-spec.json")],
   profiles: [{ id: "weather", plugin: { id: "weather-plugin", version: "0.0.1" }, bindings: [] }],
   issuedAt: "2026-07-14T00:00:00Z",
   expiresAt: "2026-07-15T00:00:00Z",

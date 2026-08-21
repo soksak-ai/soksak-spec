@@ -89,8 +89,7 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
     false,
   );
   assert.deepEqual(workspace.soksakRelease, {
-    kind: "spec",
-    id: "soksak-spec",
+    spec: { id: "soksak-spec", version: "0.0.1" },
     repository: "https://github.com/soksak-ai/soksak-spec",
     manifest: "soksak-spec-release.json",
   });

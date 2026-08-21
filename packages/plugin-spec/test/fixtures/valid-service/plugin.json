@@ -1,31 +1,49 @@
 {
-  "spec": "soksak-spec-plugin@0.0.1",
   "id": "valid-service",
   "name": "Valid Service Fixture",
   "version": "0.1.0",
   "description": "headless gate fixture — a pure contract plugin (entry: null) must pass parseManifest (PS3, PS4)",
   "entry": null,
-  "permissions": ["commands", "sidecar", "service"],
+  "permissions": [
+    "commands",
+    "sidecar",
+    "service"
+  ],
   "sidecars": [
     {
       "name": "echo",
-      "interface": { "id": "soksak-spec-sidecar-fixture-wire", "range": ">=0.0.1 <1.0.0" }
+      "interface": {
+        "id": "soksak-spec-sidecar-fixture-wire",
+        "range": ">=0.0.1 <1.0.0"
+      }
     }
   ],
   "service": {
     "sidecar": "echo",
-    "interface": { "id": "soksak-spec-service", "range": ">=0.0.1 <1.0.0" },
-    "subscribe": ["bus:fixture:changed"]
+    "interface": {
+      "id": "soksak-spec-service",
+      "range": ">=0.0.1 <1.0.0"
+    },
+    "subscribe": [
+      "bus:fixture:changed"
+    ]
   },
   "contributes": {
     "commands": [
       {
         "name": "run",
-        "title": { "en": "Run", "ko": "실행" },
+        "title": {
+          "en": "Run",
+          "ko": "실행"
+        },
         "bind": "service",
         "description": "Start a fixture run.",
         "params": {
-          "doc": { "type": "string", "description": "target document path", "required": true }
+          "doc": {
+            "type": "string",
+            "description": "target document path",
+            "required": true
+          }
         },
         "returns": "object"
       }
@@ -34,7 +52,9 @@
       {
         "name": "reconcile",
         "command": "run",
-        "trigger": { "reconcile": true },
+        "trigger": {
+          "reconcile": true
+        },
         "timeoutMs": 1800000
       }
     ]

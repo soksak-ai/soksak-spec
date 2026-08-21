@@ -26,26 +26,28 @@ describe("portable platform wire artifacts", () => {
       expect(schema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
       expect(schema.additionalProperties).toBe(false);
     }
-    expect(release.properties.spec.const).toBe("soksak-spec-release@0.0.1");
-    expect(conformance.properties.spec.const).toBe("soksak-spec-conformance@0.0.1");
-    expect(registry.properties.spec.const).toBe("soksak-spec-registry@0.0.1");
+    expect(release.properties).not.toHaveProperty("schema");
+    expect(conformance.properties).not.toHaveProperty("schema");
+    expect(registry.properties).not.toHaveProperty("schema");
     expect(registryPublicKey.properties.algorithm.const).toBe("ed25519");
     expect(release.$id).toBe("urn:soksak:spec:release:0.0.1");
     expect(conformance.$id).toBe("urn:soksak:spec:conformance:0.0.1");
     expect(registry.$id).toBe("urn:soksak:spec:registry:0.0.1");
     expect(registryPublicKey.$id).toBe("urn:soksak:spec:registry-public-key:0.0.1");
 
-    expect(release.minProperties).toBe(6);
-    expect(release.maxProperties).toBe(6);
+    expect(release.minProperties).toBe(5);
+    expect(release.maxProperties).toBe(5);
     expect(release.$defs.reference.properties.version.const).toBe("0.0.1");
     expect(registry.properties.plugins.items.allOf[0].$ref).toBe(release.$id);
     expect(registry.properties.sidecars.items.allOf[0].$ref).toBe(release.$id);
     expect(registry.properties.kits.items.allOf[0].$ref).toBe(release.$id);
+    expect(registry.properties.contracts.items.allOf[0].$ref).toBe(release.$id);
+    expect(registry.properties.specs.items.allOf[0].$ref).toBe(release.$id);
     expect(registry.properties).not.toHaveProperty(["un", "its"].join(""));
   });
 
   it("keeps the checked-in language-neutral corpus accepted by the executable parsers", () => {
-    for (const kind of ["kit", "plugin", "sidecar"]) {
+    for (const kind of ["contract", "kit", "plugin", "sidecar", "spec"]) {
       expect(parseReleaseManifest(json(join(FIXTURES, `release-${kind}.json`))).ok, kind).toBe(true);
     }
     for (const name of [
@@ -75,7 +77,7 @@ describe("portable platform wire artifacts", () => {
       publicKey: ajv.compile(json(join(SCHEMAS, "registry-public-key.schema.json"))),
     };
 
-    for (const kind of ["kit", "plugin", "sidecar"]) {
+    for (const kind of ["contract", "kit", "plugin", "sidecar", "spec"]) {
       const valid = validators.release(json(join(FIXTURES, `release-${kind}.json`)));
       expect(valid, JSON.stringify(validators.release.errors)).toBe(true);
     }

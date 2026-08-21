@@ -12,13 +12,11 @@ import {
   semverGte,
   semverSatisfies,
   serviceOps,
-  SPEC_VERSION,
 } from "../src/spec";
 
 // 서비스 선언 유효 최소 매니페스트 — 각 테스트가 여기서 변형해 깨뜨린다(implements.test.ts 관례 동형).
 function base(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    spec: SPEC_VERSION,
     id: "demo",
     name: "데모",
     version: "0.0.1",

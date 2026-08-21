@@ -15,7 +15,7 @@ import {
 
 describe("public plugin, sidecar, and kit identity source", () => {
   it("uses one flat, third-party-friendly id grammar for plugin, sidecar, and kit", () => {
-    expect(RELEASE_KINDS).toEqual(["kit", "plugin", "sidecar"]);
+    expect(RELEASE_KINDS).toEqual(["contract", "kit", "plugin", "sidecar", "spec"]);
     for (const id of ["weather", "third-party-plugin", "[redacted]"]) {
       expect(COMPONENT_ID_RE.test(id), id).toBe(true);
     }
@@ -108,7 +108,6 @@ describe("public plugin, sidecar, and kit identity source", () => {
 
   it("keeps source identity solely in the owner release manifest", () => {
     const raw = {
-      spec: "soksak-spec-plugin@0.0.1",
       id: "weather",
       name: "Weather",
       version: "1.0.0",
@@ -122,7 +121,6 @@ describe("public plugin, sidecar, and kit identity source", () => {
 
   it("uses the exact owner-release dependency range grammar in plugin.json", () => {
     const manifest = (range: string) => ({
-      spec: "soksak-spec-plugin@0.0.1",
       id: "weather",
       name: "Weather",
       version: "1.0.0",
@@ -137,7 +135,6 @@ describe("public plugin, sidecar, and kit identity source", () => {
 
   it("keeps sidecar artifact location solely in the owner release manifest", () => {
     const raw = {
-      spec: "soksak-spec-plugin@0.0.1",
       id: "weather",
       name: "Weather",
       version: "1.0.0",

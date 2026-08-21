@@ -2,7 +2,6 @@ import {
   ARTIFACT_FORMATS,
   GIT_COMMIT_RE,
   RUST_SIDECAR_TARGETS,
-  RELEASE_SPEC,
   SHA256_RE,
   STRICT_SEMVER_RE,
   COMPONENT_ID_RE,
@@ -34,16 +33,17 @@ export interface IntegrityReference {
 export interface ReleaseArtifact extends IntegrityReference {
   target: "any" | RustSidecarTarget;
   format: ArtifactFormat;
-  manifest: "plugin.json" | "sidecar.json" | "package.json";
+  manifest: "plugin.json" | "sidecar.json" | "kit.json" | "contract.json" | "spec.json";
 }
 
 export type ReleaseDependency =
   | { plugin: ExactReference; scope: "runtime" | "build" }
   | { sidecar: ExactReference; scope: "runtime" | "build" }
-  | { kit: ExactReference; scope: "runtime" | "build" };
+  | { kit: ExactReference; scope: "runtime" | "build" }
+  | { contract: ExactReference; scope: "runtime" | "build" }
+  | { spec: ExactReference; scope: "runtime" | "build" };
 
 interface ReleaseFields {
-  spec: typeof RELEASE_SPEC;
   source: ReleaseSource;
   dependencies: ReleaseDependency[];
   artifacts: ReleaseArtifact[];
@@ -61,19 +61,25 @@ export interface SidecarRelease extends ReleaseFields {
 export interface KitRelease extends ReleaseFields {
   kit: ExactReference;
 }
+export interface ContractRelease extends ReleaseFields { contract: ExactReference }
+export interface SpecRelease extends ReleaseFields { spec: ExactReference }
 
-export type ReleaseDocument = PluginRelease | SidecarRelease | KitRelease;
+export type ReleaseDocument = PluginRelease | SidecarRelease | KitRelease | ContractRelease | SpecRelease;
 export interface ReleaseIdentity extends ExactReference { kind: ReleaseKind }
 
 export function releaseIdentity(release: ReleaseDocument): ReleaseIdentity {
   if ("plugin" in release) return { kind: "plugin", ...release.plugin };
   if ("sidecar" in release) return { kind: "sidecar", ...release.sidecar };
+  if ("contract" in release) return { kind: "contract", ...release.contract };
+  if ("spec" in release) return { kind: "spec", ...release.spec };
   return { kind: "kit", ...release.kit };
 }
 
 export function dependencyIdentity(dependency: ReleaseDependency): ReleaseIdentity {
   if ("plugin" in dependency) return { kind: "plugin", ...dependency.plugin };
   if ("sidecar" in dependency) return { kind: "sidecar", ...dependency.sidecar };
+  if ("contract" in dependency) return { kind: "contract", ...dependency.contract };
+  if ("spec" in dependency) return { kind: "spec", ...dependency.spec };
   return { kind: "kit", ...dependency.kit };
 }
 
@@ -141,12 +147,12 @@ function parseDependencies(raw: unknown, owner: ReleaseIdentity, errors: string[
   raw.forEach((item, index) => {
     const label = `release.dependencies[${index}]`;
     const before = errors.length;
-    const value = strictObject(item, ["kit", "plugin", "scope", "sidecar"], ["scope"], label, errors);
+    const value = strictObject(item, ["contract", "kit", "plugin", "scope", "sidecar", "spec"], ["scope"], label, errors);
     if (!value) return;
     if (value.scope !== "runtime" && value.scope !== "build") errors.push(`${label}.scope: runtime|build required`);
-    const kinds = (["plugin", "sidecar", "kit"] as const).filter((kind) => value[kind] !== undefined);
+    const kinds = (["plugin", "sidecar", "kit", "contract", "spec"] as const).filter((kind) => value[kind] !== undefined);
     if (kinds.length !== 1) {
-      errors.push(`${label}: exactly one plugin, sidecar, or kit required`);
+      errors.push(`${label}: exactly one plugin, sidecar, kit, contract, or spec required`);
       return;
     }
     const kind = kinds[0];
@@ -165,7 +171,9 @@ function parseDependencies(raw: unknown, owner: ReleaseIdentity, errors: string[
 function expectedManifest(kind: ReleaseKind): ReleaseArtifact["manifest"] {
   if (kind === "plugin") return "plugin.json";
   if (kind === "sidecar") return "sidecar.json";
-  return "package.json";
+  if (kind === "kit") return "kit.json";
+  if (kind === "contract") return "contract.json";
+  return "spec.json";
 }
 
 function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, errors: string[]): ReleaseArtifact[] {
@@ -201,11 +209,10 @@ function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, err
 
 export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseDocument> {
   const errors: string[] = [];
-  const value = strictObject(raw, ["artifacts", "dependencies", "kit", "plugin", "reports", "sidecar", "source", "spec"], ["artifacts", "dependencies", "reports", "source", "spec"], "release", errors);
+  const value = strictObject(raw, ["artifacts", "contract", "dependencies", "kit", "plugin", "reports", "sidecar", "source", "spec"], ["artifacts", "dependencies", "reports", "source"], "release", errors);
   if (!value) return { ok: false, errors };
-  if (value.spec !== RELEASE_SPEC) errors.push(`release.spec: ${RELEASE_SPEC} required`);
-  const kinds = (["plugin", "sidecar", "kit"] as const).filter((kind) => value[kind] !== undefined);
-  if (kinds.length !== 1) errors.push("release: exactly one plugin, sidecar, or kit identity required");
+  const kinds = (["plugin", "sidecar", "kit", "contract", "spec"] as const).filter((kind) => value[kind] !== undefined);
+  if (kinds.length !== 1) errors.push("release: exactly one plugin, sidecar, kit, contract, or spec identity required");
   const kind = kinds[0];
   const reference = kind ? parseReference(value[kind], `release.${kind}`, errors) : null;
   const source = parseSource(value.source, errors);
@@ -221,10 +228,12 @@ export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseD
   });
   sortedUnique(reports.map((report) => report.url), "release.reports", errors);
   if (errors.length > 0) return { ok: false, errors };
-  const fields = { spec: RELEASE_SPEC, source, dependencies, artifacts, reports };
+  const fields = { source, dependencies, artifacts, reports };
   if (kind === "plugin") return { ok: true, value: { ...fields, plugin: reference } };
   if (kind === "sidecar") return { ok: true, value: { ...fields, sidecar: reference } };
-  return { ok: true, value: { ...fields, kit: reference } };
+  if (kind === "kit") return { ok: true, value: { ...fields, kit: reference } };
+  if (kind === "contract") return { ok: true, value: { ...fields, contract: reference } };
+  return { ok: true, value: { ...fields, spec: reference } };
 }
 
 export function verifyPluginRuntimeDependencyProjection(

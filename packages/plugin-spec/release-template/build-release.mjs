@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createRegularFileArchive, readRegularFileArchive, sha256 } from "./archive.mjs";
+import { parseManifest } from "../dist/spec.js";
 
 // The plugin repository root is resolved by a discoverable rule rather than cwd guessing.
 // The release-files.json marker is found at or above the running directory.
@@ -59,32 +60,26 @@ if (!packagePath) throw new Error("plugin package metadata is missing");
 const packageBytes = fs.readFileSync(packagePath);
 const manifestBytes = fs.readFileSync(path.join(root, "plugin.json"));
 const pkg = JSON.parse(packageBytes);
-const plugin = JSON.parse(manifestBytes);
+const rawPlugin = JSON.parse(manifestBytes);
 if (typeof pkg.version !== "string" || pkg.version.length > 256 || !STRICT_SEMVER_RE.test(pkg.version)) {
   throw new Error("package version must be strict SemVer");
 }
 const VERSION = pkg.version;
-const ID = plugin.id;
+const ID = rawPlugin.id;
 if (typeof ID !== "string") throw new Error("plugin manifest id must be a string");
+const parsedPlugin = parseManifest(rawPlugin, ID);
+if (!parsedPlugin.manifest || !parsedPlugin.validation.ok) {
+  throw new Error(`plugin manifest is invalid: ${parsedPlugin.validation.errors.join("; ")}`);
+}
+const plugin = parsedPlugin.manifest;
 if (pkg.private !== true) {
   throw new Error("plugin package metadata must be private");
 }
 if (pkg.publishConfig !== undefined || Object.keys(pkg.scripts ?? {}).some((name) => /publish/i.test(name))) {
   throw new Error("language-registry publication is forbidden");
 }
-if (
-  plugin.spec !== "soksak-spec-plugin@0.0.1" ||
-  plugin.version !== VERSION ||
-  plugin.entry !== "main.js" ||
-  "repo" in plugin
-) {
+if (plugin.version !== VERSION || plugin.entry !== "main.js") {
   throw new Error("plugin manifest does not satisfy the public plugin boundary");
-}
-for (const [index, provider] of (plugin.implements ?? []).entries()) {
-  exactKeys(provider, ["id", "version"], `implements[${index}]`);
-}
-for (const [index, consumer] of (plugin.consumes ?? []).entries()) {
-  exactKeys(consumer, ["id", "range"], `consumes[${index}]`);
 }
 
 const runtimePluginDependencies = Object.entries(plugin.dependencies ?? {})
@@ -131,23 +126,21 @@ const artifact = {
   format: "tgz",
   manifest: "plugin.json",
 };
-const report = (contract) => ({
-  spec: "soksak-spec-conformance@0.0.1",
+const report = (claim) => ({
   subject: { plugin: { id: ID, version: VERSION } },
-  contract,
+  claim,
   result: "passed",
   validator: { name: "soksak-conformance", version: VERSION },
   artifacts: [{ target: "any", sha256: artifactSha256 }],
 });
 const reports = [
-  ["conformance-plugin.json", report("soksak-spec-plugin@0.0.1")],
-  ["conformance-release.json", report("soksak-spec-release@0.0.1")],
+  ["conformance-plugin.json", report({ manifest: true })],
+  ["conformance-release.json", report({ release: true })],
 ].map(([name, value]) => {
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
   return { name, value, bytes, reference: { url: `${REPOSITORY}/releases/download/${tag}/${name}`, sha256: sha256(bytes) } };
 });
 const release = {
-  spec: "soksak-spec-release@0.0.1",
   plugin: { id: ID, version: VERSION },
   source: { repository: REPOSITORY, commit },
   dependencies,

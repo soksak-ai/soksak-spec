@@ -8,7 +8,6 @@ const artifact = (target: string, url: string, manifest: string, sha256 = SHA) =
 
 export function pluginRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    spec: "soksak-spec-release@0.0.1",
     plugin: { id: "weather-plugin", version: "0.0.1" },
     source: { repository: "https://github.com/example/weather-plugin", commit: COMMIT },
     dependencies: [{ kit: { id: "terminal-common", version: "0.0.1" }, scope: "runtime" }],
@@ -20,7 +19,6 @@ export function pluginRelease(over: Record<string, unknown> = {}): Record<string
 
 export function sidecarRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    spec: "soksak-spec-release@0.0.1",
     sidecar: { id: "weather-sidecar", version: "0.0.1" },
     source: { repository: "https://github.com/example/weather-sidecar", commit: COMMIT },
     dependencies: [],
@@ -35,12 +33,35 @@ export function sidecarRelease(over: Record<string, unknown> = {}): Record<strin
 
 export function kitRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    spec: "soksak-spec-release@0.0.1",
     kit: { id: "terminal-common", version: "0.0.1" },
     source: { repository: "https://github.com/example/terminal-common", commit: COMMIT },
     dependencies: [],
-    artifacts: [artifact("any", "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz", "package.json", "4".repeat(64))],
+    artifacts: [artifact("any", "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz", "kit.json", "4".repeat(64))],
     reports: [integrity("https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.conformance.json")],
+    ...over,
+  };
+}
+
+export function contractRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
+  const repository = "https://github.com/example/terminal-contract";
+  return {
+    contract: { id: "terminal-contract", version: "0.0.1" },
+    source: { repository, commit: COMMIT },
+    dependencies: [{ spec: { id: "soksak-spec", version: "0.0.1" }, scope: "build" }],
+    artifacts: [artifact("any", `${repository}/releases/download/v0.0.1/terminal-contract-0.0.1.tgz`, "contract.json", "5".repeat(64))],
+    reports: [integrity(`${repository}/releases/download/v0.0.1/terminal-contract-0.0.1.conformance.json`, "6".repeat(64))],
+    ...over,
+  };
+}
+
+export function specRelease(over: Record<string, unknown> = {}): Record<string, unknown> {
+  const repository = "https://github.com/example/soksak-spec";
+  return {
+    spec: { id: "soksak-spec", version: "0.0.1" },
+    source: { repository, commit: COMMIT },
+    dependencies: [],
+    artifacts: [artifact("any", `${repository}/releases/download/v0.0.1/soksak-spec-0.0.1.tgz`, "spec.json", "7".repeat(64))],
+    reports: [integrity(`${repository}/releases/download/v0.0.1/soksak-spec-0.0.1.conformance.json`, "8".repeat(64))],
     ...over,
   };
 }

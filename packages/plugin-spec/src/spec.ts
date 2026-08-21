@@ -66,7 +66,7 @@ export * from "./service.js";
 // semver 비교 유틸 — 단일진실은 semver.ts(공개 API 는 여기서 재수출).
 import { SEMVER_RE } from "./semver.js";
 export * from "./semver.js";
-import { COMPONENT_ID_RE, MANIFEST_SPEC_BY_RELEASE_KIND, isDependencyRange } from "./release-primitives.js";
+import { COMPONENT_ID_RE, isDependencyRange } from "./release-primitives.js";
 export * from "./release-primitives.js";
 export * from "./release.js";
 export * from "./sidecar.js";
@@ -249,7 +249,6 @@ export function programPathSegments(path: string): string[] {
 
 // ── §3 매니페스트 ────────────────────────────────────────────────────────────
 
-export const SPEC_VERSION = MANIFEST_SPEC_BY_RELEASE_KIND.plugin;
 export const DEFAULT_ENTRY = "main.js";
 
 // 외부 CLI/라이브러리 종속성 — 플러그인이 process 로 실행하는 외부 도구(npm 글로벌 CLI 등).
@@ -314,7 +313,6 @@ export interface ConfigSetting {
 export const CONFIG_KEY_RE = /^[a-zA-Z][a-zA-Z0-9]*$/;
 
 export interface PluginManifest {
-  spec: typeof SPEC_VERSION; // 필수 — 불일치 시 거부
   id: string; // ^[a-z0-9][a-z0-9-]*$ + 설치 디렉토리명과 일치 강제
   name: LocalizedText;
   version: string; // semver(major.minor.patch)
@@ -587,7 +585,6 @@ export function parseManifest(
   checkKnownKeys(
     raw,
     [
-      "spec",
       "id",
       "name",
       "version",
@@ -612,9 +609,6 @@ export function parseManifest(
     errors,
   );
 
-  if (raw.spec !== SPEC_VERSION) {
-    errors.push(`spec: "${SPEC_VERSION}" 필수(현재 앱이 아는 유일한 스펙)`);
-  }
   if (!isNonEmptyString(raw.id) || !PLUGIN_ID_RE.test(raw.id)) {
     errors.push("id: ^[a-z0-9][a-z0-9-]*$ 필수");
   } else if (raw.id !== dirName) {
@@ -1471,7 +1465,6 @@ export function parseManifest(
   if (errors.length > 0) return reject();
   return {
     manifest: {
-      spec: SPEC_VERSION,
       id: (raw.id as string).trim(),
       name: normalizeText(raw.name as LocalizedText),
       version: (raw.version as string).trim(),

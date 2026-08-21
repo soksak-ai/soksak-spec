@@ -1,5 +1,4 @@
 {
-  "spec": "soksak-spec-release@0.0.1",
   "plugin": { "id": "weather-plugin", "version": "0.0.1" },
   "source": { "repository": "https://github.com/example/weather-plugin", "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
   "dependencies": [{ "kit": { "id": "terminal-common", "version": "0.0.1" }, "scope": "runtime" }],
