@@ -177,7 +177,7 @@ The installed GitHub Release package provides:
 ```text
 soksak-validate plugin <plugin.json>
 soksak-validate release <release.json>
-soksak-validate conformance <report.json> --release <release.json> [--plugin-manifest <plugin.json>]
+soksak-validate conformance <report.json> --release <release.json> [--plugin-manifest <plugin.json> | --sidecar-manifest <sidecar.json>]
 soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id>
 ```
 

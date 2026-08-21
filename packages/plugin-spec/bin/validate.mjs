@@ -11,6 +11,7 @@ import {
   parseManifest,
   parseRegistryPublicKey,
   parseReleaseManifest,
+  parseSidecarManifest,
   releaseIdentity,
   transparencyViolations,
   verifyConformanceReport,
@@ -20,7 +21,7 @@ import {
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
   soksak-validate release <release.json>...
-  soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json>]
+  soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json> | --sidecar-manifest <sidecar.json>]
   soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id> [--at <ISO-8601>] [--high-water <sequence>:<sha256>]
 
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
@@ -135,7 +136,7 @@ function validateReleases(paths) {
 }
 
 function validateConformance(args) {
-  const parsedArgs = parseOptions(args, new Set(["--release", "--plugin-manifest"]));
+  const parsedArgs = parseOptions(args, new Set(["--release", "--plugin-manifest", "--sidecar-manifest"]));
   if (!parsedArgs.ok) return usageExit(parsedArgs.error);
   const releasePath = parsedArgs.options.get("--release");
   if (!releasePath || parsedArgs.positional.length === 0) {
@@ -150,6 +151,10 @@ function validateConformance(args) {
   }
   const identity = releaseIdentity(release.value);
   const pluginManifestPath = parsedArgs.options.get("--plugin-manifest");
+  const sidecarManifestPath = parsedArgs.options.get("--sidecar-manifest");
+  if (pluginManifestPath !== undefined && sidecarManifestPath !== undefined) {
+    return usageExit("conformance: plugin and sidecar manifests are mutually exclusive");
+  }
   let ownerPlugin;
   if (pluginManifestPath !== undefined) {
     const document = readDocument(pluginManifestPath, `plugin manifest ${pluginManifestPath}`);
@@ -177,6 +182,21 @@ function validateConformance(args) {
     }
     ownerPlugin = parsed.manifest;
   }
+  let ownerSidecar;
+  if (sidecarManifestPath !== undefined) {
+    const document = readDocument(sidecarManifestPath, `sidecar manifest ${sidecarManifestPath}`);
+    if (!document) return 1;
+    const parsed = parseSidecarManifest(document.raw);
+    if (!parsed.ok) {
+      printErrors(sidecarManifestPath, parsed.errors);
+      return 1;
+    }
+    if (identity.kind !== "sidecar" || parsed.value.id !== identity.id || parsed.value.version !== identity.version) {
+      printErrors(sidecarManifestPath, ["sidecar manifest identity must exactly match the sidecar release"]);
+      return 1;
+    }
+    ownerSidecar = parsed.value;
+  }
   let failed = 0;
   for (const path of parsedArgs.positional) {
     const document = readDocument(path);
@@ -193,7 +213,7 @@ function validateConformance(args) {
     const verified = verifyConformanceReport(
       report.value,
       release.value,
-      ownerPlugin?.implements ?? [],
+      [...(ownerPlugin?.implements ?? []), ...(ownerSidecar ? [ownerSidecar.interface] : [])],
     );
     if (!verified.ok) {
       printErrors(path, verified.errors);
@@ -204,6 +224,11 @@ function validateConformance(args) {
       printErrors(path, [
         "soksak-spec-plugin@0.0.1 evidence requires --plugin-manifest so runtime plugin dependencies can be matched to the release closure",
       ]);
+      failed++;
+      continue;
+    }
+    if (typeof report.value.contract === "object" && identity.kind === "sidecar" && !ownerSidecar) {
+      printErrors(path, ["sidecar domain evidence requires --sidecar-manifest"]);
       failed++;
       continue;
     }

@@ -69,6 +69,7 @@ export * from "./semver.js";
 import { COMPONENT_ID_RE, MANIFEST_SPEC_BY_RELEASE_KIND, isDependencyRange } from "./release-primitives.js";
 export * from "./release-primitives.js";
 export * from "./release.js";
+export * from "./sidecar.js";
 export * from "./conformanceWire.js";
 export * from "./pluginRuntime.js";
 import {

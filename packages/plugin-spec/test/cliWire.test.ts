@@ -74,4 +74,23 @@ describe("soksak-validate public wire modes", () => {
     const noTrustRoot = run("registry", join(FIXTURES, "registry-signed.json"));
     expect(noTrustRoot.status).toBe(2);
   });
+
+  it("binds sidecar domain evidence to sidecar.json", () => {
+    const valid = run(
+      "conformance",
+      join(FIXTURES, "conformance-sidecar-interface.json"),
+      "--release",
+      join(FIXTURES, "release-sidecar.json"),
+      "--sidecar-manifest",
+      join(FIXTURES, "sidecar.json"),
+    );
+    expect(valid.status, valid.stderr).toBe(0);
+    const missing = run(
+      "conformance",
+      join(FIXTURES, "conformance-sidecar-interface.json"),
+      "--release",
+      join(FIXTURES, "release-sidecar.json"),
+    );
+    expect(missing.status).toBe(1);
+  });
 });
