@@ -97,11 +97,19 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(build().status).toBe(0);
   });
 
-  it("records an exact build kit dependency without selecting a sidecar", () => {
-    writeFixture({ releaseDependencies: [{ kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" }] });
+  it("records exact kit, contract, and spec build dependencies without selecting a sidecar", () => {
+    writeFixture({ releaseDependencies: [
+      { kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" },
+      { contract: { id: "soksak-contract-plugin-terminal", version: "0.0.1" }, scope: "build" },
+      { spec: { id: "soksak-spec", version: "0.0.1" }, scope: "build" },
+    ] });
     expect(build().status).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    expect(release.dependencies).toEqual([{ kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" }]);
+    expect(release.dependencies).toEqual([
+      { contract: { id: "soksak-contract-plugin-terminal", version: "0.0.1" }, scope: "build" },
+      { kit: { id: "soksak-kit-plugin-terminal", version: "0.0.1" }, scope: "build" },
+      { spec: { id: "soksak-spec", version: "0.0.1" }, scope: "build" },
+    ]);
     expect(release.dependencies).not.toEqual(expect.arrayContaining([expect.objectContaining({ sidecar: expect.anything() })]));
   });
 

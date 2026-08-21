@@ -94,10 +94,15 @@ const declaredDependencies = fs.existsSync(declaredDependencyPath)
   : [];
 if (!Array.isArray(declaredDependencies)) throw new Error("release/dependencies.json must be an array");
 for (const [index, dependency] of declaredDependencies.entries()) {
-  exactKeys(dependency, ["kit", "scope"], `release dependencies[${index}]`);
-  exactKeys(dependency.kit, ["id", "version"], `release dependencies[${index}].kit`);
-  if (dependency.kit.version !== "0.0.1" || !/^[a-z0-9][a-z0-9-]*$/.test(dependency.kit.id)) {
-    throw new Error(`release dependencies[${index}].kit must be an exact 0.0.1 kit reference`);
+  if (!dependency || typeof dependency !== "object" || Array.isArray(dependency)) throw new Error(`release dependencies[${index}] must be an object`);
+  const kinds = ["plugin", "sidecar", "kit", "contract", "spec"].filter((kind) => dependency[kind] !== undefined);
+  if (kinds.length !== 1 || JSON.stringify(Object.keys(dependency).sort()) !== JSON.stringify([kinds[0], "scope"].sort())) {
+    throw new Error(`release dependencies[${index}] must name exactly one direct kind and scope`);
+  }
+  const kind = kinds[0];
+  exactKeys(dependency[kind], ["id", "version"], `release dependencies[${index}].${kind}`);
+  if (dependency[kind].version !== "0.0.1" || !/^[a-z0-9][a-z0-9-]*$/.test(dependency[kind].id)) {
+    throw new Error(`release dependencies[${index}].${kind} must be an exact 0.0.1 reference`);
   }
   if (dependency.scope !== "runtime" && dependency.scope !== "build") {
     throw new Error(`release dependencies[${index}].scope must be runtime or build`);
