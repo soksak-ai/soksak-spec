@@ -120,25 +120,14 @@ export type { LocalizedText } from "./localizedText.js";
 // ── §2 뷰 배치 ───────────────────────────────────────────────────────────────
 // 뷰 구현(provider)과 배치는 직교(§0-6). placements = 지원 배치, 기본 우측 사이드바.
 
-export type ViewPlacement =
-  | "sidebar-right"
-  | "sidebar-left"
-  | "sidebar-footer"
-  | "content";
-
-export const VIEW_PLACEMENTS: readonly ViewPlacement[] = [
-  "sidebar-right",
-  "sidebar-left",
-  "sidebar-footer",
-  "content",
-];
+export type ViewSurface = "tab" | "side";
+export const VIEW_SURFACES: readonly ViewSurface[] = ["tab", "side"];
 
 export interface ContributedView {
   id: string; // 플러그인 내 고유. 전역 키는 "<pluginId>.<id>"
   title: LocalizedText;
   icon: string; // 아이콘 레일용 짧은 글리프(문자 1~2개/이모지). v1 은 SVG 미지원
-  placements: ViewPlacement[];
-  defaultPlacement: ViewPlacement;
+  surfaces: ViewSurface[];
   // 콘텐츠 뷰 아래 네이티브 레이어(임베드 webview 등)가 비쳐야 함 — 코어가 그 셀을 투명 홀로 처리한다.
   // 브라우저류 뷰(child webview 임베드)가 선언한다(코어 하드 체크 없음 — 데이터 주도). 기본 false.
   transparent: boolean; // 파싱 시 기본 false
@@ -996,7 +985,7 @@ export function parseManifest(
       views = parseEntries(c.views, {
         label: "contributes.views",
         required: ["id", "title", "icon"],
-        optional: ["placements", "defaultPlacement", "transparent", "nativeSurface", "status"],
+        optional: ["surfaces", "transparent", "nativeSurface", "status"],
         parse: (v, errs) => {
           if (!isNonEmptyString(v.id) || !VIEW_ID_RE.test(v.id)) {
             errs.push("contributes.views: id 는 ^[a-z0-9][a-z0-9-]*$");
@@ -1004,25 +993,18 @@ export function parseManifest(
           }
           if (!validateLocalizedText(v.title, "contributes.views.title", errs)) return null;
           if (!isNonEmptyString(v.icon)) return null;
-          let placements: ViewPlacement[] = ["sidebar-right"];
-          if (v.placements !== undefined) {
+          let surfaces: ViewSurface[] = ["side"];
+          if (v.surfaces !== undefined) {
             if (
-              !Array.isArray(v.placements) ||
-              v.placements.length === 0 ||
-              v.placements.some((placement) => !VIEW_PLACEMENTS.includes(placement as ViewPlacement))
+              !Array.isArray(v.surfaces) ||
+              v.surfaces.length === 0 ||
+              v.surfaces.some((surface) => !VIEW_SURFACES.includes(surface as ViewSurface)) ||
+              new Set(v.surfaces).size !== v.surfaces.length
             ) {
-              errs.push(`contributes.views["${v.id}"].placements: ${VIEW_PLACEMENTS.join("|")} 의 비어있지 않은 배열`);
+              errs.push(`contributes.views["${v.id}"].surfaces: non-empty array of distinct ${VIEW_SURFACES.join("|")}`);
               return null;
             }
-            placements = v.placements as ViewPlacement[];
-          }
-          let defaultPlacement = placements[0];
-          if (v.defaultPlacement !== undefined) {
-            if (!placements.includes(v.defaultPlacement as ViewPlacement)) {
-              errs.push(`contributes.views["${v.id}"].defaultPlacement: placements 에 포함되어야 함`);
-              return null;
-            }
-            defaultPlacement = v.defaultPlacement as ViewPlacement;
+            surfaces = v.surfaces as ViewSurface[];
           }
           let transparent = false;
           if (v.transparent !== undefined) {
@@ -1069,8 +1051,7 @@ export function parseManifest(
             id: v.id.trim(),
             title: normalizeText(v.title as LocalizedText),
             icon: (v.icon as string).trim(),
-            placements,
-            defaultPlacement,
+            surfaces,
             transparent,
             nativeSurface,
             ...(status !== undefined ? { status } : {}),

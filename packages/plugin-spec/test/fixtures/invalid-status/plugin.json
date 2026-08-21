@@ -14,8 +14,8 @@
         "id": "canvas",
         "title": "Canvas",
         "icon": "▣",
-        "placements": [
-          "content"
+        "surfaces": [
+          "tab"
         ],
         "status": [
           "dirty",

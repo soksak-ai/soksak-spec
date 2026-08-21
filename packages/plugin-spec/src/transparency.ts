@@ -36,10 +36,10 @@ export const C2_STATIC_ENFORCEMENT: Readonly<
 
 // 판정 입력 — 파싱된 매니페스트 contributes 의 구조 부분집합. PluginManifest["contributes"] 가
 // 그대로 대입된다(구조 타이핑). counts 가 아니라 실물 선언 배열을 받는다 — 규칙 ③ 이 뷰별
-// placements·status 를 봐야 하기 때문(집계 열화 금지).
+// surfaces and status must remain available per view.
 export interface TransparencyView {
   id: string;
-  placements: readonly string[];
+  surfaces: readonly string[];
   status?: readonly string[];
 }
 
@@ -52,12 +52,9 @@ export interface TransparencyContributes {
   nodes: readonly unknown[];
 }
 
-// 콘텐츠 뷰 판별 — placements 에 "content" 포함. 설치본 매니페스트 실측으로 확정한 정의다
-// (dev 홈 40개 실측: 콘텐츠 뷰는 전부 placements 로 식별되고 별도 표식이 없다. content 단독 9,
-// sidebar 혼합 1 — 혼합도 콘텐츠 탭에 실리므로 콘텐츠 뷰다). setStatus 는 콘텐츠 배치에서만
-// 유효(사이드바 no-op)라 status 선언 의무의 스코프가 이 판별과 일치한다.
-export function isContentView(view: { placements: readonly string[] }): boolean {
-  return view.placements.includes("content");
+// Status is required for views that can render as a tab.
+export function isContentView(view: { surfaces: readonly string[] }): boolean {
+  return view.surfaces.includes("tab");
 }
 
 // 기능 보유 술어는 렌더/프로그램 기여축 전부를 센다. overlay도 별도 sandbox document에서

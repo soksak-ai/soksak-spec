@@ -32,7 +32,7 @@ function base(views: unknown[]): Record<string, unknown> {
 }
 
 function view(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { id: "canvas", title: "캔버스", icon: "▣", placements: ["content"], ...overrides };
+  return { id: "canvas", title: "캔버스", icon: "▣", surfaces: ["tab"], ...overrides };
 }
 
 describe("contributes.views[].status — 선언 축 파싱(M1)", () => {
@@ -83,7 +83,7 @@ describe("contributes.views[].status — 선언 축 파싱(M1)", () => {
 // 판정 입력 헬퍼 — contributes 형태(실물 선언 배열).
 function contributes(overrides: Record<string, unknown> = {}) {
   return {
-    views: [] as { id: string; placements: string[]; status?: string[] }[],
+    views: [] as { id: string; surfaces: string[]; status?: string[] }[],
     overlays: [] as unknown[],
     commands: [] as unknown[],
     fileViewers: [] as unknown[],
@@ -93,15 +93,15 @@ function contributes(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("isContentView — 콘텐츠 뷰 판별(설치본 실측 정의: placements 에 content 포함)", () => {
+describe("isContentView — tab surface detection", () => {
   it("content 단독 배치 → 콘텐츠 뷰", () => {
-    expect(isContentView({ placements: ["content"] })).toBe(true);
+    expect(isContentView({ surfaces: ["tab"] })).toBe(true);
   });
   it("혼합 배치(sidebar-right+content) → 콘텐츠 뷰(git-diff 형)", () => {
-    expect(isContentView({ placements: ["sidebar-right", "content"] })).toBe(true);
+    expect(isContentView({ surfaces: ["side", "tab"] })).toBe(true);
   });
   it("사이드바 전용 → 콘텐츠 뷰 아님", () => {
-    expect(isContentView({ placements: ["sidebar-left", "sidebar-right"] })).toBe(false);
+    expect(isContentView({ surfaces: ["side"] })).toBe(false);
   });
 });
 
@@ -109,7 +109,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
   it("views>0 ∧ commands=0 → command-surface", () => {
     const v = transparencyViolations(
       contributes({
-        views: [{ id: "c", placements: ["content"], status: [] }],
+        views: [{ id: "c", surfaces: ["tab"], status: [] }],
         nodes: [{ id: "root" }],
       }),
     );
@@ -131,7 +131,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
   it("views>0 ∧ nodes=0 → view-nodes", () => {
     const v = transparencyViolations(
       contributes({
-        views: [{ id: "c", placements: ["content"], status: [] }],
+        views: [{ id: "c", surfaces: ["tab"], status: [] }],
         commands: [{}],
       }),
     );
@@ -141,7 +141,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
   it("콘텐츠 뷰 status 선언 부재 → content-view-status(뷰 id 를 지목)", () => {
     const v = transparencyViolations(
       contributes({
-        views: [{ id: "canvas", placements: ["content"] }],
+        views: [{ id: "canvas", surfaces: ["tab"] }],
         commands: [{}],
         nodes: [{ id: "root" }],
       }),
@@ -153,7 +153,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
   it("빈 배열 선언 = 무상태 명시 → 위반 아님(침묵과 구분)", () => {
     const v = transparencyViolations(
       contributes({
-        views: [{ id: "canvas", placements: ["content"], status: [] }],
+        views: [{ id: "canvas", surfaces: ["tab"], status: [] }],
         commands: [{}],
         nodes: [{ id: "root" }],
       }),
@@ -164,7 +164,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
   it("사이드바 전용 뷰는 status 의무 밖(setStatus no-op — 규칙 스코프는 콘텐츠 뷰)", () => {
     const v = transparencyViolations(
       contributes({
-        views: [{ id: "panel", placements: ["sidebar-right"] }],
+        views: [{ id: "panel", surfaces: ["side"] }],
         commands: [{}],
         nodes: [{ id: "root" }],
       }),
@@ -175,7 +175,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
   it("혼합 배치 뷰도 콘텐츠 뷰 — status 부재면 위반", () => {
     const v = transparencyViolations(
       contributes({
-        views: [{ id: "view", placements: ["sidebar-right", "content"] }],
+        views: [{ id: "view", surfaces: ["side", "tab"] }],
         commands: [{}],
         nodes: [{ id: "root" }],
       }),
@@ -185,7 +185,7 @@ describe("transparencyViolations — C2 정적 3규칙(M2)", () => {
 
   it("복수 위반 동시 보고(은폐 0)", () => {
     const v = transparencyViolations(
-      contributes({ views: [{ id: "c", placements: ["content"] }] }),
+      contributes({ views: [{ id: "c", surfaces: ["tab"] }] }),
     );
     expect(v.map((x) => x.rule)).toEqual([
       "command-surface",
