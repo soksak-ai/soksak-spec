@@ -14,7 +14,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template/sidecar");
 const COMMIT = "b".repeat(40);
-const SPEC_COMMIT = "d7f54852754195527f125d1fc11362316157d19b";
 const TARGETS = [
   "aarch64-apple-darwin",
   "aarch64-unknown-linux-gnu",
@@ -43,7 +42,6 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   };
   fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
   fs.mkdirSync(path.join(root, "release"), { recursive: true });
-  fs.mkdirSync(path.join(root, "validation"), { recursive: true });
   for (const name of ["release-contract.mjs", "build-release.mjs", "validate-with-spec.mjs"]) {
     fs.copyFileSync(path.join(TEMPLATE, name), path.join(root, "scripts", name));
   }
@@ -51,10 +49,6 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   fs.writeFileSync(
     path.join(root, "release", "targets.json"),
     `${JSON.stringify(targets.map((target) => ({ target, runner: "runner" })), null, 2)}\n`,
-  );
-  fs.writeFileSync(
-    path.join(root, "validation", "spec-validator.json"),
-    `${JSON.stringify({ repository: "https://github.com/soksak-ai/soksak-spec", commit: SPEC_COMMIT, validator: "packages/plugin-spec/bin/validate.mjs" }, null, 2)}\n`,
   );
   fs.writeFileSync(
     path.join(root, "Cargo.toml"),

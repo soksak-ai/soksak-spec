@@ -41,7 +41,6 @@ export const VERSION = SIDECAR.version;
 export const TAG = `v${VERSION}`;
 export const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
 export const INTERFACE = SIDECAR.interface;
-export const SPEC_SHA = JSON.parse(fs.readFileSync(path.join(ROOT, "validation", "spec-validator.json"), "utf8")).commit;
 export const RELEASE_SPEC = "soksak-spec-release@0.0.1";
 export const SIDECAR_SPEC = "soksak-spec-sidecar@0.0.1";
 export const CONFORMANCE_SPEC = "soksak-spec-conformance@0.0.1";
@@ -190,12 +189,7 @@ export function jsonBytes(value) {
 }
 
 export function assertBaseline() {
-  // This sidecar does not link soksak-spec; the pinned public validator judges its
-  // release documents from the outside (validation/spec-validator.json).
+  // The canonical validator checks release documents from the spec checkout.
   const cargo = fs.readFileSync(path.join(ROOT, "Cargo.toml"), "utf8");
   if (!cargo.includes(`version = "${VERSION}"`) || !cargo.includes("publish = false")) throw new Error("Cargo package must match private release metadata");
-  const pin = JSON.parse(fs.readFileSync(path.join(ROOT, "validation", "spec-validator.json"), "utf8"));
-  if (pin.repository !== "https://github.com/soksak-ai/soksak-spec" || pin.commit !== SPEC_SHA || pin.validator !== "packages/plugin-spec/bin/validate.mjs") {
-    throw new Error("validator pin does not match the public specification source");
-  }
 }
