@@ -69,6 +69,7 @@ export * from "./semver.js";
 import { COMPONENT_ID_RE } from "./release-primitives.js";
 export * from "./release-primitives.js";
 export * from "./release.js";
+export * from "./installation.js";
 export * from "./sidecar.js";
 export * from "./conformanceWire.js";
 export * from "./pluginRuntime.js";
