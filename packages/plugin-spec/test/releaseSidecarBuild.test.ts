@@ -239,6 +239,31 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(result.stderr).toMatch(/archive sidecar manifest differs from the release identity/);
   });
 
+  it("accepts GNU long-name metadata for a safe bundled runtime path", () => {
+    writeFixture();
+    const target = "aarch64-apple-darwin";
+    const asset = `soksak-sidecar-example-0.0.1-${target}.tar.gz`;
+    const archiveRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "sidecar-archive-"));
+    const longPath = `runtime/${"segment/".repeat(16)}library.dylib`;
+    fs.mkdirSync(path.join(archiveRoot, "dist"), { recursive: true });
+    fs.mkdirSync(path.dirname(path.join(archiveRoot, longPath)), { recursive: true });
+    fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
+      id: "soksak-sidecar-example",
+      version: "0.0.1",
+      interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+      process: "dist/soksak-sidecar-example",
+    }));
+    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example"), "binary");
+    fs.writeFileSync(path.join(archiveRoot, longPath), "runtime");
+    const tar = spawnSync("tar", ["-czf", path.join(artifactsDir, asset), "-C", archiveRoot, "."], { encoding: "utf8" });
+    expect(tar.status, tar.stderr).toBe(0);
+    fs.rmSync(archiveRoot, { recursive: true, force: true });
+    const bytes = fs.readFileSync(path.join(artifactsDir, asset));
+    fs.writeFileSync(path.join(artifactsDir, `${asset}.sha256`), `${sha256(bytes)}  ${asset}\n`);
+    const result = build();
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("refuses a dispatch tag that does not equal v0.0.1", () => {
     writeFixture();
     const r = build("v9.9.9");

@@ -1,6 +1,6 @@
 {
   "name": "@soksak-ai/plugin-spec",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "private": true,
   "description": "Public soksak plugin, sidecar, kit, release, conformance, and signed-registry contracts.",
   "license": "MIT",
