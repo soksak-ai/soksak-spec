@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   ID, INTERFACE, REPOSITORY, TAG, VERSION,
   assertBaseline, assertCommit, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
-  parseOptions, readRegularFile, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
+  parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
 } from "./release-contract.mjs";
 
 // --emit-summary is an additive boolean flag: the core release.build handler passes it to read the
@@ -26,6 +26,16 @@ const artifacts = readTargetMatrix().map(({ target }) => {
   expectedNames.push(asset, checksumName);
   const bytes = readRegularFile(path.join(artifactsDir, asset));
   const digest = sha256(bytes);
+  const archived = readSidecarReleaseArchive(bytes);
+  const archivedManifest = archived.find((entry) => entry.name === "sidecar.json");
+  if (!archivedManifest) throw new Error(`${asset}: archive has no sidecar.json`);
+  const manifest = JSON.parse(archivedManifest.data.toString("utf8"));
+  const process = `dist/${ID}${target.includes("windows") ? ".exe" : ""}`;
+  if (
+    manifest.id !== ID || manifest.version !== VERSION ||
+    JSON.stringify(manifest.interface) !== JSON.stringify(INTERFACE) || manifest.process !== process
+  ) throw new Error(`${asset}: archive sidecar manifest differs from the release identity`);
+  if (!archived.some((entry) => entry.name === process)) throw new Error(`${asset}: archive has no declared sidecar process`);
   // The .sha256 sidecar asset ships alongside the archive; it must state exactly
   // the digest of these archive bytes ("<hex>  <asset>", sha256sum/shasum shape).
   const stated = readRegularFile(path.join(artifactsDir, checksumName)).toString("utf8").trim()

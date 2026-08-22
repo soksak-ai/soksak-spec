@@ -12,6 +12,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { createRegularFileArchive } from "../release-template/archive.mjs";
+
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template/sidecar");
 const COMMIT = "b".repeat(40);
 const TARGETS = [
@@ -59,7 +61,13 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   }
   for (const target of targets) {
     const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
-    const bytes = Buffer.from(`archive-bytes-${target}`);
+    const archiveRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "sidecar-archive-"));
+    const process = `dist/${sidecar.id}${target.includes("windows") ? ".exe" : ""}`;
+    fs.mkdirSync(path.join(archiveRoot, "dist"));
+    fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), `${JSON.stringify({ ...sidecar, process }, null, 2)}\n`);
+    fs.writeFileSync(path.join(archiveRoot, process), "binary");
+    const bytes = createRegularFileArchive({ root: archiveRoot, files: ["sidecar.json", process] });
+    fs.rmSync(archiveRoot, { recursive: true, force: true });
     fs.writeFileSync(path.join(artifactsDir, asset), bytes);
     fs.writeFileSync(path.join(artifactsDir, `${asset}.sha256`), `${sha256(bytes)}  ${asset}\n`);
   }
@@ -207,6 +215,28 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     const r = build();
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/exactly the declared release matrix/);
+  });
+
+  it("refuses an archive whose sidecar version differs from the release", () => {
+    writeFixture();
+    const target = "x86_64-pc-windows-msvc";
+    const asset = `soksak-sidecar-example-0.0.1-${target}.tar.gz`;
+    const archiveRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "sidecar-archive-"));
+    fs.mkdirSync(path.join(archiveRoot, "dist"));
+    fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
+      id: "soksak-sidecar-example",
+      version: "0.0.0",
+      interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+      process: "dist/soksak-sidecar-example.exe",
+    }));
+    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example.exe"), "binary");
+    const bytes = createRegularFileArchive({ root: archiveRoot, files: ["sidecar.json", "dist/soksak-sidecar-example.exe"] });
+    fs.rmSync(archiveRoot, { recursive: true, force: true });
+    fs.writeFileSync(path.join(artifactsDir, asset), bytes);
+    fs.writeFileSync(path.join(artifactsDir, `${asset}.sha256`), `${sha256(bytes)}  ${asset}\n`);
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/archive sidecar manifest differs from the release identity/);
   });
 
   it("refuses a dispatch tag that does not equal v0.0.1", () => {

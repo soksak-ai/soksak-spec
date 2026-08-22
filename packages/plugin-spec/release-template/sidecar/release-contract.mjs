@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 
 // ROOT is the sidecar repository root, resolved by a discoverable rule rather than cwd guessing
 // The sidecar.json identity marker is discovered at or above the working directory.
@@ -152,6 +153,49 @@ export function readRegularFile(input) {
   } finally {
     fs.closeSync(fd);
   }
+}
+
+function tarOctal(block, offset, width, label) {
+  const value = block.subarray(offset, offset + width).toString("ascii").replace(/\0.*$/, "").trim();
+  if (!/^[0-7]*$/.test(value)) throw new Error(`invalid tar ${label}`);
+  return Number.parseInt(value || "0", 8);
+}
+
+export function readSidecarReleaseArchive(bytes) {
+  const blockSize = 512;
+  const tar = zlib.gunzipSync(bytes);
+  const entries = [];
+  const seen = new Set();
+  for (let offset = 0; offset + blockSize <= tar.length; ) {
+    const block = tar.subarray(offset, offset + blockSize);
+    if (block.every((byte) => byte === 0)) break;
+    const checksum = Buffer.from(block);
+    checksum.fill(0x20, 148, 156);
+    if (tarOctal(block, 148, 8, "checksum") !== checksum.reduce((sum, byte) => sum + byte, 0)) {
+      throw new Error("invalid tar checksum");
+    }
+    const rawName = block.subarray(0, 100).toString("utf8").replace(/\0.*$/, "");
+    const name = rawName.replace(/^\.\//, "").replace(/\/$/, "");
+    const size = tarOctal(block, 124, 12, "size");
+    const type = String.fromCharCode(block[156] || 0x30);
+    const dataStart = offset + blockSize;
+    const dataEnd = dataStart + size;
+    if (dataEnd > tar.length) throw new Error("truncated archive entry");
+    if (type === "5") {
+      if (size !== 0) throw new Error(`directory archive entry contains data: ${rawName}`);
+    } else if (type === "0" || type === "\0") {
+      if (!name || name.startsWith("/") || name.includes("\\") || name.split("/").some((part) => !part || part === "." || part === "..")) {
+        throw new Error(`unsafe archive path: ${rawName}`);
+      }
+      if (seen.has(name)) throw new Error(`duplicate archive path: ${name}`);
+      seen.add(name);
+      entries.push({ name, data: tar.subarray(dataStart, dataEnd) });
+    } else {
+      throw new Error(`non-regular archive entry: ${rawName}`);
+    }
+    offset = dataStart + Math.ceil(size / blockSize) * blockSize;
+  }
+  return entries;
 }
 
 export function ensureEmptyDirectory(input) {
