@@ -6,11 +6,17 @@
 
 // 호스트가 단독 소유하는 크롬 셀렉터·변수. 플러그인 CSS 에 등장하면 위반(자기 본문 슬롯만 스타일링해야 함).
 export const HOST_CHROME_TOKENS: readonly string[] = [
+  ".sidebar-body-tabs",
+  ".sidebar-body-tab",
   ".left-host-tabs",
   ".left-host-tab",
   ".content-tabs",
+  ".space-tabs",
   ".view-tabs",
   ".view-tab",
+  ".pane-tabs",
+  ".workspace-tabs",
+  ".workspace-tab",
   ".ft-header",
   ".plugin-side-head",
   ".titlebar",
