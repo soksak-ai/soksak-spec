@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "pnpm --filter @soksak-ai/plugin-spec build",
-    "test:unit": "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked",
+    "test:unit": "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked && cd go/platformspec && go test ./... && go vet ./...",
     "release:verify": "node scripts/release-verify.mjs",
     "test": "pnpm test:unit && pnpm release:verify"
   },

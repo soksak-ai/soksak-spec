@@ -58,6 +58,7 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
     ".gitignore",
     ".nvmrc",
     "Cargo.lock",
+    "go/platformspec/go.mod",
     "LICENSE",
     "README.md",
     "package.json",
@@ -78,7 +79,7 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
   assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
   assert.equal(
     workspace.scripts?.["test:unit"],
-    "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked",
+    "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked && cd go/platformspec && go test ./... && go vet ./...",
   );
   assert.equal(workspace.scripts?.["release:verify"], "node scripts/release-verify.mjs");
   assert.equal(workspace.scripts?.test, "pnpm test:unit && pnpm release:verify");
