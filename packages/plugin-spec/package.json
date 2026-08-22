@@ -34,7 +34,7 @@
     "test/fixtures/platform-wire"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "node scripts/build.mjs"
   },
   "devDependencies": {
     "ajv": "8.17.1",

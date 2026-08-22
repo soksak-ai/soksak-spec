@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -40,6 +40,11 @@ describe("schema metadata and payload identity", () => {
     ]));
     expect(registry).not.toHaveProperty("profiles");
     expect(registry).not.toHaveProperty(["un", "its"].join(""));
+  });
+
+  it("does not publish a generic unit module", () => {
+    const published = readdirSync(join(root, "dist"));
+    expect(published.filter((name) => /(^|[-.])unit([-.]|$)/i.test(name))).toEqual([]);
   });
 
   it("uses protocol only for runtime frames", async () => {
