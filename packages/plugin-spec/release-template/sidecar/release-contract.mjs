@@ -21,7 +21,7 @@ export function parseSidecarManifest(raw) {
   const keys = Object.keys(raw).sort();
   if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "version"])) throw new Error("sidecar manifest keys are closed");
   if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
-  if (raw.process !== `dist/${raw.id}`) throw new Error("sidecar process path must match its id");
+  if (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`) throw new Error("sidecar process path must match its platform executable");
   if (
     !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
     JSON.stringify(Object.keys(raw.interface).sort()) !== JSON.stringify(["id", "version"]) ||
@@ -184,7 +184,19 @@ export function jsonBytes(value) {
 }
 
 export function assertBaseline() {
-  // The canonical validator checks release documents from the spec checkout.
-  const cargo = fs.readFileSync(path.join(ROOT, "Cargo.toml"), "utf8");
-  if (!cargo.includes(`version = "${VERSION}"`) || !cargo.includes("publish = false")) throw new Error("Cargo package must match private release metadata");
+  const cargoPath = path.join(ROOT, "Cargo.toml");
+  const goModPath = path.join(ROOT, "go.mod");
+  if (fs.existsSync(cargoPath)) {
+    const cargo = fs.readFileSync(cargoPath, "utf8");
+    if (!cargo.includes(`name = "${ID}"`) || !cargo.includes(`version = "${VERSION}"`) || !cargo.includes("publish = false")) {
+      throw new Error("Cargo package must match private release metadata");
+    }
+    return;
+  }
+  if (fs.existsSync(goModPath)) {
+    const goMod = fs.readFileSync(goModPath, "utf8");
+    if (!goMod.split(/\r?\n/).includes(`module github.com/soksak-ai/${ID}`)) throw new Error("Go module must match sidecar identity");
+    return;
+  }
+  throw new Error("sidecar repository must declare Cargo.toml or go.mod");
 }

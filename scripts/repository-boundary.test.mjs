@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const releaseVersion = "0.0.9";
+const releaseVersion = "0.0.10";
 
 function read(path) {
   return readFileSync(join(root, path), "utf8");
@@ -136,7 +136,7 @@ test("repository owns a complete reproducible release boundary", () => {
     [],
     "installed dependencies contain no symbolic links",
   );
-  assert.equal(read(".nvmrc").trim(), "22.12.0");
+  assert.equal(read(".nvmrc").trim(), "24.19.0");
   assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"1\.96\.0"$/m);
 
   for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {

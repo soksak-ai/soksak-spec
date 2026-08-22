@@ -30,7 +30,7 @@ function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string; targets?: string[] } = {}): void {
+function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string; targets?: string[]; language?: "rust" | "go" } = {}): void {
   const targets = overrides.targets ?? TARGETS;
   const sidecar = {
     id: "soksak-sidecar-example",
@@ -49,10 +49,14 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
     path.join(root, "release", "targets.json"),
     `${JSON.stringify(targets.map((target) => ({ target, runner: "runner" })), null, 2)}\n`,
   );
-  fs.writeFileSync(
-    path.join(root, "Cargo.toml"),
-    `[package]\nname = "${sidecar.id}"\nversion = "${overrides.cargoVersion ?? sidecar.version}"\npublish = false\n`,
-  );
+  if (overrides.language !== "go") {
+    fs.writeFileSync(
+      path.join(root, "Cargo.toml"),
+      `[package]\nname = "${sidecar.id}"\nversion = "${overrides.cargoVersion ?? sidecar.version}"\npublish = false\n`,
+    );
+  } else {
+    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/soksak-ai/${sidecar.id}\n\ngo 1.25.0\n`);
+  }
   for (const target of targets) {
     const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
     const bytes = Buffer.from(`archive-bytes-${target}`);
@@ -131,6 +135,18 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(r.status).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
     expect(release.artifacts.map((artifact: { target: string }) => artifact.target)).toEqual(targets);
+  });
+
+  it("accepts a Go sidecar whose identity is owned by sidecar.json", () => {
+    writeFixture({ language: "go" });
+    const result = build();
+    expect(result.status, result.stderr).toBe(0);
+  });
+
+  it("accepts the Windows executable name in a sidecar manifest", () => {
+    writeFixture({ sidecar: { process: "dist/soksak-sidecar-example.exe" } });
+    const result = build();
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it("keeps the component patch version independent from its interface version", () => {
