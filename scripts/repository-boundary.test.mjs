@@ -147,4 +147,11 @@ test("repository owns a complete reproducible release boundary", () => {
       assert.match(action, /^[^@\s]+@[a-f0-9]{40}$/, `${workflow}: action must use a full commit: ${action}`);
     }
   }
+
+  const verifyWorkflow = readFileSync(".github/workflows/verify.yml", "utf8");
+  for (const required of [
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86",
+    "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+  ]) assert.ok(verifyWorkflow.includes(required), `verify workflow does not pin ${required}`);
 });
