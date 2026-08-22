@@ -37,7 +37,7 @@ describe("portable platform wire artifacts", () => {
 
     expect(release.minProperties).toBe(4);
     expect(release.maxProperties).toBe(4);
-    expect(release.$defs.reference.properties.version.const).toBe("0.0.1");
+    expect(release.$defs.reference.properties.version.pattern).toContain("[0-9]");
     expect(registry.properties.plugins.items.allOf[0].$ref).toBe(release.$id);
     expect(registry.properties.sidecars.items.allOf[0].$ref).toBe(release.$id);
     expect(registry.properties.kits.items.allOf[0].$ref).toBe(release.$id);

@@ -95,8 +95,12 @@ function parseReference(raw: unknown, label: string, errors: string[]): ExactRef
   const value = strictObject(raw, ["id", "version"], ["id", "version"], label, errors);
   if (!value) return null;
   if (typeof value.id !== "string" || !COMPONENT_ID_RE.test(value.id)) errors.push(`${label}.id: component id required`);
-  if (value.version !== "0.0.1") errors.push(`${label}.version: exact 0.0.1 required`);
-  return errors.length === before ? { id: value.id as string, version: "0.0.1" } : null;
+  if (typeof value.version !== "string" || !STRICT_SEMVER_RE.test(value.version)) {
+    errors.push(`${label}.version: exact strict SemVer required`);
+  }
+  return errors.length === before
+    ? { id: value.id as string, version: value.version as string }
+    : null;
 }
 
 const REPOSITORY_RE = /^https:\/\/github\.com\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
@@ -110,15 +114,19 @@ function parseSource(raw: unknown, errors: string[]): ReleaseSource | null {
   return errors.length === before ? { repository: value.repository as string, commit: value.commit as string } : null;
 }
 
-function releaseAssetBelongsTo(url: unknown, repository: string): url is string {
-  return typeof url === "string" && url.startsWith(`${repository}/releases/download/v0.0.1/`) && !/[?#]/.test(url);
+function releaseAssetBelongsTo(url: unknown, repository: string, version: string): url is string {
+  return typeof url === "string"
+    && url.startsWith(`${repository}/releases/download/v${version}/`)
+    && !/[?#]/.test(url);
 }
 
-function parseIntegrity(raw: unknown, label: string, repository: string, errors: string[]): IntegrityReference | null {
+function parseIntegrity(raw: unknown, label: string, repository: string, version: string, errors: string[]): IntegrityReference | null {
   const before = errors.length;
   const value = strictObject(raw, ["sha256", "url"], ["sha256", "url"], label, errors);
   if (!value) return null;
-  if (!releaseAssetBelongsTo(value.url, repository)) errors.push(`${label}.url: v0.0.1 asset in source repository required`);
+  if (!releaseAssetBelongsTo(value.url, repository, version)) {
+    errors.push(`${label}.url: v${version} asset in source repository required`);
+  }
   if (typeof value.sha256 !== "string" || !SHA256_RE.test(value.sha256)) errors.push(`${label}.sha256: exact SHA-256 required`);
   return errors.length === before ? { url: value.url as string, sha256: value.sha256 as string } : null;
 }
@@ -131,7 +139,7 @@ function expectedManifest(kind: ReleaseKind): ReleaseArtifact["manifest"] {
   return "spec.json";
 }
 
-function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, errors: string[]): ReleaseArtifact[] {
+function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, version: string, errors: string[]): ReleaseArtifact[] {
   const result: ReleaseArtifact[] = [];
   if (!Array.isArray(raw) || raw.length === 0) {
     errors.push("release.artifacts: non-empty array required");
@@ -142,7 +150,9 @@ function parseArtifacts(raw: unknown, kind: ReleaseKind, repository: string, err
     const before = errors.length;
     const value = strictObject(item, ["format", "manifest", "sha256", "size", "target", "url"], ["format", "manifest", "sha256", "size", "target", "url"], label, errors);
     if (!value) return;
-    if (!releaseAssetBelongsTo(value.url, repository)) errors.push(`${label}.url: v0.0.1 asset in source repository required`);
+    if (!releaseAssetBelongsTo(value.url, repository, version)) {
+      errors.push(`${label}.url: v${version} asset in source repository required`);
+    }
     if (typeof value.sha256 !== "string" || !SHA256_RE.test(value.sha256)) errors.push(`${label}.sha256: exact SHA-256 required`);
     if (!Number.isSafeInteger(value.size) || (value.size as number) <= 0) errors.push(`${label}.size: positive safe integer required`);
     if (!(ARTIFACT_FORMATS as readonly unknown[]).includes(value.format)) errors.push(`${label}.format: tar.gz|tgz required`);
@@ -174,11 +184,11 @@ export function parseReleaseManifest(raw: unknown): PlatformParseResult<ReleaseD
   const reference = kind ? parseReference(value[kind], `release.${kind}`, errors) : null;
   const source = parseSource(value.source, errors);
   if (!kind || !reference || !source) return { ok: false, errors };
-  const artifacts = parseArtifacts(value.artifacts, kind, source.repository, errors);
+  const artifacts = parseArtifacts(value.artifacts, kind, source.repository, reference.version, errors);
   const reports: IntegrityReference[] = [];
   if (!Array.isArray(value.reports) || value.reports.length === 0) errors.push("release.reports: non-empty array required");
   else value.reports.forEach((item, index) => {
-    const report = parseIntegrity(item, `release.reports[${index}]`, source.repository, errors);
+    const report = parseIntegrity(item, `release.reports[${index}]`, source.repository, reference.version, errors);
     if (report) reports.push(report);
   });
   sortedUnique(reports.map((report) => report.url), "release.reports", errors);

@@ -50,4 +50,33 @@ describe("plugin, sidecar, and kit release documents", () => {
     delete (missing.artifacts as Record<string, unknown>[])[0].size;
     expect(parseReleaseManifest(missing).ok).toBe(false);
   });
+
+  it("accepts an exact patch release and binds every asset to its tag", () => {
+    const release = specRelease();
+    release.spec = { id: "soksak-spec", version: "0.0.2" };
+    release.artifacts = [{
+      ...(release.artifacts as Record<string, unknown>[])[0],
+      url: "https://github.com/example/soksak-spec/releases/download/v0.0.2/soksak-spec-0.0.2.tgz",
+    }];
+    release.reports = [{
+      ...(release.reports as Record<string, unknown>[])[0],
+      url: "https://github.com/example/soksak-spec/releases/download/v0.0.2/soksak-spec-0.0.2.conformance.json",
+    }];
+    expect(parseReleaseManifest(release)).toMatchObject({
+      ok: true,
+      value: { spec: { id: "soksak-spec", version: "0.0.2" } },
+    });
+
+    (release.artifacts as Record<string, unknown>[])[0].url =
+      "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.2.tgz";
+    expect(parseReleaseManifest(release).ok).toBe(false);
+  });
+
+  it("rejects version ranges and non-semver release identities", () => {
+    for (const version of ["^0.0.1", "latest", "0.0"]) {
+      const release = specRelease();
+      release.spec = { id: "soksak-spec", version };
+      expect(parseReleaseManifest(release).ok, version).toBe(false);
+    }
+  });
 });

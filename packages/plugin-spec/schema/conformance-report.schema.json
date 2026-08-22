@@ -14,7 +14,7 @@
   },
   "$defs": {
     "componentId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
-    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "$ref": "#/$defs/componentId" }, "version": { "const": "0.0.1" } } },
+    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "$ref": "#/$defs/componentId" }, "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" } } },
     "subject": { "type": "object", "additionalProperties": false, "minProperties": 1, "maxProperties": 1, "properties": { "plugin": { "$ref": "#/$defs/reference" }, "sidecar": { "$ref": "#/$defs/reference" }, "kit": { "$ref": "#/$defs/reference" }, "contract": { "$ref": "#/$defs/reference" }, "spec": { "$ref": "#/$defs/reference" } } },
     "contractProvider": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "type": "string", "pattern": "^soksak-spec-(?:(?:sidecar|plugin)-[a-z0-9][a-z0-9-]*|service(?:-[a-z0-9][a-z0-9-]*)?)$" }, "version": { "const": "0.0.1" } } },
     "claim": { "type": "object", "additionalProperties": false, "minProperties": 1, "maxProperties": 1, "properties": { "release": { "const": true }, "manifest": { "const": true }, "contract": { "$ref": "#/$defs/contractProvider" } } },

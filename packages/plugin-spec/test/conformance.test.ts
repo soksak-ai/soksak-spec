@@ -77,4 +77,18 @@ describe("common report binding", () => {
     generic.subject = { kind: "plugin", id: "weather-plugin", version: "0.0.1" };
     expect(parseConformanceReport(generic).ok).toBe(false);
   });
+
+  it("accepts a patch-version release subject without changing contract versions", () => {
+    const parsed = parseConformanceReport(report({
+      subject: { spec: { id: "soksak-spec", version: "0.0.2" } },
+      validator: { name: "soksak-conformance", version: "0.0.2" },
+    }));
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: { subject: { spec: { version: "0.0.2" } } },
+    });
+    expect(parseConformanceReport(report({
+      subject: { spec: { id: "soksak-spec", version: "latest" } },
+    })).ok).toBe(false);
+  });
 });

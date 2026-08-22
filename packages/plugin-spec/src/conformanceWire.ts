@@ -71,8 +71,12 @@ function parseExactReference(raw: unknown, label: string, errors: string[]): Exa
   const value = strictObject(raw, ["id", "version"], ["id", "version"], label, errors);
   if (!value) return null;
   if (typeof value.id !== "string" || !COMPONENT_ID_RE.test(value.id)) errors.push(`${label}.id: component id required`);
-  if (value.version !== "0.0.1") errors.push(`${label}.version: exact 0.0.1 required`);
-  return errors.length === before ? { id: value.id as string, version: "0.0.1" } : null;
+  if (typeof value.version !== "string" || !STRICT_SEMVER_RE.test(value.version)) {
+    errors.push(`${label}.version: exact strict SemVer required`);
+  }
+  return errors.length === before
+    ? { id: value.id as string, version: value.version as string }
+    : null;
 }
 
 function parseSubject(raw: unknown, errors: string[]): ConformanceSubject | null {
