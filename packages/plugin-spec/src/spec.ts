@@ -301,6 +301,16 @@ export interface ConfigSetting {
   max?: number; // type=number 선택
 }
 export const CONFIG_KEY_RE = /^[a-zA-Z][a-zA-Z0-9]*$/;
+export type EngineGrade = "chromium";
+export interface EngineProvision { chromium: boolean; nativeChildWebview: boolean; engineModules: boolean; supportsDocumentStart: boolean; supportsInputInjection: boolean }
+export interface EngineNeeds { requiresEngine?: EngineGrade; requiresNativeChildWebview?: boolean; requiresEngineModules?: boolean }
+export function unmetNeeds(needs: EngineNeeds, has: EngineProvision): string[] {
+  const result: string[] = [];
+  if (needs.requiresEngine === "chromium" && !has.chromium) result.push("requiresEngine=chromium");
+  if (needs.requiresNativeChildWebview && !has.nativeChildWebview) result.push("requiresNativeChildWebview");
+  if (needs.requiresEngineModules && !has.engineModules) result.push("requiresEngineModules");
+  return result;
+}
 
 export interface PluginManifest {
   id: string; // ^[a-z0-9][a-z0-9-]*$ + 설치 디렉토리명과 일치 강제
@@ -320,6 +330,9 @@ export interface PluginManifest {
   // local srcdoc/data/blob iframe은 기본 허용; remote iframe·navigation·WebRTC만 이 정책이 연다.
   runtime: PluginRuntimePolicy;
   appVersionRequirement: string;
+  requiresEngine?: EngineGrade;
+  requiresNativeChildWebview?: boolean;
+  requiresEngineModules?: boolean;
   template?: boolean; // true = 개발 템플릿(읽기 전용). 활성화 대상이 아니다 — 목록·상세만 노출하고 토글을 주지 않는다.
   // 플러그인↔플러그인 의존(라이브러리 플러그인). pluginId → semver 범위(예: "^0.1.0").
   // 설치 시 미설치 의존을 전이적으로 동반 설치(동의 게이트), 삭제 시 의존자 cascade(고아 방지).
@@ -584,6 +597,9 @@ export function parseManifest(
       "entry",
       "runtime",
       "appVersionRequirement",
+      "requiresEngine",
+      "requiresNativeChildWebview",
+      "requiresEngineModules",
       "template",
       "dependencies",
       "libraries",
@@ -623,6 +639,9 @@ export function parseManifest(
   if (raw.appVersionRequirement !== "0.0.1") {
     errors.push("appVersionRequirement: exact 0.0.1 required");
   }
+  if (raw.requiresEngine !== undefined && raw.requiresEngine !== "chromium") errors.push("requiresEngine: chromium required");
+  if (raw.requiresNativeChildWebview !== undefined && typeof raw.requiresNativeChildWebview !== "boolean") errors.push("requiresNativeChildWebview: boolean required");
+  if (raw.requiresEngineModules !== undefined && typeof raw.requiresEngineModules !== "boolean") errors.push("requiresEngineModules: boolean required");
   if (raw.template !== undefined && typeof raw.template !== "boolean") {
     errors.push("template: true/false 여야 함");
   }
@@ -1447,6 +1466,9 @@ export function parseManifest(
       entry,
       runtime,
       appVersionRequirement: raw.appVersionRequirement as string,
+      ...(raw.requiresEngine === "chromium" ? { requiresEngine: "chromium" as const } : {}),
+      ...(raw.requiresNativeChildWebview === true ? { requiresNativeChildWebview: true } : {}),
+      ...(raw.requiresEngineModules === true ? { requiresEngineModules: true } : {}),
       ...(raw.template === true ? { template: true } : {}),
       ...(Object.keys(dependencies).length > 0 ? { dependencies } : {}),
       ...(libraries.length > 0 ? { libraries } : {}),
