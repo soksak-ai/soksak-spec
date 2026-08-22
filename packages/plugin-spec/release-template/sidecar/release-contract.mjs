@@ -20,13 +20,13 @@ export function parseSidecarManifest(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("sidecar manifest must be an object");
   const keys = Object.keys(raw).sort();
   if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "version"])) throw new Error("sidecar manifest keys are closed");
-  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || raw.version !== "0.0.1") throw new Error("invalid sidecar identity");
+  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
   if (raw.process !== `dist/${raw.id}`) throw new Error("sidecar process path must match its id");
   if (
     !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
     JSON.stringify(Object.keys(raw.interface).sort()) !== JSON.stringify(["id", "version"]) ||
     !/^soksak-spec-sidecar-[a-z0-9][a-z0-9-]*$/.test(raw.interface.id) ||
-    raw.interface.version !== raw.version
+    raw.interface.version !== "0.0.1"
   ) throw new Error("interface provider must match the sidecar version");
   return Object.freeze({ ...raw, interface: Object.freeze({ ...raw.interface }) });
 }
