@@ -15,4 +15,8 @@ describe("sidecar manifest", () => {
     expect(parseSidecarManifest({ ...manifest(), extra: true }).ok).toBe(false);
     expect(parseSidecarManifest({ ...manifest(), process: "dist/other" }).ok).toBe(false);
   });
+  it("keeps component patches independent from the interface version", () => {
+    expect(parseSidecarManifest({ ...manifest(), version: "0.0.4" })).toMatchObject({ ok: true, value: { version: "0.0.4", interface: { version: "0.0.1" } } });
+    expect(parseSidecarManifest({ ...manifest(), version: "latest" }).ok).toBe(false);
+  });
 });

@@ -116,7 +116,7 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
 <!-- example:spec-correction-release:release -->
 ```json
 {
-  "spec": { "id": "soksak-spec", "version": "0.0.8" },
+  "spec": { "id": "soksak-spec", "version": "0.0.9" },
   "source": {
     "repository": "https://github.com/soksak-ai/soksak-spec",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -126,7 +126,7 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
       "target": "any",
       "format": "tgz",
       "manifest": "spec.json",
-      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.8/soksak-ai-plugin-spec-0.0.8.tgz",
+      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/soksak-ai-plugin-spec-0.0.9.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
@@ -135,7 +135,7 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
 }
 ```
 
-이 `soksak-spec@0.0.8` package는 계속 `plugin.json`, `sidecar.json` 및 런타임 인터페이스의
+이 `soksak-spec@0.0.9` package는 계속 `plugin.json`, `sidecar.json` 및 런타임 인터페이스의
 `0.0.1`을 검증할 수 있다. Package 수정은 해당 계약이 변경됐다는 근거가 아니다.
 
 ## 4. 플러그인과 사이드카 인터페이스
