@@ -77,7 +77,7 @@ dependencies = [
 
 [[package]]
 name = "soksak-spec-contract"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "soksak-spec-service"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "soksak-spec-socket"
-version = "0.0.2"
+version = "0.0.3"
 
 [[package]]
 name = "syn"

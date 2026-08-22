@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const releaseVersion = "0.0.2";
+const releaseVersion = "0.0.3";
 
 function read(path) {
   return readFileSync(join(root, path), "utf8");
@@ -59,6 +59,7 @@ test("repository owns a complete reproducible release boundary", () => {
     ".nvmrc",
     "Cargo.lock",
     "go/platformspec/go.mod",
+    "go/platformspec/go.sum",
     "LICENSE",
     "README.md",
     "package.json",
