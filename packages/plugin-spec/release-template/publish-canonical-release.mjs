@@ -30,7 +30,7 @@ function describeAsset(filename) {
   };
 }
 
-export function collectPortableReleaseAssets({ repository, commit, artifacts, manifest }) {
+export function collectCanonicalReleaseAssets({ repository, commit, artifacts, manifest }) {
   if (!REPOSITORY_RE.test(repository) || !COMMIT_RE.test(commit)) throw new Error("repository and exact commit are required");
   if (!isAbsolute(artifacts) || !isAbsolute(manifest)) throw new Error("artifact and manifest paths must be absolute");
   const directory = resolve(artifacts);
@@ -39,7 +39,6 @@ export function collectPortableReleaseAssets({ repository, commit, artifacts, ma
   const parsed = parseReleaseManifest(JSON.parse(regularFile(manifestPath, "release manifest")));
   if (!parsed.ok) throw new Error(`release manifest is invalid: ${parsed.errors.join("; ")}`);
   const identity = releaseIdentity(parsed.value);
-  if (identity.kind !== "contract" && identity.kind !== "kit") throw new Error("portable publisher accepts only contract and kit releases");
   const repositoryURL = `https://github.com/${repository}`;
   if (parsed.value.source.repository !== repositoryURL || parsed.value.source.commit !== commit || identity.id !== repository.split("/")[1]) {
     throw new Error("release identity does not match repository and commit");
@@ -86,7 +85,7 @@ function options(argv) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const input = options(process.argv.slice(2));
-    const release = collectPortableReleaseAssets(input);
+    const release = collectCanonicalReleaseAssets(input);
     const api = new GitHubApi({ repository: input.repository, token: process.env.SOKSAK_RELEASE_TOKEN });
     const result = await publishImmutableRelease({ repository: input.repository, commit: input.commit, ...release, api });
     process.stdout.write(`${JSON.stringify(result)}\n`);
