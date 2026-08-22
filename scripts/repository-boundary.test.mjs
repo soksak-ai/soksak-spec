@@ -100,6 +100,7 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.equal(pluginSpec.version, releaseVersion);
   assert.equal(pluginSpec.private, true);
   assert.equal(pluginSpec.publishConfig, undefined);
+  assert.ok(pluginSpec.files.includes("release-template"));
 
   for (const crate of [
     "crates/soksak-spec-contract/Cargo.toml",

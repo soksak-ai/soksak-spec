@@ -168,6 +168,12 @@ function verifyArchive(path, identity) {
   ) {
     throw new Error("packed plugin-spec identity, version, or publication policy is invalid");
   }
+  for (const required of [
+    "package/release-template/build-portable-release.mjs",
+    "package/release-template/publish-portable-release.mjs",
+  ]) {
+    if (!names.includes(required)) throw new Error(`packed plugin-spec is missing ${required}`);
+  }
   return { names, packed };
 }
 

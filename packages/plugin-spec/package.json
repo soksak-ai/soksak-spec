@@ -29,6 +29,7 @@
     "docs",
     "LICENSE",
     "README.md",
+    "release-template",
     "spec.json",
     "schema",
     "test/fixtures/platform-wire"
