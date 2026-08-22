@@ -45,17 +45,32 @@ if (fs.existsSync(out) && fs.readdirSync(out).length !== 0) throw new Error("rel
 fs.mkdirSync(out, { recursive: true });
 
 const identity = exactIdentity(root);
-const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-if (packageMetadata.private !== true || packageMetadata.version !== identity.version) {
-  throw new Error("private package version must equal portable component version");
-}
-if (packageMetadata.name !== `@soksak/${identity.id}`) throw new Error("package name must equal portable component id");
-if (packageMetadata.publishConfig !== undefined || Object.keys(packageMetadata.scripts ?? {}).some((name) => /publish/i.test(name))) {
-  throw new Error("language-registry publication is forbidden");
-}
 const repository = `https://github.com/soksak-ai/${identity.id}`;
-const packageRepository = packageMetadata.repository?.url;
-if (packageRepository !== `git+${repository}.git`) throw new Error("package repository does not equal portable component repository");
+const hasJavaScript = fs.existsSync(path.join(root, "package.json"));
+const hasCargo = fs.existsSync(path.join(root, "Cargo.toml"));
+if (hasJavaScript === hasCargo) throw new Error("exactly one package.json or Cargo.toml is required");
+if (hasJavaScript) {
+  const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  if (packageMetadata.private !== true || packageMetadata.version !== identity.version) {
+    throw new Error("private package version must equal portable component version");
+  }
+  if (packageMetadata.name !== `@soksak/${identity.id}`) throw new Error("package name must equal portable component id");
+  if (packageMetadata.publishConfig !== undefined || Object.keys(packageMetadata.scripts ?? {}).some((name) => /publish/i.test(name))) {
+    throw new Error("language-registry publication is forbidden");
+  }
+  if (packageMetadata.repository?.url !== `git+${repository}.git`) throw new Error("package repository does not equal portable component repository");
+} else {
+  const cargo = fs.readFileSync(path.join(root, "Cargo.toml"), "utf8");
+  const field = (name) => {
+    const matches = [...cargo.matchAll(new RegExp(`^${name}\\s*=\\s*\"([^\"]+)\"$`, "gm"))];
+    if (matches.length !== 1) throw new Error(`Cargo.toml must declare one package ${name}`);
+    return matches[0][1];
+  };
+  if (field("name") !== identity.id || field("version") !== identity.version || field("repository") !== repository) {
+    throw new Error("Cargo package identity does not equal portable component identity");
+  }
+  if (!/^publish\s*=\s*false$/m.test(cargo)) throw new Error("Cargo registry publication is forbidden");
+}
 
 const files = JSON.parse(fs.readFileSync(path.join(root, "release-files.json"), "utf8"));
 if (!Array.isArray(files) || files.length === 0 || new Set(files).size !== files.length) throw new Error("release-files.json must declare unique files");

@@ -26,6 +26,15 @@ function writeFixture(kind: "contract" | "kit", id: string): void {
   fs.writeFileSync(path.join(root, "src/index.ts"), "export const value = 1;\n");
 }
 
+function writeCargoKitFixture(id: string): void {
+  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "2021"\npublish = false\nrepository = "https://github.com/soksak-ai/${id}"\n`);
+  fs.writeFileSync(path.join(root, "kit.json"), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
+  fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["Cargo.toml", "LICENSE", "kit.json", "src/lib.rs"])}\n`);
+  fs.writeFileSync(path.join(root, "LICENSE"), "MIT\n");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src/lib.rs"), "pub const VALUE: u8 = 1;\n");
+}
+
 function build(): ReturnType<typeof spawnSync> {
   return spawnSync("node", [path.join(TEMPLATE, "build-portable-release.mjs"), "--commit", COMMIT, "--out", out], { cwd: root, encoding: "utf8" });
 }
@@ -69,5 +78,13 @@ describe("portable contract and kit release builder", () => {
     writeFixture("kit", "soksak-kit-example");
     fs.writeFileSync(path.join(root, "kit.json"), '{"id":"other","version":"0.0.1"}\n');
     expect(build().status).not.toBe(0);
+  });
+
+  it("builds a Cargo-owned kit without inventing JavaScript metadata", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    const result = build();
+    expect(result.status, result.stderr).toBe(0);
+    const release = JSON.parse(fs.readFileSync(path.join(out, "release.json"), "utf8"));
+    expect(release.kit).toEqual({ id: "soksak-kit-sidecar-example", version: "0.0.1" });
   });
 });
