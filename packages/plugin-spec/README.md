@@ -10,7 +10,7 @@ This package is `private: true` and is not published to npm. CI builds one deter
 npm-compatible tarball and publishes it as an immutable GitHub Release asset:
 
 ```text
-tag:   soksak-spec-v<version>
+tag:   v<version>
 asset: soksak-ai-plugin-spec-<version>.tgz
 url:   https://github.com/soksak-ai/soksak-spec/releases/download/<tag>/<asset>
 ```

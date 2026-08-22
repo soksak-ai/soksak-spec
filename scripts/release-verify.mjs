@@ -240,7 +240,7 @@ export function verifyRelease(argv = process.argv.slice(2)) {
       throw new Error(`unexpected archive name: ${archiveName}`);
     }
     const archiveDigest = sha256(first);
-    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize: first.length, identity });
+    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize: firstBytes.length, identity });
     const { reportFiles, ...manifest } = built;
     const parsed = parseReleaseManifest(manifest);
     if (!parsed.ok) {

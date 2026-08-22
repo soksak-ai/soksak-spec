@@ -43,12 +43,14 @@ test("spec release projects the derived owner identity", () => {
     commit,
     archiveName: "soksak-ai-plugin-spec-0.0.1.tgz",
     archiveDigest: digest,
+    archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
   });
   assert.deepEqual(release.spec, { id: "soksak-spec", version: "0.0.1" });
   assert.equal(release.source.repository, "https://github.com/soksak-ai/soksak-spec");
   assert.equal(release.source.commit, commit);
   assert.equal(release.artifacts[0].sha256, digest);
+  assert.equal(release.artifacts[0].size, 81840);
   assert.equal(release.artifacts[0].manifest, "spec.json");
   assert.equal(release.reportFiles.length, 2);
 });
