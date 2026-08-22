@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const baseline = "0.0.1";
+const releaseVersion = "0.0.2";
 
 function read(path) {
   return readFileSync(join(root, path), "utf8");
@@ -45,13 +45,13 @@ function symbolicLinks(at, prefix = "") {
 
 function assertCargoPackage(path) {
   const manifest = read(path);
-  assert.match(manifest, /^version\s*=\s*"0\.0\.1"$/m, `${path}: baseline version`);
+  assert.equal(manifest.match(/^version\s*=\s*"([^"]+)"$/m)?.[1], releaseVersion, `${path}: release version`);
   assert.match(manifest, /^publish\s*=\s*false$/m, `${path}: registry publication disabled`);
   assert.doesNotMatch(manifest, /path\s*=\s*"\//, `${path}: absolute dependencies are forbidden`);
   assert.doesNotMatch(manifest, /(?:crates\.io|cargo publish)/i, `${path}: registry distribution is forbidden`);
 }
 
-test("repository owns a complete reproducible 0.0.1 boundary", () => {
+test("repository owns a complete reproducible release boundary", () => {
   for (const path of [
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
@@ -74,7 +74,7 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
 
   const workspace = json("package.json");
   assert.equal(workspace.private, true);
-  assert.equal(workspace.version, baseline);
+  assert.equal(workspace.version, releaseVersion);
   assert.equal(workspace.packageManager, "pnpm@10.30.3");
   assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
   assert.equal(
@@ -90,13 +90,13 @@ test("repository owns a complete reproducible 0.0.1 boundary", () => {
     false,
   );
   assert.deepEqual(workspace.soksakRelease, {
-    spec: { id: "soksak-spec", version: "0.0.1" },
+    spec: { id: "soksak-spec", version: releaseVersion },
     repository: "https://github.com/soksak-ai/soksak-spec",
     manifest: "soksak-spec-release.json",
   });
 
   const pluginSpec = json("packages/plugin-spec/package.json");
-  assert.equal(pluginSpec.version, baseline);
+  assert.equal(pluginSpec.version, releaseVersion);
   assert.equal(pluginSpec.private, true);
   assert.equal(pluginSpec.publishConfig, undefined);
 

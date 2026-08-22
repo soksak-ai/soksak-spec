@@ -79,12 +79,13 @@ Soksak에는 하나의 앱 버전만 있으며 별도의 호환 버전은 없다
 예상 오류: `REQUIREMENT_UNBOUNDED`. 빈 조건, `*`, `x`, `latest`, branch, Git URL 및
 기타 package locator는 호환성을 증명하지 않는다.
 
-## 3. 0.0.1 정책
+## 3. 0.0.1 컴포넌트 정책
 
 <!-- rule:baseline-policy -->
 
-현재 모든 Soksak 소유 릴리스는 `0.0.1`이다. 모든 소유자 manifest는 정확한 조건
-`0.0.1`을 선언한다. 이는 SemVer 문법 위에 적용하는 릴리스 정책이다.
+현재 앱, 플러그인, 사이드카, 킷, 계약 및 런타임 인터페이스는 모두 `0.0.1`을 유지한다.
+모든 소유자 manifest는 정확한 조건 `0.0.1`을 선언한다. 이는 SemVer 문법 위에 적용하는
+제품 정책이다.
 
 <!-- example:plugin-unproved-range:invalid-plugin -->
 ```json
@@ -105,6 +106,37 @@ Soksak에는 하나의 앱 버전만 있으며 별도의 호환 버전은 없다
 `0.0.2-dev.1` 같은 SemVer prerelease는 문법상 유효하다. 0.0.1 레지스트리는 prerelease를
 게시하거나 자동 선택하지 않는다. SemVer는 prerelease 식별자를 숫자 및 사전식 규칙으로
 비교하며 dev, alpha, beta, rc 제품 절차를 알지 못한다.
+
+<!-- rule:immutable-release-correction -->
+
+게시된 바이트는 변경하지 않는다. 수정된 package는 다음 patch 버전을 사용하며 기존 tag나
+asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바이트를 식별하며 package가
+검증하는 컴포넌트 및 런타임 인터페이스 버전을 암묵적으로 변경하지 않는다.
+
+<!-- example:spec-correction-release:release -->
+```json
+{
+  "spec": { "id": "soksak-spec", "version": "0.0.2" },
+  "source": {
+    "repository": "https://github.com/soksak-ai/soksak-spec",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "artifacts": [
+    {
+      "target": "any",
+      "format": "tgz",
+      "manifest": "spec.json",
+      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.2/soksak-ai-plugin-spec-0.0.2.tgz",
+      "size": 12345,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "reports": []
+}
+```
+
+이 `soksak-spec@0.0.2` package는 계속 `plugin.json`, `sidecar.json` 및 런타임 인터페이스의
+`0.0.1`을 검증할 수 있다. Package 수정은 해당 계약이 변경됐다는 근거가 아니다.
 
 ## 4. 플러그인과 사이드카 인터페이스
 

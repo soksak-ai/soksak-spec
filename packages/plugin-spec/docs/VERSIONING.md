@@ -81,12 +81,13 @@ Expected error: `REQUIREMENT_FIELD_REQUIRED`. `range` is not an alias for `requi
 Expected error: `REQUIREMENT_UNBOUNDED`. Empty requirements, `*`, `x`, `latest`, branches,
 Git URLs, and other package locators do not prove compatibility.
 
-## 3. The 0.0.1 policy
+## 3. The 0.0.1 component policy
 
 <!-- rule:baseline-policy -->
 
-Every Soksak-owned release is currently `0.0.1`. Every owner manifest declares the exact
-requirement `0.0.1`. This is a release policy above SemVer grammar.
+Every application, plugin, sidecar, kit, contract, and runtime interface currently remains
+`0.0.1`. Every owner manifest declares the exact requirement `0.0.1`. This is a product policy
+above SemVer grammar.
 
 <!-- example:plugin-unproved-range:invalid-plugin -->
 ```json
@@ -107,6 +108,37 @@ requirement.
 SemVer prereleases such as `0.0.2-dev.1` are syntactically valid. The 0.0.1 registry does not
 publish or automatically select prereleases. SemVer compares prerelease identifiers by numeric
 and lexical rules; it does not know a dev, alpha, beta, and rc workflow.
+
+<!-- rule:immutable-release-correction -->
+
+Published bytes are immutable. A corrected package uses the next patch version; it never replaces
+an existing tag or asset. The package/spec release version identifies those published bytes and
+does not silently change the component and runtime-interface versions validated by the package.
+
+<!-- example:spec-correction-release:release -->
+```json
+{
+  "spec": { "id": "soksak-spec", "version": "0.0.2" },
+  "source": {
+    "repository": "https://github.com/soksak-ai/soksak-spec",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "artifacts": [
+    {
+      "target": "any",
+      "format": "tgz",
+      "manifest": "spec.json",
+      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.2/soksak-ai-plugin-spec-0.0.2.tgz",
+      "size": 12345,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "reports": []
+}
+```
+
+This `soksak-spec@0.0.2` package may still validate `plugin.json`, `sidecar.json`, and runtime
+interfaces at `0.0.1`. A package correction is not evidence that those contracts changed.
 
 ## 4. Plugin and sidecar interfaces
 
