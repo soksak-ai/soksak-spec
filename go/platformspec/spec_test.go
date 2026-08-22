@@ -48,4 +48,12 @@ func TestSidecarManifestIsExact(t *testing.T) {
 	if _, err := ParseSidecarManifest(body); err != nil {
 		t.Fatal(err)
 	}
+	windows := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/terminal-provider.exe\"}")
+	if _, err := ParseSidecarManifest(windows); err != nil {
+		t.Fatal(err)
+	}
+	wrong := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/other.exe\"}")
+	if _, err := ParseSidecarManifest(wrong); err == nil {
+		t.Fatal("mismatched Windows process was accepted")
+	}
 }

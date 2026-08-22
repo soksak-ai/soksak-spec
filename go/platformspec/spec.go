@@ -82,7 +82,8 @@ func ParseSidecarManifest(body []byte) (SidecarManifest, error) {
 	if err := decode(body, &value); err != nil {
 		return SidecarManifest{}, err
 	}
-	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !idPattern.MatchString(value.Interface.ID) || value.Interface.Version != "0.0.1" || value.Process != "dist/"+value.ID {
+	process := "dist/" + value.ID
+	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !idPattern.MatchString(value.Interface.ID) || value.Interface.Version != "0.0.1" || (value.Process != process && value.Process != process+".exe") {
 		return SidecarManifest{}, fmt.Errorf("invalid sidecar manifest")
 	}
 	return value, nil

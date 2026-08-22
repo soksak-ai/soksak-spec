@@ -18,7 +18,7 @@ export function parseSidecarManifest(raw: unknown): { ok: true; value: SidecarMa
   }
   if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id)) errors.push("sidecar.id: sidecar id required");
   if (typeof raw.version !== "string" || !STRICT_SEMVER_RE.test(raw.version)) errors.push("sidecar.version: strict SemVer required");
-  if (typeof raw.process !== "string" || raw.process !== `dist/${raw.id}`) errors.push("sidecar.process: dist/<sidecar-id> required");
+  if (typeof raw.process !== "string" || (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`)) errors.push("sidecar.process: platform executable path required");
   const interfaceRef = parseContractProviderRef(raw.interface, "sidecar.interface", errors, SIDECAR_CONTRACT_ID_RE);
   if (errors.length > 0 || !interfaceRef || typeof raw.id !== "string") return { ok: false, errors };
   return { ok: true, value: { id: raw.id, version: raw.version as string, interface: interfaceRef, process: raw.process as string } };

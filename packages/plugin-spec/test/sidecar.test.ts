@@ -10,6 +10,7 @@ const manifest = () => ({
 describe("sidecar manifest", () => {
   it("parses exact sidecar identity, interface, and process", () => {
     expect(parseSidecarManifest(manifest())).toMatchObject({ ok: true });
+    expect(parseSidecarManifest({ ...manifest(), process: `${manifest().process}.exe` })).toMatchObject({ ok: true });
   });
   it("rejects unknown fields and mismatched process paths", () => {
     expect(parseSidecarManifest({ ...manifest(), extra: true }).ok).toBe(false);
