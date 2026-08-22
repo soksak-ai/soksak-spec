@@ -19,7 +19,6 @@ export type PluginPermission =
   | "commands:inject" // danger:"inject" 명령 실행(term.send/exec, browser.eval …)
   | "process" // 외부 서브프로세스 spawn + 양방향 raw stdio(범용 — LSP/MCP/ACP/임의 CLI 통합)
   | "webview" // 코어가 임베드한 child webview(WKWebView) 구동 — 브라우저류 콘텐츠 뷰(네이티브 페이지 로드·eval·inject)
-  | "pty" // PTY 백드 터미널 세션 spawn+IO(flow control+셸 env 주입 — process 의 raw stdio 와 구분)
   | "sidecar" // 공유 네이티브 엔진 모듈(dylib)을 앱 프로세스에 로드 + 불투명 채널(sidecars[] 선언 필수 — docs/SIDECARS.md)
   | "service" // 상주 plugin service — 코어가 스폰·라우팅하는 커맨드 소유 프로세스(service 선언 필수 — docs/PLUGIN-SERVICE.md)
   | "storage" // 전용 저장소(~/.soksak/plugins-data/<id>/)
@@ -48,7 +47,6 @@ export const PERMISSIONS: readonly PluginPermission[] = [
   "commands:inject",
   "process",
   "webview",
-  "pty",
   "sidecar",
   "service",
   "storage",
@@ -138,12 +136,6 @@ export const PERMISSION_INFO: Record<
     label: "상주 서비스 실행",
     detail:
       "이 플러그인의 커맨드를 구현하는 상주 네이티브 프로세스를 앱이 스폰하고 커맨드를 그 프로세스로 라우팅합니다(네이티브 코드 실행 — 앱이 켜져 있는 동안 상주). 매니페스트 service 선언의 사이드카 바이너리만 실행됩니다.",
-    caution: true,
-  },
-  pty: {
-    label: "터미널 세션 실행",
-    detail:
-      "PTY 백드 셸/터미널 세션을 띄우고 입출력을 주고받습니다(flow control·셸 환경 주입 포함 — 사실상 임의 셸 명령 실행).",
     caution: true,
   },
   storage: {
