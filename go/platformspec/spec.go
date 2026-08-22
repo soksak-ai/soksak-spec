@@ -82,7 +82,7 @@ func ParseSidecarManifest(body []byte) (SidecarManifest, error) {
 	if err := decode(body, &value); err != nil {
 		return SidecarManifest{}, err
 	}
-	if !idPattern.MatchString(value.ID) || value.Version != "0.0.1" || !idPattern.MatchString(value.Interface.ID) || value.Interface.Version != "0.0.1" || value.Process != "dist/"+value.ID {
+	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !idPattern.MatchString(value.Interface.ID) || value.Interface.Version != "0.0.1" || value.Process != "dist/"+value.ID {
 		return SidecarManifest{}, fmt.Errorf("invalid sidecar manifest")
 	}
 	return value, nil
@@ -145,7 +145,7 @@ func ValidateInstalled(value Installed) error {
 	}
 	for kind, values := range map[string]map[string]InstalledComponent{"plugin": value.Plugins, "sidecar": value.Sidecars, "kit": value.Kits, "contract": value.Contracts, "spec": value.Specs} {
 		for id, item := range values {
-			if !idPattern.MatchString(id) || item.Version != "0.0.1" || !filepath.IsAbs(item.Path) || item.RegistryID == "" || item.Repository == "" || !commitPattern.MatchString(item.SourceCommit) || !digestPattern.MatchString(item.ManifestSHA256) || !digestPattern.MatchString(item.ArtifactSHA256) {
+			if !idPattern.MatchString(id) || !strictSemver(item.Version) || !filepath.IsAbs(item.Path) || item.RegistryID == "" || item.Repository == "" || !commitPattern.MatchString(item.SourceCommit) || !digestPattern.MatchString(item.ManifestSHA256) || !digestPattern.MatchString(item.ArtifactSHA256) {
 				return fmt.Errorf("invalid installed %s %s", kind, id)
 			}
 			if kind == "sidecar" && item.Target == "" {

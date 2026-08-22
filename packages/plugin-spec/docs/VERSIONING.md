@@ -118,7 +118,7 @@ does not silently change the component and runtime-interface versions validated 
 <!-- example:spec-correction-release:release -->
 ```json
 {
-  "spec": { "id": "soksak-spec", "version": "0.0.6" },
+  "spec": { "id": "soksak-spec", "version": "0.0.7" },
   "source": {
     "repository": "https://github.com/soksak-ai/soksak-spec",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -128,7 +128,7 @@ does not silently change the component and runtime-interface versions validated 
       "target": "any",
       "format": "tgz",
       "manifest": "spec.json",
-      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.6/soksak-ai-plugin-spec-0.0.6.tgz",
+      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.7/soksak-ai-plugin-spec-0.0.7.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
@@ -137,7 +137,7 @@ does not silently change the component and runtime-interface versions validated 
 }
 ```
 
-This `soksak-spec@0.0.6` package may still validate `plugin.json`, `sidecar.json`, and runtime
+This `soksak-spec@0.0.7` package may still validate `plugin.json`, `sidecar.json`, and runtime
 interfaces at `0.0.1`. A package correction is not evidence that those contracts changed.
 
 ## 4. Plugin and sidecar interfaces

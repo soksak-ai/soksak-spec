@@ -22,6 +22,27 @@ func TestSettingsAndInstalledKeepSeparateFacts(t *testing.T) {
 	}
 }
 
+func TestInstalledComponentsAcceptStrictPatchVersions(t *testing.T) {
+	installed := EmptyInstalled()
+	installed.Plugins["terminal-ghostty"] = InstalledComponent{
+		Version: "0.0.2", Path: "/installed/ghostty", RegistryID: "official",
+		Repository: "https://github.com/example/ghostty", SourceCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		ManifestSHA256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		ArtifactSHA256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+	}
+	if err := ValidateInstalled(installed); err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []string{"0.0", "v0.0.2", "latest", "01.0.0"} {
+		component := installed.Plugins["terminal-ghostty"]
+		component.Version = version
+		installed.Plugins["terminal-ghostty"] = component
+		if err := ValidateInstalled(installed); err == nil {
+			t.Errorf("accepted installed version %q", version)
+		}
+	}
+}
+
 func TestSidecarManifestIsExact(t *testing.T) {
 	body := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/terminal-provider\"}")
 	if _, err := ParseSidecarManifest(body); err != nil {
