@@ -4,6 +4,7 @@ packages:
 nodeLinker: hoisted
 symlink: false
 preferSymlinkedExecutables: false
+storeDir: .pnpm-store
 
 allowBuilds:
   esbuild: true

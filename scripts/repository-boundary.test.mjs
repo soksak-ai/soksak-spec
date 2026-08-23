@@ -156,6 +156,7 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"\d+\.\d+\.\d+"$/m);
   const pnpmWorkspace = read("pnpm-workspace.yaml");
   assert.match(pnpmWorkspace, /nodeLinker: hoisted/);
+  assert.match(pnpmWorkspace, /storeDir: [.]pnpm-store/);
   assert.match(pnpmWorkspace, /symlink: false/);
   assert.match(pnpmWorkspace, /preferSymlinkedExecutables: false/);
   assert.match(pnpmWorkspace, /allowBuilds:/);
