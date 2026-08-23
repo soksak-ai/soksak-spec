@@ -5,3 +5,6 @@ members = [
   "crates/soksak-spec-service",
   "crates/soksak-spec-socket",
 ]
+
+[workspace.package]
+edition = "2024"

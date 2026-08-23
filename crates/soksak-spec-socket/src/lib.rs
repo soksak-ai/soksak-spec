@@ -28,6 +28,17 @@ pub const MIN_COMPATIBLE_CLIENT_PROTOCOL: u32 = 0;
 /// [`MIN_COMPATIBLE_CLIENT_PROTOCOL`]: never raise it silently.
 pub const MIN_COMPATIBLE_SERVER_PROTOCOL: u32 = 0;
 
+const _: () = assert!(
+    SOCKET_PROTOCOL_VERSION
+        .checked_sub(MIN_COMPATIBLE_CLIENT_PROTOCOL)
+        .is_some()
+);
+const _: () = assert!(
+    SOCKET_PROTOCOL_VERSION
+        .checked_sub(MIN_COMPATIBLE_SERVER_PROTOCOL)
+        .is_some()
+);
+
 /// Verdict of [`evaluate_compat`]. The direction is explicit — exactly one side is
 /// stale, and the caller never has to re-derive which one from the numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,7 +90,9 @@ pub fn skew_sentence(
     let (core, stale) = match (lang, compat) {
         (_, Compat::Compatible) => return None,
         (Lang::En, Compat::PeerTooOld { peer, floor }) => (
-            format!("{peer_name} speaks socket protocol {peer} but {self_name} accepts {floor} at the oldest"),
+            format!(
+                "{peer_name} speaks socket protocol {peer} but {self_name} accepts {floor} at the oldest"
+            ),
             format!("update {peer_name}"),
         ),
         (Lang::En, Compat::SelfTooOld { own, peer }) => (
@@ -87,11 +100,15 @@ pub fn skew_sentence(
             format!("update {self_name}"),
         ),
         (Lang::Ko, Compat::PeerTooOld { peer, floor }) => (
-            format!("{peer_name} 이(가) 소켓 프로토콜 {peer} 을(를) 쓰지만 {self_name} 은(는) 최소 {floor} 까지만 받습니다"),
+            format!(
+                "{peer_name} 이(가) 소켓 프로토콜 {peer} 을(를) 쓰지만 {self_name} 은(는) 최소 {floor} 까지만 받습니다"
+            ),
             format!("{peer_name} 을(를) 업데이트하세요"),
         ),
         (Lang::Ko, Compat::SelfTooOld { own, peer }) => (
-            format!("{peer_name} 이(가) 소켓 프로토콜 {peer} 을(를) 쓰지만 {self_name} 은(는) 최대 {own} 까지 씁니다"),
+            format!(
+                "{peer_name} 이(가) 소켓 프로토콜 {peer} 을(를) 쓰지만 {self_name} 은(는) 최대 {own} 까지 씁니다"
+            ),
             format!("{self_name} 을(를) 업데이트하세요"),
         ),
     };
@@ -122,15 +139,8 @@ impl Lang {
     /// setting to Korean on its own before reaching here.
     pub fn from_tag(tag: &str) -> Lang {
         let normalized = tag.trim().to_ascii_lowercase();
-        let primary = normalized
-            .split(['-', '_', '.'])
-            .next()
-            .unwrap_or("");
-        if primary == "ko" {
-            Lang::Ko
-        } else {
-            Lang::En
-        }
+        let primary = normalized.split(['-', '_', '.']).next().unwrap_or("");
+        if primary == "ko" { Lang::Ko } else { Lang::En }
     }
 }
 
@@ -168,24 +178,6 @@ mod tests {
         );
     }
 
-    // ── compatibility floors sit at or below our own protocol ────────────────
-
-    // A floor above our own protocol is unactionable: evaluate_compat would hand a
-    // peer that already speaks our exact version a `PeerTooOld` verdict pointing at a
-    // build older than the one it runs — an instruction it cannot follow. This guards
-    // a relegislation typo that raises a MIN_COMPATIBLE_* past SOCKET_PROTOCOL_VERSION.
-    #[test]
-    fn compatibility_floor_never_exceeds_own_protocol() {
-        assert!(
-            MIN_COMPATIBLE_CLIENT_PROTOCOL <= SOCKET_PROTOCOL_VERSION,
-            "client floor {MIN_COMPATIBLE_CLIENT_PROTOCOL} exceeds own protocol {SOCKET_PROTOCOL_VERSION}",
-        );
-        assert!(
-            MIN_COMPATIBLE_SERVER_PROTOCOL <= SOCKET_PROTOCOL_VERSION,
-            "server floor {MIN_COMPATIBLE_SERVER_PROTOCOL} exceeds own protocol {SOCKET_PROTOCOL_VERSION}",
-        );
-    }
-
     // ── effective_protocol: absent = 0 rule ─────────────────────────────────
 
     #[test]
@@ -199,12 +191,24 @@ mod tests {
     #[test]
     fn compatible_pair_has_no_skew_sentence() {
         assert_eq!(
-            skew_sentence(Compat::Compatible, "this app", "this client", None, Lang::En),
+            skew_sentence(
+                Compat::Compatible,
+                "this app",
+                "this client",
+                None,
+                Lang::En
+            ),
             None
         );
         // 언어와 무관하게 건강한 쌍엔 스큐 문장이 없다.
         assert_eq!(
-            skew_sentence(Compat::Compatible, "this app", "this client", None, Lang::Ko),
+            skew_sentence(
+                Compat::Compatible,
+                "this app",
+                "this client",
+                None,
+                Lang::Ko
+            ),
             None
         );
     }
@@ -219,10 +223,22 @@ mod tests {
             Lang::En,
         )
         .expect("a skewed pair must produce a sentence");
-        assert!(s.contains("this client") && s.contains("this app"), "both endpoints named: {s}");
-        assert!(s.contains('1') && s.contains('2'), "both version numbers present: {s}");
-        assert!(s.contains("update this client"), "stale side named explicitly: {s}");
-        assert!(s.contains("rerun `sok mcp install`"), "remedy included: {s}");
+        assert!(
+            s.contains("this client") && s.contains("this app"),
+            "both endpoints named: {s}"
+        );
+        assert!(
+            s.contains('1') && s.contains('2'),
+            "both version numbers present: {s}"
+        );
+        assert!(
+            s.contains("update this client"),
+            "stale side named explicitly: {s}"
+        );
+        assert!(
+            s.contains("rerun `sok mcp install`"),
+            "remedy included: {s}"
+        );
     }
 
     #[test]
@@ -235,8 +251,14 @@ mod tests {
             Lang::En,
         )
         .expect("a skewed pair must produce a sentence");
-        assert!(s.contains('1') && s.contains('3'), "both version numbers present: {s}");
-        assert!(s.contains("update this app"), "stale side named explicitly: {s}");
+        assert!(
+            s.contains('1') && s.contains('3'),
+            "both version numbers present: {s}"
+        );
+        assert!(
+            s.contains("update this app"),
+            "stale side named explicitly: {s}"
+        );
     }
 
     // 사람 표면: 같은 판정을 ko 로 렌더하면 한국어 골격이 나오고 영어 골격은 새지 않는다.
@@ -253,9 +275,18 @@ mod tests {
         .expect("a skewed pair must produce a sentence");
         assert!(s.contains("소켓 프로토콜"), "한국어 골격: {s}");
         assert!(s.contains("업데이트하세요"), "낡은 쪽을 한국어로 명시: {s}");
-        assert!(!s.contains("speaks socket protocol"), "영어 골격이 새면 안 된다: {s}");
-        assert!(s.contains('1') && s.contains('3'), "판 숫자는 언어 독립: {s}");
-        assert!(s.contains("앱") && s.contains("클라이언트"), "caller 명사 유지: {s}");
+        assert!(
+            !s.contains("speaks socket protocol"),
+            "영어 골격이 새면 안 된다: {s}"
+        );
+        assert!(
+            s.contains('1') && s.contains('3'),
+            "판 숫자는 언어 독립: {s}"
+        );
+        assert!(
+            s.contains("앱") && s.contains("클라이언트"),
+            "caller 명사 유지: {s}"
+        );
     }
 
     // ── Lang::from_tag: one place interprets a language tag ──────────────────

@@ -417,18 +417,18 @@ mod tests {
             serde_json::to_value(&requirement).unwrap(),
             serde_json::json!({"id":"soksak-spec-service","range":">=0.0.1 <1.0.0"})
         );
-        assert!(serde_json::from_str::<ContractProviderRef>(
-            r#""soksak-spec-service@0.0.1""#
-        )
-        .is_err());
-        assert!(serde_json::from_str::<ContractRequirement>(
-            r#""soksak-spec-service@0.0.1""#
-        )
-        .is_err());
-        assert!(serde_json::from_str::<ContractProviderRef>(
-            r#"{"id":"soksak-spec-service","version":"0.0.1","legacy":true}"#,
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<ContractProviderRef>(r#""soksak-spec-service@0.0.1""#).is_err()
+        );
+        assert!(
+            serde_json::from_str::<ContractRequirement>(r#""soksak-spec-service@0.0.1""#).is_err()
+        );
+        assert!(
+            serde_json::from_str::<ContractProviderRef>(
+                r#"{"id":"soksak-spec-service","version":"0.0.1","legacy":true}"#,
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -472,25 +472,32 @@ mod tests {
             ("1.0.0", ">=1.0.0  <2.0.0", None),
         ];
         for (version, range, expected) in cases {
-            assert_eq!(semver_satisfies(version, range), expected, "{version} {range}");
+            assert_eq!(
+                semver_satisfies(version, range),
+                expected,
+                "{version} {range}"
+            );
         }
     }
 
     #[test]
     fn requirement_matches_id_and_range_but_not_an_exact_concatenated_token() {
-        let requirement = ContractRequirement::new(
-            "soksak-spec-sidecar-browser",
-            ">=0.0.1 <0.1.0",
-        )
-        .unwrap();
-        assert!(requirement.matches(
-            &ContractProviderRef::new("soksak-spec-sidecar-browser", "0.0.2").unwrap()
-        ));
-        assert!(!requirement.matches(
-            &ContractProviderRef::new("soksak-spec-sidecar-browser", "0.1.0").unwrap()
-        ));
-        assert!(!requirement.matches(
-            &ContractProviderRef::new("soksak-spec-sidecar-terminal", "0.0.2").unwrap()
-        ));
+        let requirement =
+            ContractRequirement::new("soksak-spec-sidecar-browser", ">=0.0.1 <0.1.0").unwrap();
+        assert!(
+            requirement.matches(
+                &ContractProviderRef::new("soksak-spec-sidecar-browser", "0.0.2").unwrap()
+            )
+        );
+        assert!(
+            !requirement.matches(
+                &ContractProviderRef::new("soksak-spec-sidecar-browser", "0.1.0").unwrap()
+            )
+        );
+        assert!(
+            !requirement.matches(
+                &ContractProviderRef::new("soksak-spec-sidecar-terminal", "0.0.2").unwrap()
+            )
+        );
     }
 }

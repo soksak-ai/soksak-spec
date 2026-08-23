@@ -11,13 +11,13 @@
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
-    service_contract_provider, ErrCode, Hello, Hint, ServiceIn, ServiceOut,
-    SERVICE_PROTOCOL_VERSION,
+    ErrCode, Hello, Hint, SERVICE_PROTOCOL_VERSION, ServiceIn, ServiceOut,
+    service_contract_provider,
 };
 
 /// Execution context the core stamped on a req (PS13) — read-only to the op.
@@ -104,11 +104,11 @@ struct Sink {
 
 impl Sink {
     fn emit(&self, frame: &ServiceOut) {
-        if let Ok(line) = serde_json::to_string(frame) {
-            if let Ok(mut w) = self.writer.lock() {
-                let _ = writeln!(w, "{line}");
-                let _ = w.flush();
-            }
+        if let Ok(line) = serde_json::to_string(frame)
+            && let Ok(mut w) = self.writer.lock()
+        {
+            let _ = writeln!(w, "{line}");
+            let _ = w.flush();
         }
     }
 }
@@ -194,11 +194,7 @@ pub fn serve<R: BufRead, W: Write + Send + 'static>(
 
     let mut inflight: Vec<std::thread::JoinHandle<()>> = Vec::new();
     let mut lines = reader.lines();
-    loop {
-        let line = match lines.next() {
-            Some(Ok(l)) => l,
-            _ => break, // stdin EOF / pipe death → drain and exit (PS17)
-        };
+    while let Some(Ok(line)) = lines.next() {
         if line.trim().is_empty() {
             continue;
         }
@@ -210,10 +206,10 @@ pub fn serve<R: BufRead, W: Write + Send + 'static>(
             ServiceIn::Ready => {}
             ServiceIn::Shutdown => break, // drain in-flight, exit
             ServiceIn::CmdRes { id, envelope } => {
-                if let Ok(mut p) = cmd.pending.lock() {
-                    if let Some(tx) = p.remove(&id) {
-                        let _ = tx.try_send(envelope);
-                    }
+                if let Ok(mut p) = cmd.pending.lock()
+                    && let Some(tx) = p.remove(&id)
+                {
+                    let _ = tx.try_send(envelope);
                 }
             }
             ServiceIn::Push {
@@ -232,11 +228,11 @@ pub fn serve<R: BufRead, W: Write + Send + 'static>(
                 ctx,
             } => {
                 // Idempotency replay (PS12) — same key returns the cached res.
-                if let Ok(cache) = idem.lock() {
-                    if let Some(cached) = cache.get(&key) {
-                        sink.emit(&res_from_cache(id, cached));
-                        continue;
-                    }
+                if let Ok(cache) = idem.lock()
+                    && let Some(cached) = cache.get(&key)
+                {
+                    sink.emit(&res_from_cache(id, cached));
+                    continue;
                 }
                 let h = handler.clone();
                 let sink2 = sink.clone();
@@ -715,7 +711,7 @@ mod tests {
         let _hello = core.recv();
         core.send(&ServiceIn::Ready);
         core.to_service.close(); // pipe death
-                                 // serve() must return (join completes) — no shutdown frame needed.
+        // serve() must return (join completes) — no shutdown frame needed.
         h.join().expect("serve exits on stdin EOF");
     }
 

@@ -14,18 +14,16 @@
 //! pair pins both sides to the same literal.
 
 mod serve;
-pub use serve::{serve, serve_stdio, Emit, OpCtx, Outcome, ServiceHandler};
+pub use serve::{Emit, OpCtx, Outcome, ServiceHandler, serve, serve_stdio};
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, Serialize};
-use soksak_spec_contract::{
-    is_service_contract_id, ContractProviderRef, ContractRequirement,
-};
+use soksak_spec_contract::{ContractProviderRef, ContractRequirement, is_service_contract_id};
 
 // hello 판정을 소비하는 쪽(서비스·앱)이 판정 타입과 스큐 문장을 이 크레이트 한 경로로
 // 받는다 — soksak-spec-socket 이중 의존 대신 재수출(정본은 그대로 soksak-spec-socket).
-pub use soksak_spec_socket::{skew_sentence, Compat, Lang};
+pub use soksak_spec_socket::{Compat, Lang, skew_sentence};
 
 /// Version of the plugin service wire contract. Bump rules follow the socket
 /// protocol precedent (soksak-spec-socket): additive optional fields and new
@@ -520,15 +518,21 @@ mod tests {
     fn generic_contract_grammar_is_not_owned_or_reexported_by_the_service_crate() {
         let source = include_str!("lib.rs");
         let lines = source.lines().map(str::trim).collect::<Vec<_>>();
-        assert!(!lines
-            .iter()
-            .any(|line| line.starts_with("pub struct ContractRequirement")));
-        assert!(!lines
-            .iter()
-            .any(|line| line.starts_with("pub struct ContractProviderRef")));
-        assert!(!lines
-            .iter()
-            .any(|line| line.starts_with("pub use soksak_spec_contract")));
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.starts_with("pub struct ContractRequirement"))
+        );
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.starts_with("pub struct ContractProviderRef"))
+        );
+        assert!(
+            !lines
+                .iter()
+                .any(|line| line.starts_with("pub use soksak_spec_contract"))
+        );
     }
 
     // ── ops equality: bidirectional declared ≡ actual (PS3) ─────────────────
@@ -776,7 +780,7 @@ mod tests {
     fn supervision_constants_hold_the_legislated_values() {
         assert_eq!(RESTART_BACKOFF_SECS, [1, 2, 4, 8, 16]);
         assert_eq!(MAX_LINE_BYTES, 4 * 1024 * 1024);
-        assert!(SHUTDOWN_GRACE_MS > 0);
-        assert!(DEFAULT_REQ_TIMEOUT_MS > 0);
+        assert_eq!(SHUTDOWN_GRACE_MS, 5_000);
+        assert_eq!(DEFAULT_REQ_TIMEOUT_MS, 10_000);
     }
 }
