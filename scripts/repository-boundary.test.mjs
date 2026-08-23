@@ -73,9 +73,7 @@ test("repository owns a complete reproducible release boundary", () => {
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
     ".gitignore",
-    ".nvmrc",
     "Cargo.lock",
-    "build/docker/Dockerfile.verify",
     "go/platformspec/go.mod",
     "go/platformspec/go.sum",
     "LICENSE",
@@ -94,8 +92,8 @@ test("repository owns a complete reproducible release boundary", () => {
   const workspace = json("package.json");
   assert.equal(workspace.private, true);
   assert.equal(workspace.version, releaseVersion);
-  assert.equal(workspace.engines.node, "26.7.0");
-  assert.equal(workspace.packageManager, "pnpm@11.22.0");
+  assert.match(workspace.engines.node, /^\d+\.\d+\.\d+$/);
+  assert.match(workspace.packageManager, /^pnpm@\d+\.\d+\.\d+$/);
   assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
   assert.equal(
     workspace.scripts?.["test:unit"],
@@ -155,23 +153,27 @@ test("repository owns a complete reproducible release boundary", () => {
     [],
     "installed dependencies contain no symbolic links",
   );
-  assert.equal(read(".nvmrc").trim(), "26.7.0");
-  assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"1\.98\.0"$/m);
+  assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"\d+\.\d+\.\d+"$/m);
   const pnpmWorkspace = read("pnpm-workspace.yaml");
   assert.match(pnpmWorkspace, /nodeLinker: hoisted/);
   assert.match(pnpmWorkspace, /symlink: false/);
   assert.match(pnpmWorkspace, /preferSymlinkedExecutables: false/);
   assert.match(pnpmWorkspace, /allowBuilds:/);
-  const verifier = read("build/docker/Dockerfile.verify");
-  assert.match(verifier, /^FROM node:26\.7\.0-bookworm AS node$/m);
-  assert.match(verifier, /^FROM rust:1\.98\.0-bookworm AS rust$/m);
-  assert.match(verifier, /^FROM golang:1\.26\.3-bookworm AS go$/m);
-  assert.match(verifier, /npm install --global pnpm@11\.22\.0/);
+  const verifier = read("scripts/build-verifier-image.sh");
+  assert.match(verifier, /package\.json/);
+  assert.match(verifier, /go\/platformspec\/go\.mod/);
+  assert.match(verifier, /rust-toolchain\.toml/);
+  assert.doesNotMatch(verifier, /(?:node|golang|rust):\d/);
+  assert.match(verifier, /--no-update-notifier --no-fund/);
 
   for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
     const source = read(workflow);
     assert.match(source, /actions\/setup-go@[a-f0-9]{40}/);
     assert.match(source, /go-version-file:\s*go\/platformspec\/go\.mod/);
+    assert.match(source, /node-version-file:\s*package\.json/);
+    assert.doesNotMatch(source, /node-version:\s*["']?\d/);
+    assert.doesNotMatch(source, /pnpm\/action-setup@[a-f0-9]{40}\n\s+with:\n\s+version:/);
+    assert.match(source, /rust-toolchain\.toml/);
     const uses = [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)].map((match) => match[1]);
     assert.ok(uses.length > 0, `${workflow}: actions required`);
     for (const action of uses) {

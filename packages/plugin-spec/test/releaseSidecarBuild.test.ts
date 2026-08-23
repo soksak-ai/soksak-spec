@@ -16,6 +16,8 @@ import { createRegularFileArchive } from "../release-template/archive.mjs";
 
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template/sidecar");
 const COMMIT = "b".repeat(40);
+const GO_MOD = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../go/platformspec/go.mod"), "utf8");
+const GO_VERSION = GO_MOD.match(/^go (\S+)$/m)?.[1];
 const TARGETS = [
   "aarch64-apple-darwin",
   "aarch64-unknown-linux-gnu",
@@ -57,7 +59,8 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
       `[package]\nname = "${sidecar.id}"\nversion = "${overrides.cargoVersion ?? sidecar.version}"\npublish = false\n`,
     );
   } else {
-    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/soksak-ai/${sidecar.id}\n\ngo 1.26.3\n`);
+    if (!GO_VERSION) throw new Error("workspace Go version is missing");
+    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/soksak-ai/${sidecar.id}\n\ngo ${GO_VERSION}\n`);
   }
   for (const target of targets) {
     const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;

@@ -11,6 +11,8 @@ import { parseReleaseManifest } from "../src/release.js";
 
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template");
 const COMMIT = "a".repeat(40);
+const WORKSPACE_CARGO = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../Cargo.toml"), "utf8");
+const RUST_EDITION = WORKSPACE_CARGO.match(/^edition = "([^"]+)"$/m)?.[1];
 let root = "";
 let out = "";
 
@@ -27,7 +29,8 @@ function writeFixture(kind: "contract" | "kit", id: string): void {
 }
 
 function writeCargoKitFixture(id: string): void {
-  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "2024"\npublish = false\nrepository = "https://github.com/soksak-ai/${id}"\n`);
+  if (!RUST_EDITION) throw new Error("workspace Rust edition is missing");
+  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "${RUST_EDITION}"\npublish = false\nrepository = "https://github.com/soksak-ai/${id}"\n`);
   fs.writeFileSync(path.join(root, "kit.json"), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["Cargo.toml", "LICENSE", "kit.json", "src/lib.rs"])}\n`);
   fs.writeFileSync(path.join(root, "LICENSE"), "MIT\n");

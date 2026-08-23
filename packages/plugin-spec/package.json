@@ -11,9 +11,6 @@
     "url": "git+https://github.com/soksak-ai/soksak-spec.git",
     "directory": "packages/plugin-spec"
   },
-  "engines": {
-    "node": "26.7.0"
-  },
   "exports": {
     ".": {
       "types": "./dist/spec.d.ts",
