@@ -105,6 +105,13 @@ afterEach(() => {
 });
 
 describe("release-template/sidecar — canonical sidecar release documents", () => {
+  it("validates with an extracted immutable spec package rather than a source checkout", () => {
+    const source = fs.readFileSync(path.join(TEMPLATE, "validate-with-spec.mjs"), "utf8");
+    expect(source).toContain("spec-package");
+    expect(source).toContain("bin/validate.mjs");
+    expect(source).not.toContain("git");
+    expect(source).not.toContain("spec-root");
+  });
   it("emits a sidecar release and three conformance reports from sidecar.json", () => {
     writeFixture();
     const r = build();

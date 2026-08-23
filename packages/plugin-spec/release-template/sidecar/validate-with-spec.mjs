@@ -6,13 +6,10 @@ import {
 } from "./release-contract.mjs";
 
 // The sidecar repository root is discovered by release-contract and is not passed as an option.
-const options = parseOptions(process.argv.slice(2), ["spec-root", "release-dir"]);
-const specRoot = assertNoLinkPath(options["spec-root"], "directory");
+const options = parseOptions(process.argv.slice(2), ["spec-package", "release-dir"]);
+const specPackage = assertNoLinkPath(options["spec-package"], "directory");
 const releaseDir = assertNoLinkPath(options["release-dir"], "directory");
-const head = spawnSync("git", ["-C", specRoot, "rev-parse", "HEAD"], { encoding: "utf8", windowsHide: true });
-if (head.error) throw head.error;
-if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.trim())) throw new Error("spec checkout must have an exact commit");
-const validator = assertNoLinkPath(path.join(specRoot, "packages/plugin-spec/bin/validate.mjs"), "file");
+const validator = assertNoLinkPath(path.join(specPackage, "bin/validate.mjs"), "file");
 const release = assertNoLinkPath(path.join(releaseDir, "release.json"), "file");
 const reports = ["conformance-interface.json", "conformance-release.json", "conformance-sidecar.json"]
   .map((name) => assertNoLinkPath(path.join(releaseDir, name), "file"));
