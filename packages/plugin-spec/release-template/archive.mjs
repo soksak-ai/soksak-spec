@@ -90,10 +90,30 @@ export function createRegularFileArchive({ root, files, prefix = "" }) {
   }
   blocks.push(Buffer.alloc(BLOCK * 2));
 
-  const gzip = zlib.gzipSync(Buffer.concat(blocks), { level: 9, mtime: 0 });
-  gzip.writeUInt32LE(0, 4);
-  gzip[9] = 255;
-  return gzip;
+  return gzipStored(Buffer.concat(blocks));
+}
+
+export function gzipStored(bytes) {
+  const input = Buffer.from(bytes);
+  const chunks = [Buffer.from("1f8b08000000000000ff", "hex")];
+  if (input.length === 0) {
+    chunks.push(Buffer.from([1, 0, 0, 0xff, 0xff]));
+  } else {
+    for (let offset = 0; offset < input.length; offset += 0xffff) {
+      const length = Math.min(0xffff, input.length - offset);
+      const final = offset + length === input.length;
+      const block = Buffer.alloc(5);
+      block[0] = final ? 1 : 0;
+      block.writeUInt16LE(length, 1);
+      block.writeUInt16LE((~length) & 0xffff, 3);
+      chunks.push(block, input.subarray(offset, offset + length));
+    }
+  }
+  const footer = Buffer.alloc(8);
+  footer.writeUInt32LE(zlib.crc32(input) >>> 0, 0);
+  footer.writeUInt32LE(input.length >>> 0, 4);
+  chunks.push(footer);
+  return Buffer.concat(chunks);
 }
 
 function parseOctal(block, offset, width, label) {
