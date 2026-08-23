@@ -45,6 +45,7 @@ function symbolicLinks(at, prefix = "") {
 
 function assertCargoPackage(path) {
   const manifest = read(path);
+  assert.match(manifest, /^edition\.workspace\s*=\s*true$/m, path + ": workspace Rust edition");
   assert.equal(manifest.match(/^version\s*=\s*"([^"]+)"$/m)?.[1], releaseVersion, `${path}: release version`);
   assert.match(manifest, /^publish\s*=\s*false$/m, `${path}: registry publication disabled`);
   assert.doesNotMatch(manifest, /path\s*=\s*"\//, `${path}: absolute dependencies are forbidden`);
@@ -52,6 +53,7 @@ function assertCargoPackage(path) {
 }
 
 test("repository owns a complete reproducible release boundary", () => {
+  assert.match(read("Cargo.toml"), /^edition\s*=\s*"2024"$/m, "workspace Rust edition");
   for (const path of [
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
