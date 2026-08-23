@@ -1,0 +1,10 @@
+FROM node:24.19.0-bookworm AS node
+FROM golang:1.25.0-bookworm AS go
+FROM rust:1.96.0-bookworm AS rust
+FROM node
+COPY --from=rust /usr/local/cargo/ /usr/local/cargo/
+COPY --from=rust /usr/local/rustup/ /usr/local/rustup/
+COPY --from=go /usr/local/go/ /usr/local/go/
+ENV CARGO_HOME="/usr/local/cargo" RUSTUP_HOME="/usr/local/rustup"
+ENV PATH="/usr/local/cargo/bin:/usr/local/go/bin:${PATH}"
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate

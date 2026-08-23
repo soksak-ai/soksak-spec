@@ -60,6 +60,7 @@ test("repository owns a complete reproducible release boundary", () => {
     ".gitignore",
     ".nvmrc",
     "Cargo.lock",
+    "build/docker/Dockerfile.verify",
     "go/platformspec/go.mod",
     "go/platformspec/go.sum",
     "LICENSE",
@@ -140,6 +141,10 @@ test("repository owns a complete reproducible release boundary", () => {
   );
   assert.equal(read(".nvmrc").trim(), "24.19.0");
   assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"1\.96\.0"$/m);
+  const verifier = read("build/docker/Dockerfile.verify");
+  assert.match(verifier, /^FROM node:24\.19\.0-bookworm AS node$/m);
+  assert.match(verifier, /^FROM rust:1\.96\.0-bookworm AS rust$/m);
+  assert.match(verifier, /^FROM golang:1\.25\.0-bookworm AS go$/m);
 
   for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
     const source = read(workflow);
