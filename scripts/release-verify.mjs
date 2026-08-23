@@ -192,7 +192,10 @@ function verifyArchive(path, identity, workspace) {
     packed.engines?.node !== workspace.engines.node ||
     packed.packageManager !== workspace.packageManager
   ) {
-    throw new Error("packed plugin-spec identity, toolchain, or publication policy is invalid");
+    throw new Error(`packed plugin-spec identity, toolchain, or publication policy is invalid: ${JSON.stringify({
+      actual: { name: packed.name, version: packed.version, private: packed.private, publishConfig: packed.publishConfig, engines: packed.engines, packageManager: packed.packageManager },
+      expected: { name: identity.packageName, version: identity.version, private: true, engines: { node: workspace.engines.node }, packageManager: workspace.packageManager },
+    })}`);
   }
   for (const required of [
     "package/release-template/build-portable-release.mjs",
