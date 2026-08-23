@@ -90,4 +90,28 @@ describe("signed plugin registry", () => {
     value.profiles = [];
     expect(parseSignedRegistryIndex({ ...value, signature: Buffer.alloc(64).toString("base64") }).ok).toBe(false);
   });
+
+  it("rejects release history for one component id", () => {
+    const value = unsigned();
+    const older = value.plugins[0] as any;
+    value.plugins = [
+      older,
+      {
+        ...older,
+        plugin: { ...older.plugin, version: "0.0.2" },
+        artifacts: older.artifacts.map((artifact: any) => ({
+          ...artifact,
+          url: artifact.url.replaceAll("v0.0.1", "v0.0.2"),
+        })),
+        reports: older.reports.map((report: any) => ({
+          ...report,
+          url: report.url.replaceAll("v0.0.1", "v0.0.2"),
+        })),
+      },
+    ];
+    expect(parseSignedRegistryIndex({
+      ...value,
+      signature: Buffer.alloc(64).toString("base64"),
+    }).ok).toBe(false);
+  });
 });

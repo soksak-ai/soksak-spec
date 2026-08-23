@@ -315,6 +315,10 @@ after compatibility tests, never to make a failing implementation pass.
 | Selected version, local path, source kind, activation, provider | `environment.json` |
 | Download URL, source commit, artifact digest, dependencies | Registry release |
 
+The registry is the current install catalogue, not release history. Each release-kind array holds
+at most one current release per component id. Git history and immutable owner releases retain older
+versions.
+
 There is no public unit, dependency scope, installation profile, dependency closure, composition
 graph, execution graph, or deployment graph. Temporary local validation data is not a stored
 contract or user concept.

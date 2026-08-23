@@ -67,8 +67,8 @@ function canonicalBase64(value: unknown, bytes: number): value is string {
   try { const decoded = atob(value); return decoded.length === bytes && btoa(decoded) === value; } catch { return false; }
 }
 
-function identityKey(identity: ReleaseIdentity): string {
-  return identity.kind + ":" + identity.id + "@" + identity.version;
+function catalogueKey(identity: ReleaseIdentity): string {
+  return identity.id;
 }
 
 export function registryReleases(registry: RegistryPayload): ReleaseDocument[] {
@@ -84,7 +84,7 @@ function parseReleaseArray<T extends ReleaseDocument>(raw: unknown, label: strin
     if (releaseIdentity(parsed.value).kind !== kind) { errors.push(label + "[" + index + "]: " + kind + " release required"); return; }
     result.push(parsed.value as T);
   });
-  sortedUnique(result.map((release) => identityKey(releaseIdentity(release))), label, errors);
+  sortedUnique(result.map((release) => catalogueKey(releaseIdentity(release))), label, errors);
   return result;
 }
 

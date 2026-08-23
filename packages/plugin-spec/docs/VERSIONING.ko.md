@@ -310,6 +310,10 @@ Major 버전은 의도적으로 호환되지 않는 공개 변경을 표시한�
 | 선택 버전, local path, source kind, 활성화, provider | `environment.json` |
 | 다운로드 URL, source commit, artifact digest, dependency | Registry release |
 
+Registry는 release history가 아니라 현재 install catalogue다. 각 release-kind array에는 component
+id별 현재 release가 최대 하나만 존재한다. 과거 version은 Git history와 immutable owner release가
+보존한다.
+
 공개 unit, dependency scope, install profile, dependency closure, composition graph, execution
 graph, deployment graph는 없다. 일시적인 로컬 검증 데이터는 저장 계약이나 사용자 개념이
 아니다.
