@@ -171,6 +171,7 @@ function verifyArchive(path, identity) {
   for (const required of [
     "package/release-template/build-portable-release.mjs",
     "package/release-template/publish-canonical-release.mjs",
+    "package/release-template/verify-plugin-release.mjs",
   ]) {
     if (!names.includes(required)) throw new Error(`packed plugin-spec is missing ${required}`);
   }
