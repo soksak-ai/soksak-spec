@@ -7,10 +7,19 @@ import (
 
 func TestEnvironmentOwnsLocalMaterializationAndUserChoices(t *testing.T) {
 	environment := EmptyEnvironment()
-	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource, Registry: "official"}, Enabled: true}
+	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", Source: RegistrySource, Registry: "official"}, Enabled: true}
 	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
 	if err := ValidateEnvironment(environment); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPluginComponentErrorsNameTheFieldRatherThanTheID(t *testing.T) {
+	environment := EmptyEnvironment()
+	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", Source: RegistrySource, Registry: "official", Target: "any"}}
+	err := ValidateEnvironment(environment)
+	if err == nil || err.Error() != "plugin soksak-plugin-browser-wails3: target belongs only to sidecars" {
+		t.Fatalf("error = %v", err)
 	}
 }
 

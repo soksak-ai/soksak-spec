@@ -84,8 +84,11 @@ func ValidateEnvironment(value Environment) error {
 		return fmt.Errorf("environment requires revision and all component maps")
 	}
 	for id, plugin := range value.Plugins {
-		if !idPattern.MatchString(id) || validComponent(plugin.Component, false) != nil {
+		if !idPattern.MatchString(id) {
 			return fmt.Errorf("invalid plugin id")
+		}
+		if err := validComponent(plugin.Component, false); err != nil {
+			return fmt.Errorf("plugin %s: %w", id, err)
 		}
 	}
 	for index, values := range []map[string]Component{value.Sidecars, value.Kits, value.Contracts, value.Specs} {
