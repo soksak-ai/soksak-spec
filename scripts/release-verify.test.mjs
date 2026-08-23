@@ -77,7 +77,7 @@ test("the public package projects the workspace toolchain owner", () => {
   const { workspace, pluginSpec } = metadata();
   const projected = projectPackageToolchain(workspace, pluginSpec);
   assert.deepEqual(projected.engines, { node: "26.7.0" });
-  assert.equal(projected.packageManager, "pnpm@11.22.0");
+  assert.equal(projected.packageManager, undefined);
   assert.equal(pluginSpec.engines, undefined);
   assert.throws(
     () => projectPackageToolchain({ ...workspace, engines: { node: "latest" } }, pluginSpec),

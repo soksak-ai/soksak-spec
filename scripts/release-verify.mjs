@@ -80,13 +80,9 @@ export function projectPackageToolchain(workspace, pluginSpec) {
   if (!/^\d+\.\d+\.\d+$/.test(workspace?.engines?.node ?? "")) {
     throw new Error("workspace Node toolchain must be exact");
   }
-  if (!/^pnpm@\d+\.\d+\.\d+$/.test(workspace?.packageManager ?? "")) {
-    throw new Error("workspace pnpm toolchain must be exact");
-  }
   return {
     ...pluginSpec,
     engines: { node: workspace.engines.node },
-    packageManager: workspace.packageManager,
   };
 }
 
@@ -189,12 +185,11 @@ function verifyArchive(path, identity, workspace) {
     packed.version !== identity.version ||
     packed.private !== true ||
     packed.publishConfig !== undefined ||
-    packed.engines?.node !== workspace.engines.node ||
-    packed.packageManager !== workspace.packageManager
+    packed.engines?.node !== workspace.engines.node
   ) {
     throw new Error(`packed plugin-spec identity, toolchain, or publication policy is invalid: ${JSON.stringify({
       actual: { name: packed.name, version: packed.version, private: packed.private, publishConfig: packed.publishConfig, engines: packed.engines, packageManager: packed.packageManager },
-      expected: { name: identity.packageName, version: identity.version, private: true, engines: { node: workspace.engines.node }, packageManager: workspace.packageManager },
+      expected: { name: identity.packageName, version: identity.version, private: true, engines: { node: workspace.engines.node } },
     })}`);
   }
   for (const required of [
