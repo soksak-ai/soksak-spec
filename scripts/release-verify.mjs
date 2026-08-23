@@ -42,6 +42,16 @@ function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+export function canonicalizeGzipPlatform(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 10 || bytes[0] !== 0x1f || bytes[1] !== 0x8b || bytes[2] !== 8) {
+    throw new Error("package archive must use gzip");
+  }
+  if (bytes[3] !== 0) throw new Error("package gzip header extensions are forbidden");
+  const canonical = Buffer.from(bytes);
+  canonical[9] = 255;
+  return canonical;
+}
+
 function strictSemver(value, label) {
   if (typeof value !== "string" || value.length > 256 || !STRICT_SEMVER_RE.test(value)) {
     throw new Error(`${label}: strict SemVer required`);
@@ -172,7 +182,9 @@ function packOnce(destination, workspace) {
   if (archives.length !== 1) {
     throw new Error(`expected one plugin-spec archive, found: ${archives.join(", ")}`);
   }
-  return join(destination, archives[0]);
+  const archive = join(destination, archives[0]);
+  writeFileSync(archive, canonicalizeGzipPlatform(readFileSync(archive)));
+  return archive;
 }
 
 function verifyArchive(path, identity, workspace) {

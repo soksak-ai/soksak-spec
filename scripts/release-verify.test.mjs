@@ -4,6 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   buildPlatformRelease,
+  canonicalizeGzipPlatform,
   projectPackageToolchain,
   resolveSourceCommit,
   specReleaseIdentity,
@@ -42,13 +43,13 @@ test("spec release projects the derived owner identity", () => {
   const { workspace, pluginSpec } = metadata();
   const release = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.26.tgz",
+    archiveName: "soksak-ai-plugin-spec-0.0.27.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
     manifestBytes: Buffer.from('{}\n'),
   });
-  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.26" });
+  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.27" });
   assert.equal(release.source.repository, "https://github.com/soksak-ai/soksak-spec");
   assert.equal(release.source.commit, commit);
   assert.equal(release.artifacts[0].sha256, digest);
@@ -83,6 +84,17 @@ test("the public package projects the workspace toolchain owner", () => {
     () => projectPackageToolchain({ ...workspace, engines: { node: "latest" } }, pluginSpec),
     /Node toolchain must be exact/,
   );
+});
+
+test("package gzip bytes do not retain the build host platform", () => {
+  const mac = Buffer.from([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 19, 1]);
+  const linux = Buffer.from([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3, 1]);
+  assert.deepEqual(canonicalizeGzipPlatform(mac), canonicalizeGzipPlatform(linux));
+  assert.equal(canonicalizeGzipPlatform(mac)[9], 255);
+  assert.throws(() => canonicalizeGzipPlatform(Buffer.from("not gzip")), /must use gzip/);
+  const extended = Buffer.from(mac);
+  extended[3] = 2;
+  assert.throws(() => canonicalizeGzipPlatform(extended), /extensions are forbidden/);
 });
 
 test("release archives contain only unique portable regular files", () => {

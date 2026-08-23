@@ -15,7 +15,7 @@ function sha256(bytes) {
 }
 
 function fixture() {
-  const version = "0.0.26";
+  const version = "0.0.27";
   const directory = mkdtempSync(join(tmpdir(), "soksak-spec-publish-"));
   const archiveName = `soksak-ai-plugin-spec-${version}.tgz`;
   const archive = Buffer.from(`spec-${version}`);
