@@ -261,7 +261,7 @@ describe("entry:null service boundary", () => {
       {
         entry: null,
         runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1", url: "https://github.com/example/demo-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "a".repeat(64) }] },
-        service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT },
+        service: { interface: SERVICE_CONTRACT_REQUIREMENT },
       },
     );
   }

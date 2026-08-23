@@ -13,6 +13,10 @@ dependency이며 Kit·contract·spec·언어 라이브러리는 빌드 입력이
 fallback은 없다. dependency가 없으면 필드와 빈 배열을 생략한다. 참조가 바뀌면 plugin 버전도
 올린다.
 
+Service 선언은 service interface와 선택적인 subscribe만 포함한다. v1 service plugin은
+`runtimeDependencies.sidecars` 공통 release reference를 정확히 하나 가지며 그것이 service
+실행체다. `service.sidecar`와 부분 `{id, version}` component 참조는 존재하지 않는다.
+
 ## 자동 릴리스
 
 공용 builder는 lockfile, self-contained artifact, 전체 runtime dependency chain을 검증하고

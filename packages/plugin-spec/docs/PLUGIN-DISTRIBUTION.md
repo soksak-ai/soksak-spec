@@ -30,6 +30,11 @@ The array location states the kind. There is no role, provider alias, interface 
 `latest`, or fallback. An absent dependency section is omitted rather than represented by empty
 arrays. Changing a reference requires a new plugin version.
 
+A service declaration contains its service interface and optional subscriptions only. A v1 service
+plugin has exactly one `runtimeDependencies.sidecars` reference; that common release reference is
+the service executable. `service.sidecar` and partial `{id, version}` component references do not
+exist.
+
 ## Automated owner release
 
 The canonical builder verifies locked build inputs, produces self-contained artifacts, validates

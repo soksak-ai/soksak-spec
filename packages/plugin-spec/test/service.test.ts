@@ -25,7 +25,7 @@ function base(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     entry: null,
     permissions: ["commands", "sidecar", "service"],
     runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1", url: "https://github.com/example/demo-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "a".repeat(64) }] },
-    service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT },
+    service: { interface: SERVICE_CONTRACT_REQUIREMENT },
     contributes: {
       commands: [
         {
@@ -64,7 +64,6 @@ describe("service — 수용(PS3·PS4)", () => {
     expect(validation.ok).toBe(true);
     expect(manifest?.entry).toBeNull();
     expect(manifest?.service).toEqual({
-      sidecar: { id: "demo-svc", version: "0.0.1" },
       interface: SERVICE_CONTRACT_REQUIREMENT,
       subscribe: [],
     });
@@ -112,7 +111,6 @@ describe("service — 수용(PS3·PS4)", () => {
     const { manifest, validation } = parseManifest(
       base({
         service: {
-          sidecar: { id: "demo-svc", version: "0.0.1" },
           interface: SERVICE_CONTRACT_REQUIREMENT,
           subscribe: ["bus:kanban:changed"],
         },
@@ -206,17 +204,16 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
       "Service-Spec@1",
     ]) {
       const errs = errorsOf(
-        base({ service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: iface } }),
+        base({ service: { interface: iface } }),
       );
       expect(errs.some((e) => e.includes("interface"))).toBe(true);
     }
   });
 
-  it("service.sidecar가 runtimeDependencies.sidecars를 참조하지 않으면 거부한다", () => {
-    const errs = errorsOf(
-      base({ service: { sidecar: { id: "ghost", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT } }),
-    );
-    expect(errs.some((e) => e.includes("sidecar"))).toBe(true);
+  it("service는 runtimeDependencies.sidecars release를 정확히 하나 요구한다", () => {
+    expect(errorsOf(base({ runtimeDependencies: undefined })).some((e) => e.includes("exactly one"))).toBe(true);
+    const second = { id: "other-svc", version: "0.0.1", url: "https://github.com/example/other-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "b".repeat(64) };
+    expect(errorsOf(base({ runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1", url: "https://github.com/example/demo-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "a".repeat(64) }, second] } })).some((e) => e.includes("exactly one"))).toBe(true);
   });
 
   it('service 선언에 "service" 권한 부재 → 거부(caution 동의 고지)', () => {
@@ -235,10 +232,11 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
   });
 
   it("service 블록 미지 키·subscribe 비 bus: 토픽 → 거부", () => {
+    expect(errorsOf(base({ service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT } })).some((e) => e.includes('알 수 없는 키 "sidecar"'))).toBe(true);
     expect(
       errorsOf(
         base({
-          service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT, extra: 1 },
+          service: { interface: SERVICE_CONTRACT_REQUIREMENT, extra: 1 },
         }),
       ).length,
     ).toBeGreaterThan(0);
@@ -246,7 +244,6 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
       errorsOf(
         base({
           service: {
-            sidecar: { id: "demo-svc", version: "0.0.1" },
             interface: SERVICE_CONTRACT_REQUIREMENT,
             subscribe: ["kanban:changed"],
           },
