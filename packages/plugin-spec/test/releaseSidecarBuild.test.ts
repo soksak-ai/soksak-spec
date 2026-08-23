@@ -57,7 +57,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
       `[package]\nname = "${sidecar.id}"\nversion = "${overrides.cargoVersion ?? sidecar.version}"\npublish = false\n`,
     );
   } else {
-    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/soksak-ai/${sidecar.id}\n\ngo 1.25.0\n`);
+    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/soksak-ai/${sidecar.id}\n\ngo 1.26.3\n`);
   }
   for (const target of targets) {
     const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;

@@ -1,5 +1,9 @@
 packages:
-  - "packages/plugin-spec"
-autoInstallPeers: false
+  - packages/*
+
 nodeLinker: hoisted
+symlink: false
 preferSymlinkedExecutables: false
+
+allowBuilds:
+  esbuild: true

@@ -27,7 +27,7 @@ function writeFixture(kind: "contract" | "kit", id: string): void {
 }
 
 function writeCargoKitFixture(id: string): void {
-  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "2021"\npublish = false\nrepository = "https://github.com/soksak-ai/${id}"\n`);
+  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "2024"\npublish = false\nrepository = "https://github.com/soksak-ai/${id}"\n`);
   fs.writeFileSync(path.join(root, "kit.json"), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["Cargo.toml", "LICENSE", "kit.json", "src/lib.rs"])}\n`);
   fs.writeFileSync(path.join(root, "LICENSE"), "MIT\n");

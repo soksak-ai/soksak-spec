@@ -94,7 +94,8 @@ test("repository owns a complete reproducible release boundary", () => {
   const workspace = json("package.json");
   assert.equal(workspace.private, true);
   assert.equal(workspace.version, releaseVersion);
-  assert.equal(workspace.packageManager, "pnpm@10.30.3");
+  assert.equal(workspace.engines.node, "26.7.0");
+  assert.equal(workspace.packageManager, "pnpm@11.22.0");
   assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
   assert.equal(
     workspace.scripts?.["test:unit"],
@@ -154,15 +155,23 @@ test("repository owns a complete reproducible release boundary", () => {
     [],
     "installed dependencies contain no symbolic links",
   );
-  assert.equal(read(".nvmrc").trim(), "24.19.0");
-  assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"1\.96\.0"$/m);
+  assert.equal(read(".nvmrc").trim(), "26.7.0");
+  assert.match(read("rust-toolchain.toml"), /^channel\s*=\s*"1\.98\.0"$/m);
+  const pnpmWorkspace = read("pnpm-workspace.yaml");
+  assert.match(pnpmWorkspace, /nodeLinker: hoisted/);
+  assert.match(pnpmWorkspace, /symlink: false/);
+  assert.match(pnpmWorkspace, /preferSymlinkedExecutables: false/);
+  assert.match(pnpmWorkspace, /allowBuilds:/);
   const verifier = read("build/docker/Dockerfile.verify");
-  assert.match(verifier, /^FROM node:24\.19\.0-bookworm AS node$/m);
-  assert.match(verifier, /^FROM rust:1\.96\.0-bookworm AS rust$/m);
-  assert.match(verifier, /^FROM golang:1\.25\.0-bookworm AS go$/m);
+  assert.match(verifier, /^FROM node:26\.7\.0-bookworm AS node$/m);
+  assert.match(verifier, /^FROM rust:1\.98\.0-bookworm AS rust$/m);
+  assert.match(verifier, /^FROM golang:1\.26\.3-bookworm AS go$/m);
+  assert.match(verifier, /npm install --global pnpm@11\.22\.0/);
 
   for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
     const source = read(workflow);
+    assert.match(source, /actions\/setup-go@[a-f0-9]{40}/);
+    assert.match(source, /go-version-file:\s*go\/platformspec\/go\.mod/);
     const uses = [...source.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)].map((match) => match[1]);
     assert.ok(uses.length > 0, `${workflow}: actions required`);
     for (const action of uses) {

@@ -12,7 +12,7 @@
     "directory": "packages/plugin-spec"
   },
   "engines": {
-    "node": "24.19.0"
+    "node": "26.7.0"
   },
   "exports": {
     ".": {
