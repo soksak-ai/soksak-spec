@@ -6,7 +6,7 @@ type Source = "registry" | "development";
 export interface Component {
   version: string; path: string; source: Source; registry?: string; target?: string;
 }
-type Plugin = Component & { enabled: boolean; sidecars?: Record<string, string> };
+type Plugin = Component & { enabled: boolean };
 export interface EnvironmentDocument {
   revision: number;
   plugins: Record<string, Plugin>;
@@ -17,7 +17,6 @@ export interface EnvironmentDocument {
 }
 
 const TOP_LEVEL = ["contracts", "kits", "plugins", "revision", "sidecars", "specs"];
-const PROVIDER_RE = /^[a-z0-9][a-z0-9-]*$/;
 const REGISTRY_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const absolutePath = (value: unknown): value is string => typeof value === "string" && (/^\/(?!\/)/.test(value) || /^[A-Za-z]:\\/.test(value));
 
@@ -35,7 +34,7 @@ function components(raw: unknown, label: string, plugin: boolean, sidecar: boole
     const itemLabel = label + "." + id;
     if (!COMPONENT_ID_RE.test(id)) { errors.push(itemLabel + ": component id required"); continue; }
     const base = ["path", "registry", "source", "target", "version"];
-    const allowed = plugin ? [...base, "enabled", "sidecars"] : base;
+    const allowed = plugin ? [...base, "enabled"] : base;
     const required = plugin ? ["enabled", "path", "source", "version"] : ["path", "source", "version"];
     const value = strict(item, allowed, required, itemLabel, errors);
     if (!value) continue;
@@ -49,18 +48,7 @@ function components(raw: unknown, label: string, plugin: boolean, sidecar: boole
     const component = { version: value.version, path: value.path, source: value.source, ...(value.registry === undefined ? {} : { registry: value.registry }), ...(value.target === undefined ? {} : { target: value.target }) } as Component;
     if (!plugin) { result[id] = component; continue; }
     if (typeof value.enabled !== "boolean") errors.push(itemLabel + ".enabled: boolean required");
-    let sidecars: Record<string, string> | undefined;
-    if (value.sidecars !== undefined) {
-      if (!isRecord(value.sidecars)) errors.push(itemLabel + ".sidecars: object required");
-      else {
-        sidecars = {};
-        for (const [role, sidecar] of Object.entries(value.sidecars)) {
-          if (!PROVIDER_RE.test(role) || typeof sidecar !== "string" || !COMPONENT_ID_RE.test(sidecar)) errors.push(itemLabel + ".sidecars." + role + ": sidecar id required");
-          else sidecars[role] = sidecar;
-        }
-      }
-    }
-    result[id] = { ...component, enabled: value.enabled as boolean, ...(sidecars ? { sidecars } : {}) };
+    result[id] = { ...component, enabled: value.enabled as boolean };
   }
   return result;
 }

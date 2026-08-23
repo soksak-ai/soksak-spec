@@ -7,10 +7,17 @@ import (
 
 func TestEnvironmentOwnsLocalMaterializationAndUserChoices(t *testing.T) {
 	environment := EmptyEnvironment()
-	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource, Registry: "official"}, Enabled: true, Sidecars: map[string]string{"terminal": "terminal-provider"}}
+	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource, Registry: "official"}, Enabled: true}
 	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
 	if err := ValidateEnvironment(environment); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEnvironmentRejectsPluginSidecarBindings(t *testing.T) {
+	body := []byte(`{"revision":1,"plugins":{"demo":{"version":"0.0.1","path":"/installed/demo","source":"registry","registry":"official","enabled":true,"sidecars":{"pty":"soksak-sidecar-pty"}}},"sidecars":{},"kits":{},"contracts":{},"specs":{}}`)
+	if _, err := ParseEnvironment(body); err == nil {
+		t.Fatal("plugin sidecar binding was accepted")
 	}
 }
 

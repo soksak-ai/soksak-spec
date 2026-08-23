@@ -140,6 +140,8 @@ surface shows permissions and every additional component by ID and version. Deta
 repository, platform artifact, size, digest, manifest, interface, and evidence. After consent Core
 stages the complete closure and commits files plus `environment.json` atomically. Any failure leaves
 the previous environment unchanged.
+`environment.json` records installed components, not plugin role bindings. Exact relationships are
+read from the plugin's immutable runtime dependencies.
 
 An installed plugin shows Update only when the registry version is greater. Equal or lower is
 Installed. A development source never receives a managed update.

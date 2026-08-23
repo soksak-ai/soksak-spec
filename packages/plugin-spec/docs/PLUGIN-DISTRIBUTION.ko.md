@@ -43,6 +43,8 @@ Core는 실행 artifact를 받기 전에 직접·전이 metadata를 모두 해�
 component의 ID·버전을 표시한다. 상세 화면은 종류, 저장소, 플랫폼 artifact, 크기, digest,
 manifest, interface, evidence를 보여준다. 동의 후 전체 폐쇄를 staging하고 파일과
 `environment.json`을 원자적으로 commit한다. 하나라도 실패하면 기존 환경을 변경하지 않는다.
+`environment.json`은 설치된 component만 기록하고 plugin role binding을 저장하지 않는다. Exact
+관계는 plugin의 불변 runtime dependency에서 읽는다.
 
 Registry 버전이 설치 버전보다 클 때만 Update다. 같거나 낮으면 Installed이며 development source는
 관리형 업데이트를 받지 않는다.

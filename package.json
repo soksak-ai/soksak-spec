@@ -1,11 +1,11 @@
 {
   "name": "soksak-spec-workspace",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "private": true,
   "engines": { "node": "26.7.0" },
   "packageManager": "pnpm@11.22.0",
   "soksakRelease": {
-    "spec": { "id": "soksak-spec", "version": "0.0.21" },
+    "spec": { "id": "soksak-spec", "version": "0.0.22" },
     "repository": "https://github.com/soksak-ai/soksak-spec",
     "manifest": "soksak-spec-release.json"
   },
