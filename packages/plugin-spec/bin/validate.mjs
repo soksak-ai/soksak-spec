@@ -2,6 +2,7 @@
 // Public, headless validation boundary. Every mode calls the same parser/verifier that
 // consumers import from dist/spec.js; the CLI does not maintain a second wire grammar.
 
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
@@ -18,6 +19,7 @@ import {
   verifyConformanceReport,
 } from "../dist/spec.js";
 import { authenticateRegistry, buildRegistry, verifyReleaseClosure } from "../dist/registryPublication.js";
+import { GitHubApi, publishImmutableRelease } from "../release-template/publish-release.mjs";
 
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
@@ -27,10 +29,11 @@ const USAGE = `사용:
   soksak-validate registry-verify <plugins-directory>
   soksak-validate registry-build <plugins-directory> --id <id> --sequence <n> --issued-at <RFC3339> --expires-at <RFC3339> --out <registry.json>
   SOKSAK_REGISTRY_ED25519_SEED=<base64> soksak-validate registry-authenticate <unsigned-registry.json> --out <registry.json>
+  SOKSAK_RELEASE_TOKEN=<token> soksak-validate registry-publish <registry.json> --repository <owner/name> --commit <sha>
 
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
-const MODES = new Set(["plugin", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate"]);
+const MODES = new Set(["plugin", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
 
 function usageExit(message) {
   if (message) console.error(message);
@@ -311,6 +314,17 @@ async function readRemoteRelease(reference) {
   return { bytes, value: JSON.parse(new TextDecoder().decode(bytes)) };
 }
 async function registryPublication(mode, args) {
+  if (mode === "registry-publish") {
+    const parsed = parseOptions(args, new Set(["--repository", "--commit"]));
+    if (!parsed.ok || parsed.positional.length !== 1 || !parsed.options.has("--repository") || !parsed.options.has("--commit")) return usageExit(parsed.ok ? "registry-publish: input, repository, and commit required" : parsed.error);
+    const document = readDocument(parsed.positional[0]); if (!document) return 1;
+    const registry = parseRegistry(document.raw); if (!registry.ok) { printErrors(parsed.positional[0], registry.errors); return 1; }
+    const token = process.env.SOKSAK_RELEASE_TOKEN; if (!token) throw new Error("SOKSAK_RELEASE_TOKEN is required");
+    const bytes = document.bytes;
+    const asset = { name: "registry.json", bytes, size: bytes.length, digest: `sha256:${createHash("sha256").update(bytes).digest("hex")}`, contentType: "application/json" };
+    const result = await publishImmutableRelease({ repository: parsed.options.get("--repository"), commit: parsed.options.get("--commit"), tag: `registry-${registry.value.sequence}`, prerelease: false, assets: [asset], api: new GitHubApi({ repository: parsed.options.get("--repository"), token }) });
+    console.log(JSON.stringify(result)); return 0;
+  }
   if (mode === "registry-verify") {
     if (args.length !== 1) return usageExit("registry-verify: plugins directory required");
     const plugins = registryPlugins(args[0]); await verifyReleaseClosure(plugins, readRemoteRelease);

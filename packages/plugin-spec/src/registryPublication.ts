@@ -1,4 +1,4 @@
-import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { canonicalRegistryPayload, parseRegistry, type RegistryPlugin } from "./registry.js";
 import { parseReleaseManifest, type ReleaseDocument } from "./release.js";
 import type { ReleaseReference } from "./distribution.js";
@@ -47,7 +47,10 @@ export function authenticateRegistry(registry: UnsignedRegistry, seedBase64: str
   const publicDer = createPublicKey(privateKey).export({ type: "spki", format: "der" }) as Buffer;
   const keyId = createHash("sha256").update(publicDer.subarray(-32)).digest("hex").slice(0, 32);
   const placeholder = { ...registry, signature: { algorithm: "ed25519" as const, keyId, value: Buffer.alloc(64).toString("base64") } };
-  const value = { ...registry, signature: { algorithm: "ed25519" as const, keyId, value: sign(null, canonicalRegistryPayload(placeholder), privateKey).toString("base64") } };
+  const payload = canonicalRegistryPayload(placeholder);
+  const signature = sign(null, payload, privateKey);
+  if (!verify(null, payload, createPublicKey(privateKey), signature)) throw new Error("registry signature self-verification failed");
+  const value = { ...registry, signature: { algorithm: "ed25519" as const, keyId, value: signature.toString("base64") } };
   const parsed = parseRegistry(value); if (!parsed.ok) throw new Error(`authenticated registry is invalid: ${parsed.errors.join("; ")}`);
   return value;
 }
