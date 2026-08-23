@@ -10,6 +10,7 @@ import {
   certifyRegistry,
   parseConformanceReport,
   parseManifest,
+  parseRegistry,
   parseRegistryPublicKey,
   parseReleaseReference,
   parseReleaseManifest,

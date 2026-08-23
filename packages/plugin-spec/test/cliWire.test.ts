@@ -93,4 +93,16 @@ describe("soksak-validate public wire modes", () => {
     );
     expect(missing.status).toBe(1);
   });
+
+  it("executes the Registry publication path through parsing before requiring credentials", () => {
+    const result = run(
+      "registry-publish",
+      join(FIXTURES, "registry.json"),
+      "--repository", "example/registry",
+      "--commit", "a".repeat(40),
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("SOKSAK_RELEASE_TOKEN is required");
+    expect(result.stderr).not.toContain("ReferenceError");
+  });
 });
