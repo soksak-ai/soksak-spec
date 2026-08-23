@@ -72,7 +72,7 @@ function collect(root, relative, out) {
   out.push({ name, absolute, mode: stat.mode & 0o111 ? 0o755 : 0o644 });
 }
 
-export function createRegularFileArchive({ root, files }) {
+export function createRegularFileArchive({ root, files, prefix = "" }) {
   if (!Array.isArray(files) || files.length === 0) throw new Error("archive files must be non-empty");
   const entries = [];
   for (const relative of files) collect(root, relative, entries);
@@ -84,7 +84,7 @@ export function createRegularFileArchive({ root, files }) {
   const blocks = [];
   for (const entry of entries) {
     const bytes = fs.readFileSync(entry.absolute);
-    blocks.push(header(entry.name, bytes.length, entry.mode), bytes);
+    blocks.push(header(`${prefix}${entry.name}`, bytes.length, entry.mode), bytes);
     const padding = (BLOCK - (bytes.length % BLOCK)) % BLOCK;
     if (padding) blocks.push(Buffer.alloc(padding));
   }

@@ -77,12 +77,23 @@ if (!Array.isArray(files) || files.length === 0 || new Set(files).size !== files
 for (const required of ["LICENSE", identity.manifestName]) {
   if (!files.includes(required)) throw new Error(`release-files.json must include ${required}`);
 }
-const archive = createRegularFileArchive({ root, files });
+if (hasJavaScript && !files.includes("package.json")) {
+  throw new Error("JavaScript portable releases must include package.json");
+}
+if (hasJavaScript) {
+  const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  const exported = packageMetadata.exports?.["."];
+  if (typeof exported !== "string" || !exported.startsWith("./") || !files.includes(exported.slice(2))) {
+    throw new Error("JavaScript portable release export must name a declared file");
+  }
+}
+const prefix = hasJavaScript ? "package/" : "";
+const archive = createRegularFileArchive({ root, files, prefix });
 const archived = readRegularFileArchive(archive);
-if (JSON.stringify(archived.map(({ name }) => name)) !== JSON.stringify([...files].sort())) {
+if (JSON.stringify(archived.map(({ name }) => name)) !== JSON.stringify(files.map((name) => `${prefix}${name}`).sort())) {
   throw new Error("release archive inventory diverges from declared files");
 }
-const archivedManifest = archived.find(({ name }) => name === identity.manifestName);
+const archivedManifest = archived.find(({ name }) => name === `${prefix}${identity.manifestName}`);
 if (!archivedManifest || !archivedManifest.data.equals(fs.readFileSync(path.join(root, identity.manifestName)))) {
   throw new Error("archived component manifest differs from source");
 }

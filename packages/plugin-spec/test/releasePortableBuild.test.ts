@@ -18,11 +18,11 @@ let out = "";
 
 function writeFixture(kind: "contract" | "kit", id: string): void {
   fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
-    name: `@soksak/${id}`, version: "0.0.1", private: true,
+    name: `@soksak/${id}`, version: "0.0.1", private: true, exports: { ".": "./src/index.ts" },
     repository: { type: "git", url: `git+https://github.com/soksak-ai/${id}.git` },
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, `${kind}.json`), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
-  fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["LICENSE", `${kind}.json`, "src/index.ts"])}\n`);
+  fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["LICENSE", `${kind}.json`, "package.json", "src/index.ts"])}\n`);
   fs.writeFileSync(path.join(root, "LICENSE"), "MIT\n");
   fs.mkdirSync(path.join(root, "src"));
   fs.writeFileSync(path.join(root, "src/index.ts"), "export const value = 1;\n");
@@ -65,7 +65,12 @@ describe("portable contract and kit release builder", () => {
       expect(parsed.ok).toBe(true);
       expect(release[kind]).toEqual({ id, version: "0.0.1" });
       const names = readRegularFileArchive(fs.readFileSync(path.join(out, summary.archive))).map(({ name }) => name);
-      expect(names).toEqual(["LICENSE", `${kind}.json`, "src/index.ts"]);
+      expect(names).toEqual(["package/LICENSE", `package/${kind}.json`, "package/package.json", "package/src/index.ts"]);
+      const packageMetadata = JSON.parse(
+        readRegularFileArchive(fs.readFileSync(path.join(out, summary.archive)))
+          .find(({ name }) => name === "package/package.json")!.data.toString("utf8"),
+      );
+      expect(names).toContain(`package/${packageMetadata.exports["."]}`.replace("./", ""));
       for (const reportName of ["conformance-manifest.json", "conformance-release.json"]) {
         const report = JSON.parse(fs.readFileSync(path.join(out, reportName), "utf8"));
         expect(parseConformanceReport(report).ok).toBe(true);
