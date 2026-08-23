@@ -82,8 +82,13 @@ if (hasJavaScript && !files.includes("package.json")) {
 }
 if (hasJavaScript) {
   const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  const exported = packageMetadata.exports?.["."];
-  if (typeof exported !== "string" || !exported.startsWith("./") || !files.includes(exported.slice(2))) {
+  const exportTargets = (value) => {
+    if (typeof value === "string") return [value];
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    return Object.values(value).flatMap(exportTargets);
+  };
+  const exported = exportTargets(packageMetadata.exports?.["."]);
+  if (exported.length === 0 || exported.some((target) => !target.startsWith("./") || !files.includes(target.slice(2)))) {
     throw new Error("JavaScript portable release export must name a declared file");
   }
 }

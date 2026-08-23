@@ -18,7 +18,7 @@ let out = "";
 
 function writeFixture(kind: "contract" | "kit", id: string): void {
   fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
-    name: `@soksak/${id}`, version: "0.0.1", private: true, exports: { ".": "./src/index.ts" },
+    name: `@soksak/${id}`, version: "0.0.1", private: true, exports: { ".": { types: "./src/index.ts", default: "./src/index.ts" } },
     repository: { type: "git", url: `git+https://github.com/soksak-ai/${id}.git` },
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, `${kind}.json`), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
@@ -70,7 +70,9 @@ describe("portable contract and kit release builder", () => {
         readRegularFileArchive(fs.readFileSync(path.join(out, summary.archive)))
           .find(({ name }) => name === "package/package.json")!.data.toString("utf8"),
       );
-      expect(names).toContain(`package/${packageMetadata.exports["."]}`.replace("./", ""));
+      for (const exported of Object.values(packageMetadata.exports["."])) {
+        expect(names).toContain(`package/${String(exported)}`.replace("./", ""));
+      }
       for (const reportName of ["conformance-manifest.json", "conformance-release.json"]) {
         const report = JSON.parse(fs.readFileSync(path.join(out, reportName), "utf8"));
         expect(parseConformanceReport(report).ok).toBe(true);
