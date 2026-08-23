@@ -36,8 +36,8 @@ type Component struct {
 }
 type Plugin struct {
 	Component
-	Enabled   bool              `json:"enabled"`
-	Providers map[string]string `json:"providers,omitempty"`
+	Enabled  bool              `json:"enabled"`
+	Sidecars map[string]string `json:"sidecars,omitempty"`
 }
 type Environment struct {
 	Revision  uint64               `json:"revision"`
@@ -88,9 +88,9 @@ func ValidateEnvironment(value Environment) error {
 		if !idPattern.MatchString(id) || validComponent(plugin.Component, false) != nil {
 			return fmt.Errorf("invalid plugin id")
 		}
-		for name, provider := range plugin.Providers {
-			if !idPattern.MatchString(name) || !idPattern.MatchString(provider) {
-				return fmt.Errorf("invalid provider selection")
+		for role, sidecar := range plugin.Sidecars {
+			if !idPattern.MatchString(role) || !idPattern.MatchString(sidecar) {
+				return fmt.Errorf("invalid sidecar selection")
 			}
 		}
 	}

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const releaseVersion = "0.0.15";
+const releaseVersion = "0.0.16";
 
 function read(path) {
   return readFileSync(join(root, path), "utf8");
@@ -61,7 +61,7 @@ test("repository owns a complete reproducible release boundary", () => {
     "packages/plugin-spec/docs/VERSIONING.ko.md",
   ]) {
     const source = read(file);
-    for (const obsolete of ["settings.json", "installed.json", "parseSettingsDocument", "parseInstalledDocument", "InstalledDocument", "SettingsDocument"]) {
+    for (const obsolete of ["settings.json", "installed.json", "parseSettingsDocument", "parseInstalledDocument", "InstalledDocument", "SettingsDocument", "providers"]) {
       assert.equal(source.includes(obsolete), false, file + ": obsolete environment split " + obsolete);
     }
   }
