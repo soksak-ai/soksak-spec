@@ -1,6 +1,31 @@
 {
-  "spec": { "id": "soksak-spec", "version": "0.0.1" },
-  "source": { "repository": "https://github.com/example/soksak-spec", "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" },
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.tgz", "size": 12345, "sha256": "7777777777777777777777777777777777777777777777777777777777777777", "format": "tgz", "manifest": "spec.json" }],
-  "reports": [{ "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.conformance.json", "sha256": "8888888888888888888888888888888888888888888888888888888888888888" }]
+  "kind": "spec",
+  "id": "soksak-spec",
+  "version": "0.0.1",
+  "manifest": {
+    "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/spec.json",
+    "size": 22,
+    "sha256": "cb9f47b10740fbbfd6b0377c5f9c83b5953202795d092fc554cf8b4a101aebbc"
+  },
+  "source": {
+    "repository": "https://github.com/example/soksak-spec",
+    "commit": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "artifacts": [
+    {
+      "target": "any",
+      "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/soksak-spec-0.0.1.tgz",
+      "size": 12345,
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "format": "tgz",
+      "manifest": "spec.json"
+    }
+  ],
+  "evidence": [
+    {
+      "url": "https://github.com/example/soksak-spec/releases/download/v0.0.1/spec-release.conformance.json",
+      "size": 12345,
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
 }

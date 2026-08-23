@@ -24,11 +24,8 @@ function base(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     description: "테스트용",
     entry: null,
     permissions: ["commands", "sidecar", "service"],
-    sidecars: [{
-      name: "demo-svc",
-      interface: { id: "soksak-spec-sidecar-fixture-wire", requirement: "0.0.1" },
-    }],
-    service: { sidecar: "demo-svc", interface: SERVICE_CONTRACT_REQUIREMENT },
+    runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1", url: "https://github.com/example/demo-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "a".repeat(64) }] },
+    service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT },
     contributes: {
       commands: [
         {
@@ -67,7 +64,7 @@ describe("service — 수용(PS3·PS4)", () => {
     expect(validation.ok).toBe(true);
     expect(manifest?.entry).toBeNull();
     expect(manifest?.service).toEqual({
-      sidecar: "demo-svc",
+      sidecar: { id: "demo-svc", version: "0.0.1" },
       interface: SERVICE_CONTRACT_REQUIREMENT,
       subscribe: [],
     });
@@ -115,7 +112,7 @@ describe("service — 수용(PS3·PS4)", () => {
     const { manifest, validation } = parseManifest(
       base({
         service: {
-          sidecar: "demo-svc",
+          sidecar: { id: "demo-svc", version: "0.0.1" },
           interface: SERVICE_CONTRACT_REQUIREMENT,
           subscribe: ["bus:kanban:changed"],
         },
@@ -173,7 +170,7 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
         entry: "main.js",
         service: undefined,
         permissions: ["commands"],
-        sidecars: undefined,
+        runtimeDependencies: undefined,
         contributes: {
           commands: [{ name: "open", title: "Open", description: "js command" }],
         },
@@ -209,15 +206,15 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
       "Service-Spec@1",
     ]) {
       const errs = errorsOf(
-        base({ service: { sidecar: "demo-svc", interface: iface } }),
+        base({ service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: iface } }),
       );
       expect(errs.some((e) => e.includes("interface"))).toBe(true);
     }
   });
 
-  it("service.sidecar 가 sidecars[] 를 참조하지 않음 → 거부(PS9 — 배급은 사이드카 법 상속)", () => {
+  it("service.sidecar가 runtimeDependencies.sidecars를 참조하지 않으면 거부한다", () => {
     const errs = errorsOf(
-      base({ service: { sidecar: "ghost", interface: SERVICE_CONTRACT_REQUIREMENT } }),
+      base({ service: { sidecar: { id: "ghost", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT } }),
     );
     expect(errs.some((e) => e.includes("sidecar"))).toBe(true);
   });
@@ -241,7 +238,7 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
     expect(
       errorsOf(
         base({
-          service: { sidecar: "demo-svc", interface: SERVICE_CONTRACT_REQUIREMENT, extra: 1 },
+          service: { sidecar: { id: "demo-svc", version: "0.0.1" }, interface: SERVICE_CONTRACT_REQUIREMENT, extra: 1 },
         }),
       ).length,
     ).toBeGreaterThan(0);
@@ -249,7 +246,7 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
       errorsOf(
         base({
           service: {
-            sidecar: "demo-svc",
+            sidecar: { id: "demo-svc", version: "0.0.1" },
             interface: SERVICE_CONTRACT_REQUIREMENT,
             subscribe: ["kanban:changed"],
           },
@@ -264,7 +261,7 @@ describe("entry:null — 합법 조건(PS4)", () => {
     const errs = errorsOf(
       base({
         service: undefined,
-        sidecars: undefined,
+        runtimeDependencies: undefined,
         permissions: ["commands"],
         contributes: { commands: [{ name: "open", title: "Open" }] },
       }),
@@ -374,7 +371,7 @@ describe("contributes.schedules — 데이터 선언(PS14)", () => {
       base({
         entry: "main.js",
         service: undefined,
-        sidecars: undefined,
+        runtimeDependencies: undefined,
         permissions: ["commands"],
         contributes: {
           commands: [{ name: "open", title: "Open" }],

@@ -116,7 +116,14 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
 <!-- example:spec-correction-release:release -->
 ```json
 {
-  "spec": { "id": "soksak-spec", "version": "0.0.9" },
+  "kind": "spec",
+  "id": "soksak-spec",
+  "version": "0.0.9",
+  "manifest": {
+    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/spec.json",
+    "size": 256,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
   "source": {
     "repository": "https://github.com/soksak-ai/soksak-spec",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -131,7 +138,11 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
-  "reports": []
+  "evidence": [{
+    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/conformance-release.json",
+    "size": 512,
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }]
 }
 ```
 
@@ -142,8 +153,8 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
 
 <!-- rule:plugin-sidecar-interface -->
 
-플러그인은 provider 저장소가 아니라 필요한 인터페이스를 명시한다. 설정에서 provider를
-선택한다. 선택된 사이드카는 같은 인터페이스 ID를 허용된 버전으로 제공해야 한다.
+플러그인은 설치할 정확한 불변 Sidecar release를 고정한다. 제공 interface는 Sidecar manifest와
+conformance evidence가 소유하며 설치 시 provider 선택이나 fallback은 없다.
 
 <!-- example:terminal-plugin-valid:valid-plugin -->
 ```json
@@ -157,15 +168,17 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
   "implements": [
     { "id": "soksak-spec-plugin-terminal", "version": "0.0.1" }
   ],
-  "sidecars": [
+  "runtimeDependencies": {
+    "sidecars": [
     {
-      "name": "terminal",
-      "interface": {
-        "id": "soksak-spec-sidecar-terminal",
-        "requirement": "0.0.1"
-      }
+      "id": "terminal-provider",
+      "version": "0.0.1",
+      "url": "https://github.com/example/terminal-provider/releases/download/v0.0.1/release.json",
+      "size": 12345,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
-  ]
+    ]
+  }
 }
 ```
 
@@ -237,12 +250,20 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 
 <!-- rule:release-install-separation -->
 
-릴리스는 게시된 내용을 기록한다. 런타임 관계나 빌드 dependency를 다시 기록하지 않는다.
+릴리스는 게시된 바이트와 정확한 runtime dependency를 투영한다. 빌드 dependency는 언어 package
+manifest와 lockfile만 소유한다.
 
 <!-- example:plugin-release-valid:release -->
 ```json
 {
-  "plugin": { "id": "example-plugin", "version": "0.0.1" },
+  "kind": "plugin",
+  "id": "example-plugin",
+  "version": "0.0.1",
+  "manifest": {
+    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/plugin.json",
+    "size": 256,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
   "source": {
     "repository": "https://github.com/soksak-ai/example-plugin",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -257,13 +278,17 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
-  "reports": []
+  "evidence": [{
+    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/conformance-release.json",
+    "size": 512,
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }]
 }
 ```
 
 레지스트리는 정확한 릴리스, dependency, source commit, artifact URL, 크기와 digest를 게시한다.
 `environment.json`은 exact 선택 버전, registry ID, 절대 local path, source kind, 해당되는 target,
-plugin 활성화와 provider 선택을 기록하는 유일한 local state다. repository, commit, digest를
+plugin 활성화와 설치된 정확한 component identity를 기록하는 유일한 local state다. repository, commit, digest를
 레지스트리에서 복제하지 않는다.
 
 인스톨러는 transaction 디렉터리에 다운로드하고 압축 해제 전에 크기와 SHA-256을 검사하며
@@ -307,12 +332,12 @@ Major 버전은 의도적으로 호환되지 않는 공개 변경을 표시한�
 | 외부 source dependency | Package manifest 및 lock/checksum |
 | 게시된 바이트 | Release descriptor 및 attestation |
 | 발견 가능한 릴리스 | Registry |
-| 선택 버전, local path, source kind, 활성화, provider | `environment.json` |
+| 선택 버전, local path, source kind, 활성화 | `environment.json` |
 | 다운로드 URL, source commit, artifact digest, dependency | Registry release |
 
-Registry는 release history가 아니라 현재 install catalogue다. 각 release-kind array에는 component
-id별 현재 release가 최대 하나만 존재한다. 과거 version은 Git history와 immutable owner release가
-보존한다.
+Registry는 release history가 아니라 현재 plugin catalogue다. plugins array에는 plugin ID별 현재
+release가 하나만 존재한다. Sidecar는 plugin의 exact runtime dependency로만 나타난다. 과거 version은
+Git history와 immutable owner release가 보존한다.
 
 공개 unit, dependency scope, install profile, dependency closure, composition graph, execution
 graph, deployment graph는 없다. 일시적인 로컬 검증 데이터는 저장 계약이나 사용자 개념이

@@ -113,7 +113,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
 
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
     expect(release).toMatchObject({
-      sidecar: { id: "soksak-sidecar-example", version: "0.0.1" },
+      kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1",
       source: { repository: "https://github.com/soksak-ai/soksak-sidecar-example", commit: COMMIT },
     });
     expect(release.artifacts).toHaveLength(5);
@@ -165,7 +165,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     const result = build("v0.0.4");
     expect(result.status, result.stderr).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    expect(release.sidecar.version).toBe("0.0.4");
+    expect(release).toMatchObject({ kind: "sidecar", version: "0.0.4" });
     expect(JSON.parse(fs.readFileSync(path.join(outDir, "conformance-interface.json"), "utf8")).claim.contract.version).toBe("0.0.1");
   });
 
@@ -199,7 +199,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    expect(release.sidecar.id).toBe("soksak-sidecar-example");
+    expect(release.id).toBe("soksak-sidecar-example");
     expect(release.artifacts).toHaveLength(5);
   });
 

@@ -1,9 +1,36 @@
 {
-  "plugin": { "id": "weather-plugin", "version": "0.0.1" },
-  "source": { "repository": "https://github.com/example/weather-plugin", "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz", "size": 12345, "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "format": "tgz", "manifest": "plugin.json" }],
-  "reports": [
-    { "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-kind.conformance.json", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-    { "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-release.conformance.json", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+  "kind": "plugin",
+  "id": "weather-plugin",
+  "version": "0.0.1",
+  "manifest": {
+    "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin.json",
+    "size": 24,
+    "sha256": "e0b4f06af96f48d98fc90ddd21f8157ec3959db28d9439d1a725ee6800c45222"
+  },
+  "source": {
+    "repository": "https://github.com/example/weather-plugin",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "artifacts": [
+    {
+      "target": "any",
+      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz",
+      "size": 12345,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "format": "tgz",
+      "manifest": "plugin.json"
+    }
+  ],
+  "evidence": [
+    {
+      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-kind.conformance.json",
+      "size": 12345,
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-release.conformance.json",
+      "size": 12345,
+      "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
   ]
 }

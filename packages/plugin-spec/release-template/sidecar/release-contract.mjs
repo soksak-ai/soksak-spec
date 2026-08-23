@@ -48,10 +48,7 @@ export function releaseAssetName(target, sidecar = SIDECAR) {
 
 export function releaseIdentity(commit, sidecar = SIDECAR) {
   assertCommit(commit);
-  return {
-    sidecar: { id: sidecar.id, version: sidecar.version },
-    source: { repository: REPOSITORY, commit },
-  };
+  return { kind: "sidecar", id: sidecar.id, version: sidecar.version, source: { repository: REPOSITORY, commit } };
 }
 
 export function sha256(bytes) {

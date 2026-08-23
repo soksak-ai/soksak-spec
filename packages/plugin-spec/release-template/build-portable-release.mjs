@@ -116,21 +116,23 @@ const report = (claim) => ({
   validator: { name: "soksak-conformance", version: identity.version },
   artifacts: [{ target: "any", sha256: digest }],
 });
-const reports = [
+const evidenceFiles = [
   ["conformance-manifest.json", report({ manifest: true })],
   ["conformance-release.json", report({ release: true })],
 ].map(([name, value]) => {
   if (!parseConformanceReport(value).ok) throw new Error(`${name} is invalid`);
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-  return { name, bytes, reference: { url: `${repository}/releases/download/${tag}/${name}`, sha256: sha256(bytes) } };
+  return { name, bytes, reference: { url: `${repository}/releases/download/${tag}/${name}`, size: bytes.length, sha256: sha256(bytes) } };
 });
 const release = {
-  [identity.kind]: { id: identity.id, version: identity.version },
-  source: { repository, commit }, artifacts: [artifact], reports: reports.map(({ reference }) => reference),
+  kind: identity.kind, id: identity.id, version: identity.version,
+  manifest: { url: `${repository}/releases/download/${tag}/${identity.manifestName}`, size: archivedManifest.data.length, sha256: sha256(archivedManifest.data) },
+  source: { repository, commit }, artifacts: [artifact], evidence: evidenceFiles.map(({ reference }) => reference),
 };
 if (!parseReleaseManifest(release).ok) throw new Error("generated release manifest is invalid");
 
 fs.writeFileSync(path.join(out, archiveName), archive);
+fs.writeFileSync(path.join(out, identity.manifestName), archivedManifest.data);
 fs.writeFileSync(path.join(out, "release.json"), `${JSON.stringify(release, null, 2)}\n`);
-for (const item of reports) fs.writeFileSync(path.join(out, item.name), item.bytes);
+for (const item of evidenceFiles) fs.writeFileSync(path.join(out, item.name), item.bytes);
 process.stdout.write(`${JSON.stringify({ archive: archiveName, sha256: digest })}\n`);

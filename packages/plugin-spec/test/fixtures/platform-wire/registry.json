@@ -1,0 +1,20 @@
+{
+  "id": "fixture",
+  "sequence": 42,
+  "plugins": [
+    {
+      "id": "weather-plugin",
+      "version": "0.0.1",
+      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/release.json",
+      "size": 12345,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "issuedAt": "2026-07-14T00:00:00Z",
+  "expiresAt": "2026-07-15T00:00:00Z",
+  "signature": {
+    "algorithm": "ed25519",
+    "keyId": "fixture-2026",
+    "value": "PLlab8JPrrl2ubKA//pmkrOb/uxRDuFHdDdM+U01r8NBFpzCaCwkg/HLz+mhf8CVmjWWC+gc/ve4dS3FpjkUAg=="
+  }
+}

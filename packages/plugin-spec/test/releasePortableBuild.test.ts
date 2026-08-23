@@ -63,7 +63,7 @@ describe("portable contract and kit release builder", () => {
       const release = JSON.parse(fs.readFileSync(path.join(out, "release.json"), "utf8"));
       const parsed = parseReleaseManifest(release);
       expect(parsed.ok).toBe(true);
-      expect(release[kind]).toEqual({ id, version: "0.0.1" });
+      expect(release).toMatchObject({ kind, id, version: "0.0.1" });
       const names = readRegularFileArchive(fs.readFileSync(path.join(out, summary.archive))).map(({ name }) => name);
       expect(names).toEqual(["package/LICENSE", `package/${kind}.json`, "package/package.json", "package/src/index.ts"]);
       const packageMetadata = JSON.parse(
@@ -95,6 +95,6 @@ describe("portable contract and kit release builder", () => {
     const result = build();
     expect(result.status, result.stderr).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(out, "release.json"), "utf8"));
-    expect(release.kit).toEqual({ id: "soksak-kit-sidecar-example", version: "0.0.1" });
+    expect(release).toMatchObject({ kind: "kit", id: "soksak-kit-sidecar-example", version: "0.0.1" });
   });
 });

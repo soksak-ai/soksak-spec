@@ -20,7 +20,7 @@ describe("schema metadata and payload identity", () => {
       "test/fixtures/platform-wire/release-kit.json",
       "test/fixtures/platform-wire/release-contract.json",
       "test/fixtures/platform-wire/release-spec.json",
-      "test/fixtures/platform-wire/registry-signed.json",
+      "test/fixtures/platform-wire/registry.json",
       "test/fixtures/platform-wire/conformance-plugin-release.json",
       "test/fixtures/platform-wire/plugin.json",
       "test/fixtures/platform-wire/sidecar.json",
@@ -33,11 +33,9 @@ describe("schema metadata and payload identity", () => {
     }
   });
 
-  it("requires all five direct registry arrays", () => {
-    const registry = JSON.parse(read("test/fixtures/platform-wire/registry-signed.json"));
-    expect(Object.keys(registry).sort()).toEqual(expect.arrayContaining([
-      "plugins", "sidecars", "kits", "contracts", "specs",
-    ]));
+  it("keeps the registry focused on authenticated plugins", () => {
+    const registry = JSON.parse(read("test/fixtures/platform-wire/registry.json"));
+    expect(Object.keys(registry).sort()).toEqual(["expiresAt", "id", "issuedAt", "plugins", "sequence", "signature"]);
     expect(registry).not.toHaveProperty("profiles");
     expect(registry).not.toHaveProperty(["un", "its"].join(""));
   });

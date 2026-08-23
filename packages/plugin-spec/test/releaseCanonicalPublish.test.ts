@@ -16,18 +16,22 @@ function fixture() {
   const commit = "a".repeat(40);
   const archiveName = "soksak-kit-example-0.0.1-any.tgz";
   const archive = Buffer.from("archive");
+  const manifestName = "kit.json";
+  const manifestBytes = Buffer.from("{}\n");
+  fs.writeFileSync(path.join(directory, manifestName), manifestBytes);
   const reportNames = ["conformance-manifest.json", "conformance-release.json"];
-  const reports = reportNames.map((name) => {
+  const evidence = reportNames.map((name) => {
     const bytes = Buffer.from(`${name}\n`);
     fs.writeFileSync(path.join(directory, name), bytes);
-    return { url: `https://github.com/${repository}/releases/download/v0.0.1/${name}`, sha256: sha256(bytes) };
+    return { url: `https://github.com/${repository}/releases/download/v0.0.1/${name}`, size: bytes.length, sha256: sha256(bytes) };
   });
   fs.writeFileSync(path.join(directory, archiveName), archive);
   const release = {
-    kit: { id: "soksak-kit-example", version: "0.0.1" },
+    kind: "kit", id: "soksak-kit-example", version: "0.0.1",
+    manifest: { url: `https://github.com/${repository}/releases/download/v0.0.1/${manifestName}`, size: manifestBytes.length, sha256: sha256(manifestBytes) },
     source: { repository: `https://github.com/${repository}`, commit },
     artifacts: [{ target: "any", url: `https://github.com/${repository}/releases/download/v0.0.1/${archiveName}`, sha256: sha256(archive), size: archive.length, format: "tgz", manifest: "kit.json" }],
-    reports,
+    evidence,
   };
   const manifest = path.join(directory, "release.json");
   fs.writeFileSync(manifest, `${JSON.stringify(release, null, 2)}\n`);
@@ -40,7 +44,7 @@ describe("canonical release asset collection", () => {
     const result = collectCanonicalReleaseAssets({ repository: value.repository, commit: value.commit, artifacts: value.directory, manifest: value.manifest });
     expect(result.tag).toBe("v0.0.1");
     expect(result.assets.map(({ name }) => name)).toEqual([
-      "conformance-manifest.json", "conformance-release.json", "release.json", value.archiveName,
+      "conformance-manifest.json", "conformance-release.json", "kit.json", "release.json", value.archiveName,
     ].sort());
     fs.rmSync(value.directory, { recursive: true, force: true });
   });
@@ -55,15 +59,17 @@ describe("canonical release asset collection", () => {
       fs.writeFileSync(path.join(directory, name), bytes);
       return { target, url: `https://github.com/${repository}/releases/download/v0.0.1/${name}`, sha256: sha256(bytes), size: bytes.length, format: "tar.gz", manifest: "sidecar.json" };
     });
-    const reports = ["conformance-interface.json", "conformance-release.json", "conformance-sidecar.json"].map((name) => {
+    const sidecarManifest = Buffer.from("{}\n");
+    fs.writeFileSync(path.join(directory, "sidecar.json"), sidecarManifest);
+    const evidence = ["conformance-interface.json", "conformance-release.json", "conformance-sidecar.json"].map((name) => {
       const bytes = Buffer.from(name);
       fs.writeFileSync(path.join(directory, name), bytes);
-      return { url: `https://github.com/${repository}/releases/download/v0.0.1/${name}`, sha256: sha256(bytes) };
+      return { url: `https://github.com/${repository}/releases/download/v0.0.1/${name}`, size: bytes.length, sha256: sha256(bytes) };
     });
     const manifest = path.join(directory, "release.json");
-    fs.writeFileSync(manifest, `${JSON.stringify({ sidecar: { id: "soksak-sidecar-example", version: "0.0.1" }, source: { repository: `https://github.com/${repository}`, commit }, artifacts, reports }, null, 2)}\n`);
+    fs.writeFileSync(manifest, `${JSON.stringify({ kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1", manifest: { url: `https://github.com/${repository}/releases/download/v0.0.1/sidecar.json`, size: sidecarManifest.length, sha256: sha256(sidecarManifest) }, source: { repository: `https://github.com/${repository}`, commit }, artifacts, evidence }, null, 2)}\n`);
     const result = collectCanonicalReleaseAssets({ repository, commit, artifacts: directory, manifest });
-    expect(result.assets).toHaveLength(6);
+    expect(result.assets).toHaveLength(7);
     fs.writeFileSync(path.join(directory, `${path.basename(new URL(artifacts[0].url).pathname)}.sha256`), artifacts[0].sha256);
     expect(() => collectCanonicalReleaseAssets({ repository, commit, artifacts: directory, manifest })).toThrow(/asset set/);
     fs.rmSync(directory, { recursive: true, force: true });

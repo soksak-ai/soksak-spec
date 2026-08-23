@@ -1,6 +1,31 @@
 {
-  "contract": { "id": "terminal-contract", "version": "0.0.1" },
-  "source": { "repository": "https://github.com/example/terminal-contract", "commit": "dddddddddddddddddddddddddddddddddddddddd" },
-  "artifacts": [{ "target": "any", "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.tgz", "size": 12345, "sha256": "5555555555555555555555555555555555555555555555555555555555555555", "format": "tgz", "manifest": "contract.json" }],
-  "reports": [{ "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.conformance.json", "sha256": "6666666666666666666666666666666666666666666666666666666666666666" }]
+  "kind": "contract",
+  "id": "terminal-contract",
+  "version": "0.0.1",
+  "manifest": {
+    "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/contract.json",
+    "size": 26,
+    "sha256": "50fcaa07400660d605f5d98e22c15bc2d94f2522b660ac65d703c1c7a3f7c7cd"
+  },
+  "source": {
+    "repository": "https://github.com/example/terminal-contract",
+    "commit": "dddddddddddddddddddddddddddddddddddddddd"
+  },
+  "artifacts": [
+    {
+      "target": "any",
+      "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/terminal-contract-0.0.1.tgz",
+      "size": 12345,
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "format": "tgz",
+      "manifest": "contract.json"
+    }
+  ],
+  "evidence": [
+    {
+      "url": "https://github.com/example/terminal-contract/releases/download/v0.0.1/contract-release.conformance.json",
+      "size": 12345,
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
 }

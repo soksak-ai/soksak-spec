@@ -120,14 +120,14 @@ describe("public plugin, sidecar, and kit identity source", () => {
     expect(parseManifest(raw, "weather").validation.ok).toBe(false);
   });
 
-  it("uses exact 0.0.1 plugin dependencies in the current owner manifest", () => {
-    const manifest = (range: string) => ({
+  it("uses exact immutable plugin runtime dependencies", () => {
+    const manifest = (version: string) => ({
       id: "weather",
       name: "Weather",
       version: "1.0.0",
       appVersionRequirement: "0.0.1",
       description: "Weather plugin",
-      dependencies: { "weather-data": range },
+      runtimeDependencies: { plugins: [{ id: "weather-data", version, url: `https://github.com/example/weather-data/releases/download/v${version}/release.json`, size: 1, sha256: "a".repeat(64) }] },
       permissions: [],
       contributes: {},
     });

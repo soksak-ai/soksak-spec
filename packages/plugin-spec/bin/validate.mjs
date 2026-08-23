@@ -6,7 +6,7 @@ import { readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
   C2_STATIC_ENFORCEMENT,
-  certifyRegistryIndex,
+  certifyRegistry,
   parseConformanceReport,
   parseManifest,
   parseRegistryPublicKey,
@@ -267,7 +267,7 @@ async function validateRegistry(args) {
     printErrors(publicKeyPath, publicKey.errors);
     return 1;
   }
-  const certified = await certifyRegistryIndex(registryDocument.raw, {
+  const certified = await certifyRegistry(registryDocument.raw, {
     expectedRegistryId,
     expectedKeyId,
     publicKey: publicKey.value,
@@ -279,7 +279,7 @@ async function validateRegistry(args) {
     return 1;
   }
   console.log(
-    `✓ ${registryPath} (registry=${certified.value.index.id} sequence=${certified.value.index.sequence} digest=${certified.value.digest} continuity=${certified.value.continuity})`,
+    `✓ ${registryPath} (registry=${certified.value.registry.id} sequence=${certified.value.registry.sequence} digest=${certified.value.digest} continuity=${certified.value.continuity})`,
   );
   return 0;
 }

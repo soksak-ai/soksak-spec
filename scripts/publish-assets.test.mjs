@@ -15,22 +15,25 @@ function sha256(bytes) {
 }
 
 function fixture() {
-  const version = "0.0.18";
+  const version = "0.0.19";
   const directory = mkdtempSync(join(tmpdir(), "soksak-spec-publish-"));
   const archiveName = `soksak-ai-plugin-spec-${version}.tgz`;
   const archive = Buffer.from(`spec-${version}`);
   const tag = `v${version}`;
   const manifestName = "soksak-spec-release.json";
-  const reports = ["conformance-manifest.json", "conformance-release.json"].map((name) => {
+  const specManifest = Buffer.from('{}\n');
+  writeFileSync(join(directory, "spec.json"), specManifest);
+  const evidence = ["conformance-manifest.json", "conformance-release.json"].map((name) => {
     const bytes = Buffer.from(name);
     writeFileSync(join(directory, name), bytes);
-    return { url: `https://github.com/${repository}/releases/download/${tag}/${name}`, sha256: sha256(bytes) };
+    return { url: `https://github.com/${repository}/releases/download/${tag}/${name}`, size: bytes.length, sha256: sha256(bytes) };
   });
   const manifest = {
-    spec: { id: "soksak-spec", version },
+    kind: "spec", id: "soksak-spec", version,
+    manifest: { url: `https://github.com/${repository}/releases/download/${tag}/spec.json`, size: specManifest.length, sha256: sha256(specManifest) },
     source: { repository: `https://github.com/${repository}`, commit },
     artifacts: [{ target: "any", url: `https://github.com/${repository}/releases/download/${tag}/${archiveName}`, size: archive.length, sha256: sha256(archive), format: "tgz", manifest: "spec.json" }],
-    reports,
+    evidence,
   };
   writeFileSync(join(directory, archiveName), archive);
   writeFileSync(join(directory, manifestName), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -47,7 +50,7 @@ test("release assets and tag are derived from the verified owner manifest", (con
     manifest: join(value.directory, value.manifestName),
   });
   assert.equal(result.tag, value.tag);
-  assert.deepEqual(result.assets.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json", value.archiveName, value.manifestName]);
+  assert.deepEqual(result.assets.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json", value.archiveName, value.manifestName, "spec.json"]);
 });
 
 test("asset collection fails closed on undeclared or changed files", (context) => {

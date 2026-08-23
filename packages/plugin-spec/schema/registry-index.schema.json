@@ -1,26 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:soksak:spec:registry:0.0.1",
-  "title": "soksak signed plugin registry 0.0.1",
+  "title": "Authenticated Soksak plugin registry",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "sequence", "plugins", "sidecars", "kits", "contracts", "specs", "issuedAt", "expiresAt", "algorithm", "keyId", "signature"],
+  "required": ["id", "sequence", "issuedAt", "expiresAt", "plugins", "signature"],
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
-    "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-    "plugins": { "type": "array", "uniqueItems": true, "items": { "allOf": [{ "$ref": "urn:soksak:spec:release:0.0.1" }, { "type": "object", "properties": { "plugin": true }, "required": ["plugin"] }] } },
-    "sidecars": { "type": "array", "uniqueItems": true, "items": { "allOf": [{ "$ref": "urn:soksak:spec:release:0.0.1" }, { "type": "object", "properties": { "sidecar": true }, "required": ["sidecar"] }] } },
-    "kits": { "type": "array", "uniqueItems": true, "items": { "allOf": [{ "$ref": "urn:soksak:spec:release:0.0.1" }, { "type": "object", "properties": { "kit": true }, "required": ["kit"] }] } },
-    "contracts": { "type": "array", "uniqueItems": true, "items": { "allOf": [{ "$ref": "urn:soksak:spec:release:0.0.1" }, { "type": "object", "properties": { "contract": true }, "required": ["contract"] }] } },
-    "specs": { "type": "array", "uniqueItems": true, "items": { "allOf": [{ "$ref": "urn:soksak:spec:release:0.0.1" }, { "type": "object", "properties": { "spec": true }, "required": ["spec"] }] } },
-    "issuedAt": { "$ref": "#/$defs/timestamp" },
-    "expiresAt": { "$ref": "#/$defs/timestamp" },
-    "algorithm": { "const": "ed25519" },
-    "keyId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
-    "signature": { "type": "string", "pattern": "^(?:[A-Za-z0-9+/]{4}){21}[A-Za-z0-9+/]{2}==$" }
-  },
-  "$defs": {
-    "timestamp": { "type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
-    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" }, "version": { "const": "0.0.1" } } }
+    "sequence": { "type": "integer", "minimum": 1 },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "plugins": { "type": "array", "items": { "$ref": "urn:soksak:spec:release:0.0.1#/$defs/reference" } },
+    "signature": { "type": "object", "additionalProperties": false, "required": ["algorithm", "keyId", "value"], "properties": { "algorithm": { "const": "ed25519" }, "keyId": { "type": "string" }, "value": { "type": "string" } } }
   }
 }

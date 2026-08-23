@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  ID, INTERFACE, REPOSITORY, TAG, VERSION,
+  ID, INTERFACE, REPOSITORY, SIDECAR, TAG, VERSION,
   assertBaseline, assertCommit, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
   parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
 } from "./release-contract.mjs";
@@ -64,22 +64,25 @@ const report = (claim) => ({
   validator: { name: "soksak-validate", version: VERSION },
   artifacts: evidence,
 });
-const reports = [
+const evidenceFiles = [
   ["conformance-interface.json", report({ contract: INTERFACE })],
   ["conformance-release.json", report({ release: true })],
   ["conformance-sidecar.json", report({ manifest: true })],
 ].map(([name, value]) => {
   const bytes = jsonBytes(value);
-  return { name, bytes, reference: { url: `${REPOSITORY}/releases/download/${TAG}/${name}`, sha256: sha256(bytes) } };
+  return { name, bytes, reference: { url: `${REPOSITORY}/releases/download/${TAG}/${name}`, size: bytes.length, sha256: sha256(bytes) } };
 });
+const manifestBytes = jsonBytes(SIDECAR);
 const release = {
   ...releaseIdentity(options.commit),
+  manifest: { url: `${REPOSITORY}/releases/download/${TAG}/sidecar.json`, size: manifestBytes.length, sha256: sha256(manifestBytes) },
   artifacts,
-  reports: reports.map(({ reference }) => reference),
+  evidence: evidenceFiles.map(({ reference }) => reference),
 };
 const releaseBytes = jsonBytes(release);
+writeRegularFile(path.join(out, "sidecar.json"), manifestBytes);
 writeRegularFile(path.join(out, "release.json"), releaseBytes);
-for (const item of reports) writeRegularFile(path.join(out, item.name), item.bytes);
+for (const item of evidenceFiles) writeRegularFile(path.join(out, item.name), item.bytes);
 
 // The one machine-readable line — a sentinel prefix so the caller extracts it regardless of any
 // other output. Carries exactly what the handler would otherwise re-derive from the written files.

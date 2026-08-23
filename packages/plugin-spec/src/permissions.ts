@@ -19,7 +19,7 @@ export type PluginPermission =
   | "commands:inject" // danger:"inject" 명령 실행(term.send/exec, browser.eval …)
   | "process" // 외부 서브프로세스 spawn + 양방향 raw stdio(범용 — LSP/MCP/ACP/임의 CLI 통합)
   | "webview" // 코어가 임베드한 child webview(WKWebView) 구동 — 브라우저류 콘텐츠 뷰(네이티브 페이지 로드·eval·inject)
-  | "sidecar" // 공유 네이티브 엔진 모듈(dylib)을 앱 프로세스에 로드 + 불투명 채널(sidecars[] 선언 필수 — docs/SIDECARS.md)
+  | "sidecar" // runtimeDependencies에 고정된 Sidecar와 불투명 채널로 통신
   | "service" // 상주 plugin service — 코어가 스폰·라우팅하는 커맨드 소유 프로세스(service 선언 필수 — docs/PLUGIN-SERVICE.md)
   | "storage" // 전용 저장소(~/.soksak/plugins-data/<id>/)
   | "data" // 범용 임베디드 DB(app.data — 네임스페이스 격리·CJK 검색·전 창 watch)
@@ -129,7 +129,7 @@ export const PERMISSION_INFO: Record<
   sidecar: {
     label: "네이티브 엔진 모듈 로드",
     detail:
-      "공유 네이티브 엔진 모듈(사이드카 dylib)을 앱 프로세스 안에 로드하고 메시지를 주고받습니다(네이티브 코드 실행 — 가장 강력한 부류). 매니페스트 sidecars[] 에 선언된 모듈만 열 수 있습니다.",
+      "매니페스트 runtimeDependencies에 공개된 Sidecar 구성요소와 메시지를 주고받습니다. 정확히 고정된 Sidecar만 열 수 있습니다.",
     caution: true,
   },
   service: {

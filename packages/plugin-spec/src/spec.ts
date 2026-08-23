@@ -68,6 +68,8 @@ import { SEMVER_RE } from "./semver.js";
 export * from "./semver.js";
 import { COMPONENT_ID_RE } from "./release-primitives.js";
 export * from "./release-primitives.js";
+export * from "./distribution.js";
+import { parseRuntimeDependencies, type RuntimeDependencies } from "./distribution.js";
 export * from "./release.js";
 export * from "./installation.js";
 export * from "./sidecar.js";
@@ -261,11 +263,6 @@ export type ReachStrategy =
 // 사이드카(engine 모델) 의존 선언 — 플러그인이 열 공유 네이티브 모듈. name 은 사이드카 이름
 // (soksak-sidecar-<name> 의 <name>), interface 는 계약 요구 `{ id, requirement }`.
 // 로드 시 바이너리 자기보고(soksak_sidecar_abi)와 대조 — 불일치는 거부(선언≡실물). 정본 docs/SIDECARS.md.
-export interface SidecarDep {
-  name: string; // ^[a-z0-9][a-z0-9-]*$
-  interface: ContractRequirement;
-}
-
 export interface LibraryDep {
   name: string; // identity — 패키지/도구 식별(예: "@google/gemini-cli")
   bin: string; // PATH/probe 대상 실행 bin
@@ -334,15 +331,10 @@ export interface PluginManifest {
   requiresNativeChildWebview?: boolean;
   requiresEngineModules?: boolean;
   template?: boolean; // true = 개발 템플릿(읽기 전용). 활성화 대상이 아니다 — 목록·상세만 노출하고 토글을 주지 않는다.
-  // 플러그인↔플러그인 의존(라이브러리 플러그인). pluginId → semver 범위(예: "^0.1.0").
-  // 설치 시 미설치 의존을 전이적으로 동반 설치(동의 게이트), 삭제 시 의존자 cascade(고아 방지).
-  // 코어 권한(permissions)과 별개 축 — 이건 다른 플러그인에 대한 의존. 범용(어떤 플러그인↔플러그인).
-  dependencies?: Record<string, string>;
+  runtimeDependencies?: RuntimeDependencies;
   // 외부 CLI/라이브러리 종속성 — 동의 후 미설치면 강제 설치. dependencies(플러그인↔플러그인)와 별개 축.
   libraries?: LibraryDep[];
-  // 사이드카(engine 모듈) 의존 — 선언된 것만 app.sidecar.open 가능. "sidecar" 권한 필수.
-  sidecars?: SidecarDep[];
-  // plugin service 선언(제3 실행 형태 — 규범 docs/PLUGIN-SERVICE.md). sidecar 는 sidecars[]
+  // plugin service 선언(제3 실행 형태 — 규범 docs/PLUGIN-SERVICE.md). sidecar 는 runtimeDependencies.sidecars
   // 의 상주 바이너리 참조, interface 는 와이어 계약 id(PS5·PS6). "service" 권한 필수.
   service?: ServiceDecl;
   // 이 플러그인이 구현하는 계약 선언(C3 L2 계약-핀) — 각 항목은 exact `{ id, version }` provider.
@@ -463,7 +455,6 @@ const VIEW_ID_RE = /^[a-z0-9][a-z0-9-]*$/;
 // 뷰 상태 코드(ViewStatus.code — 기계 식별자) — id 와 같은 lexical 계열.
 const STATUS_CODE_RE = /^[a-z0-9][a-z0-9-]*$/;
 // 사이드카 이름(soksak-sidecar-<name> 의 <name>) — 경로 조립에 쓰이므로 traversal 안전 형식.
-const SIDECAR_NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 // 사이드카 interface 도 계약 요구 `{ id, requirement }`다 — 별도 정규식 없이
 // CONTRACT_ID_RE 로 검증한다. wire 축이 하나의 계약 id 문법으로 수렴(NAMING §8).
 const COMMAND_NAME_RE = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
@@ -601,9 +592,8 @@ export function parseManifest(
       "requiresNativeChildWebview",
       "requiresEngineModules",
       "template",
-      "dependencies",
+      "runtimeDependencies",
       "libraries",
-      "sidecars",
       "service",
       "implements",
       "consumes",
@@ -646,28 +636,15 @@ export function parseManifest(
     errors.push("template: true/false 여야 함");
   }
 
-  // dependencies: 런타임 플러그인 관계/호출 권한(pluginId → semver 범위). locator나 설치 source가
-  // 아니다. owner release의 kind:plugin dependency projection과 정확히 같아야 하고, 설치 closure는
-  // release manifest만 소유한다. 선택. 자기 의존 금지·빈 객체 무해.
-  const dependencies: Record<string, string> = {};
-  if (raw.dependencies !== undefined) {
-    if (!isRecord(raw.dependencies)) {
-      errors.push("dependencies: 객체(pluginId → semver 범위)여야 함");
-    } else {
-      for (const [depId, version] of Object.entries(raw.dependencies)) {
-        if (!PLUGIN_ID_RE.test(depId)) {
-          errors.push(`dependencies: 키 "${depId}" 는 플러그인 id 형식(^[a-z0-9][a-z0-9-]*$)`);
-        } else if (isNonEmptyString(raw.id) && depId === raw.id) {
-          errors.push(`dependencies: 자기 자신("${depId}") 의존 금지`);
-        } else if (version !== "0.0.1") {
-          errors.push(
-            `dependencies["${depId}"]: exact 0.0.1 required`,
-          );
-        } else {
-          dependencies[depId] = version;
-        }
-      }
-    }
+  let runtimeDependencies: RuntimeDependencies | undefined;
+  if (raw.runtimeDependencies !== undefined) {
+    const parsed = parseRuntimeDependencies(raw.runtimeDependencies);
+    if (parsed.ok) {
+      runtimeDependencies = parsed.value;
+      if (parsed.value.plugins?.some((dependency) => dependency.id === raw.id)) errors.push("runtimeDependencies.plugins: self dependency forbidden");
+      const permissions = (raw.permissions as unknown[] | undefined) ?? [];
+      if (parsed.value.sidecars && !permissions.includes("sidecar") && !permissions.includes("process")) errors.push('runtimeDependencies.sidecars: "sidecar" or "process" permission required');
+    } else errors.push(...parsed.errors);
   }
 
   // libraries: 외부 CLI/라이브러리 종속성(name·bin·install). 선택. 동의 후 미설치면 강제 설치.
@@ -766,44 +743,6 @@ export function parseManifest(
         libraries.push(lib);
       });
       checkDuplicates(libraries.map((l) => l.bin), "libraries[].bin", errors);
-    }
-  }
-
-  // sidecars: 사이드카(engine 모듈) 의존 선언(선택). 선언된 것만 app.sidecar.open 가능(코어가
-  // 로드 시 interface 를 바이너리 자기보고와 대조). "sidecar" 권한 필수. 정본 docs/SIDECARS.md.
-  const sidecars: SidecarDep[] = [];
-  if (raw.sidecars !== undefined) {
-    if (!Array.isArray(raw.sidecars)) {
-      errors.push("sidecars: 배열(사이드카 의존 선언)이어야 함");
-    } else {
-      raw.sidecars.forEach((item, i) => {
-        if (!isRecord(item)) {
-          errors.push(`sidecars[${i}]: 객체여야 함`);
-          return;
-        }
-        checkKnownKeys(item, ["name", "interface"], `sidecars[${i}]`, errors);
-        if (!isNonEmptyString(item.name) || !SIDECAR_NAME_RE.test(item.name)) {
-          errors.push(`sidecars[${i}].name: ^[a-z0-9][a-z0-9-]*$ 필수`);
-          return;
-        }
-        const interfaceRef = parseContractRequirement(
-          item.interface,
-          `sidecars[${i}].interface`,
-          errors,
-          SIDECAR_CONTRACT_ID_RE,
-        );
-        if (!interfaceRef) return;
-        sidecars.push({ name: item.name.trim(), interface: interfaceRef });
-      });
-      checkDuplicates(sidecars.map((s) => s.name), "sidecars[].name", errors);
-      // 사이드카는 두 모델로 소비된다(SIDECARS.md §1): engine 모델은 앱 프로세스에 dlopen
-      // (app.sidecar → "sidecar" 권한), service 모델은 별도 프로세스로 스폰(app.process →
-      // "process" 권한, 예: soksak-sidecar-terminal). sidecars[] 선언은 둘 중 어느 소비 권한이든
-      // 있으면 정합이다 — 실제 채널 게이트는 app.sidecar/app.process 가 각자 권한으로 따로 건다.
-      const perms = (raw.permissions as unknown[] | undefined) ?? [];
-      if (sidecars.length > 0 && !perms.includes("sidecar") && !perms.includes("process")) {
-        errors.push('sidecars: "sidecar"(engine 모델) 또는 "process"(service 모델) 권한 선언 필요');
-      }
     }
   }
 
@@ -1447,7 +1386,7 @@ export function parseManifest(
         fileViewers: fileViewers.length,
         iconSets: iconSets.length,
       },
-      sidecarNames: sidecars.map((s) => s.name),
+      sidecars: runtimeDependencies?.sidecars ?? [],
       permissions,
       entryIsNull: entry === null,
     },
@@ -1470,9 +1409,8 @@ export function parseManifest(
       ...(raw.requiresNativeChildWebview === true ? { requiresNativeChildWebview: true } : {}),
       ...(raw.requiresEngineModules === true ? { requiresEngineModules: true } : {}),
       ...(raw.template === true ? { template: true } : {}),
-      ...(Object.keys(dependencies).length > 0 ? { dependencies } : {}),
+      ...(runtimeDependencies ? { runtimeDependencies } : {}),
       ...(libraries.length > 0 ? { libraries } : {}),
-      ...(sidecars.length > 0 ? { sidecars } : {}),
       ...(service !== undefined ? { service } : {}),
       ...(implementsIds.length > 0 ? { implements: implementsIds } : {}),
       ...(consumesIds.length > 0 ? { consumes: consumesIds } : {}),

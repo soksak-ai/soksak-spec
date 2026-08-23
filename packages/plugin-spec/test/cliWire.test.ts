@@ -58,7 +58,7 @@ describe("soksak-validate public wire modes", () => {
   it("certifies a registry only with an explicit trust root and time", () => {
     const valid = run(
       "registry",
-      join(FIXTURES, "registry-signed.json"),
+      join(FIXTURES, "registry.json"),
       "--public-key",
       join(FIXTURES, "registry-public-key.json"),
       "--registry-id",
@@ -71,7 +71,7 @@ describe("soksak-validate public wire modes", () => {
     expect(valid.status, valid.stderr).toBe(0);
     expect(valid.stdout).toContain("sequence=42");
 
-    const noTrustRoot = run("registry", join(FIXTURES, "registry-signed.json"));
+    const noTrustRoot = run("registry", join(FIXTURES, "registry.json"));
     expect(noTrustRoot.status).toBe(2);
   });
 

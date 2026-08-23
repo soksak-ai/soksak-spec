@@ -114,7 +114,7 @@ const report = (claim) => ({
   validator: { name: "soksak-conformance", version: VERSION },
   artifacts: [{ target: "any", sha256: artifactSha256 }],
 });
-const reports = [
+const evidenceFiles = [
   ["conformance-plugin.json", report({ manifest: true })],
   ["conformance-release.json", report({ release: true })],
   ...(plugin.implements ?? []).map((contract, index) => [
@@ -123,18 +123,21 @@ const reports = [
   ]),
 ].map(([name, value]) => {
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-  return { name, value, bytes, reference: { url: `${REPOSITORY}/releases/download/${tag}/${name}`, sha256: sha256(bytes) } };
+  return { name, value, bytes, reference: { url: `${REPOSITORY}/releases/download/${tag}/${name}`, size: bytes.length, sha256: sha256(bytes) } };
 });
 const release = {
-  plugin: { id: ID, version: VERSION },
+  kind: "plugin", id: ID, version: VERSION,
+  manifest: { url: `${REPOSITORY}/releases/download/${tag}/plugin.json`, size: manifestBytes.length, sha256: sha256(manifestBytes) },
   source: { repository: REPOSITORY, commit },
   artifacts: [artifact],
-  reports: reports.map(({ reference }) => reference).sort((left, right) => left.url.localeCompare(right.url)),
+  ...(plugin.runtimeDependencies ? { runtimeDependencies: plugin.runtimeDependencies } : {}),
+  evidence: evidenceFiles.map(({ reference }) => reference).sort((left, right) => left.url.localeCompare(right.url)),
 };
 const releaseBytes = Buffer.from(`${JSON.stringify(release, null, 2)}\n`);
 
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(path.join(outDir, archiveName), archive);
+fs.writeFileSync(path.join(outDir, "plugin.json"), manifestBytes);
 fs.writeFileSync(path.join(outDir, "release.json"), releaseBytes);
-for (const item of reports) fs.writeFileSync(path.join(outDir, item.name), item.bytes);
+for (const item of evidenceFiles) fs.writeFileSync(path.join(outDir, item.name), item.bytes);
 console.log(JSON.stringify({ archive: archiveName, sha256: artifactSha256 }));

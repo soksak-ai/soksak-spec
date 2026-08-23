@@ -118,7 +118,14 @@ does not silently change the component and runtime-interface versions validated 
 <!-- example:spec-correction-release:release -->
 ```json
 {
-  "spec": { "id": "soksak-spec", "version": "0.0.9" },
+  "kind": "spec",
+  "id": "soksak-spec",
+  "version": "0.0.9",
+  "manifest": {
+    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/spec.json",
+    "size": 256,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
   "source": {
     "repository": "https://github.com/soksak-ai/soksak-spec",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -133,7 +140,11 @@ does not silently change the component and runtime-interface versions validated 
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
-  "reports": []
+  "evidence": [{
+    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/conformance-release.json",
+    "size": 512,
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }]
 }
 ```
 
@@ -144,8 +155,8 @@ interfaces at `0.0.1`. A package correction is not evidence that those contracts
 
 <!-- rule:plugin-sidecar-interface -->
 
-A plugin names the interface it needs, not a provider repository. The environment selects a provider.
-The selected sidecar must provide the same interface ID at an accepted version.
+A plugin pins the exact immutable sidecar release it installs. The sidecar manifest and conformance
+evidence own the provided interface; there is no provider selection or fallback at install time.
 
 <!-- example:terminal-plugin-valid:valid-plugin -->
 ```json
@@ -159,15 +170,17 @@ The selected sidecar must provide the same interface ID at an accepted version.
   "implements": [
     { "id": "soksak-spec-plugin-terminal", "version": "0.0.1" }
   ],
-  "sidecars": [
+  "runtimeDependencies": {
+    "sidecars": [
     {
-      "name": "terminal",
-      "interface": {
-        "id": "soksak-spec-sidecar-terminal",
-        "requirement": "0.0.1"
-      }
+      "id": "terminal-provider",
+      "version": "0.0.1",
+      "url": "https://github.com/example/terminal-provider/releases/download/v0.0.1/release.json",
+      "size": 12345,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
-  ]
+    ]
+  }
 }
 ```
 
@@ -240,13 +253,20 @@ development flag or installed document duplicates it.
 
 <!-- rule:release-install-separation -->
 
-A release records what was published. It does not restate runtime relationships or build
-dependencies.
+A release records published bytes and projects exact runtime dependencies. Build dependencies
+remain solely in the language package manifest and lockfile.
 
 <!-- example:plugin-release-valid:release -->
 ```json
 {
-  "plugin": { "id": "example-plugin", "version": "0.0.1" },
+  "kind": "plugin",
+  "id": "example-plugin",
+  "version": "0.0.1",
+  "manifest": {
+    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/plugin.json",
+    "size": 256,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
   "source": {
     "repository": "https://github.com/soksak-ai/example-plugin",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -261,14 +281,18 @@ dependencies.
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
-  "reports": []
+  "evidence": [{
+    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/conformance-release.json",
+    "size": 512,
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }]
 }
 ```
 
 The registry publishes exact releases, dependencies, source commits, artifact URLs, sizes, and
 digests. `environment.json` is the single local state: exact selected version, registry ID,
-absolute materialized path, source kind, target where applicable, plugin activation, and provider
-selection. It does not copy repository, commit, or digest facts out of the registry.
+absolute materialized path, source kind, target where applicable, plugin activation, and exact
+installed component identities. It does not copy repository, commit, or digest facts out of the registry.
 
 The installer downloads into a transaction directory, checks size and SHA-256 before extraction,
 validates every manifest and requirement, moves all content into place, and atomically replaces
@@ -312,12 +336,12 @@ after compatibility tests, never to make a failing implementation pass.
 | External source dependencies | Package manifest and lock/checksum |
 | Published bytes | Release descriptor and attestation |
 | Discoverable releases | Registry |
-| Selected version, local path, source kind, activation, provider | `environment.json` |
+| Selected version, local path, source kind, activation | `environment.json` |
 | Download URL, source commit, artifact digest, dependencies | Registry release |
 
-The registry is the current install catalogue, not release history. Each release-kind array holds
-at most one current release per component id. Git history and immutable owner releases retain older
-versions.
+The registry is the current plugin catalogue, not release history. Its plugins array holds one
+current release per plugin id. Sidecars appear only as exact runtime dependencies of a plugin. Git
+history and immutable owner releases retain older versions.
 
 There is no public unit, dependency scope, installation profile, dependency closure, composition
 graph, execution graph, or deployment graph. Temporary local validation data is not a stored

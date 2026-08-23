@@ -12,6 +12,7 @@ import {
   isNonEmptyString,
   isRecord,
 } from "./util.js";
+import type { ExactReference } from "./release.js";
 
 // 코어가 말하는 plugin service 와이어 계약(PS5·PS6). Rust 측 단일진실은
 // soksak-spec-service 크레이트 — 이 상수는 TS 표면 미러이며 교차언어 골든 테스트가
@@ -60,10 +61,10 @@ export const SERVICE_COMMAND_KEYS = [
   "returns",
 ] as const;
 
-// 서비스 선언(PS1·PS5·PS9·PS15) — sidecar 는 sidecars[] 의 상주 바이너리 참조,
+// 서비스 선언(PS1·PS5·PS9·PS15) — sidecar 는 runtimeDependencies.sidecars 의 exact identity,
 // interface 는 와이어 계약 id, subscribe 는 코어가 브리지해 push 할 bus 토픽.
 export interface ServiceDecl {
-  sidecar: string;
+  sidecar: ExactReference;
   interface: ContractRequirement;
   subscribe: string[];
 }
@@ -118,14 +119,16 @@ export function parseServiceDecl(
 ): ServiceDecl | undefined {
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) {
-    errors.push("service: 객체({ sidecar, interface, subscribe? })여야 함");
+    errors.push("service: object with sidecar, interface, and optional subscribe required");
     return undefined;
   }
   checkKnownKeys(raw, ["sidecar", "interface", "subscribe"], "service", errors);
   let bad = false;
-  if (!isNonEmptyString(raw.sidecar) || !SERVICE_NAME_RE.test(raw.sidecar.trim())) {
-    errors.push("service.sidecar: 사이드카 이름(^[a-z0-9][a-z0-9-]*$) 필수");
+  if (!isRecord(raw.sidecar) || !isNonEmptyString(raw.sidecar.id) || !SERVICE_NAME_RE.test(raw.sidecar.id.trim()) || !isNonEmptyString(raw.sidecar.version)) {
+    errors.push("service.sidecar: exact {id, version} required");
     bad = true;
+  } else {
+    checkKnownKeys(raw.sidecar, ["id", "version"], "service.sidecar", errors);
   }
   const interfaceRef = parseContractRequirement(
     raw.interface,
@@ -149,7 +152,7 @@ export function parseServiceDecl(
   }
   if (bad) return undefined;
   return {
-    sidecar: (raw.sidecar as string).trim(),
+    sidecar: { id: (raw.sidecar as Record<string, string>).id.trim(), version: (raw.sidecar as Record<string, string>).version.trim() },
     interface: interfaceRef!,
     subscribe,
   };
@@ -340,7 +343,7 @@ function parseTrigger(raw: unknown, label: string, errors: string[]): ScheduleTr
 // PS4: entry:null ⇒ service 선언 ∧ 전 커맨드 bind:"service" ∧ 코드-필요 기여 0
 //      (views·overlays·nodes·fileViewers·iconSets — 런타임 provider 바인딩이 필요한 축).
 //      headerActions/statusItems는 host-declarative command binding이라 service command만으로 합법.
-// PS9: service.sidecar 는 sidecars[] 참조(배급·스테이징은 사이드카 법 상속).
+// PS9: service.sidecar 는 runtimeDependencies.sidecars exact identity 참조.
 // PS14: schedules ⇒ service(수명 소유자), command 는 선언 참조.
 export function validateServiceRules(
   m: {
@@ -348,7 +351,7 @@ export function validateServiceRules(
     commands: ServiceCommandView[];
     schedules: ContributedSchedule[];
     codeBoundCounts: Record<string, number>; // views/overlays/nodes/fileViewers/iconSets → 개수
-    sidecarNames: string[];
+    sidecars: ExactReference[];
     permissions: readonly string[];
     entryIsNull: boolean;
   },
@@ -366,8 +369,8 @@ export function validateServiceRules(
     if (boundOps.length === 0) {
       errors.push('service: bind:"service" 커맨드 최소 1개 필요(PS3 — 서비스는 커맨드를 소유한다)');
     }
-    if (!m.sidecarNames.includes(m.service.sidecar)) {
-      errors.push(`service.sidecar: sidecars[] 에 "${m.service.sidecar}" 선언 필요(PS9 — 배급은 사이드카 법 상속)`);
+    if (!m.sidecars.some((sidecar) => sidecar.id === m.service?.sidecar.id && sidecar.version === m.service.sidecar.version)) {
+      errors.push(`service.sidecar: runtimeDependencies.sidecars requires ${m.service.sidecar.id}@${m.service.sidecar.version}`);
     }
     if (!m.permissions.includes("service")) {
       errors.push('service: "service" 권한 선언 필요(caution — 동의 고지)');

@@ -112,8 +112,8 @@ export function collectReleaseAssets({ repository, commit, artifacts, manifest }
     return entry.name;
   });
   const conformance = actualNames.filter((name) => CONFORMANCE_RE.test(name));
-  if (conformance.length === 0) throw new Error("release must include conformance reports");
-  const expectedNames = [archiveName, basename(manifestPath), ...conformance]
+  if (conformance.length === 0) throw new Error("release must include conformance evidence");
+  const expectedNames = [archiveName, basename(manifestPath), basename(value.manifest.url), ...conformance]
     .sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
   if (new Set(expectedNames).size !== expectedNames.length) throw new Error("duplicate declared release asset");
   const sortedActual = [...actualNames].sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));

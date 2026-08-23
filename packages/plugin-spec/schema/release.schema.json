@@ -1,46 +1,34 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:soksak:spec:release:0.0.1",
-  "title": "soksak plugin, sidecar, or kit release 0.0.1",
+  "title": "Soksak component release",
   "type": "object",
   "additionalProperties": false,
-  "minProperties": 4,
-  "maxProperties": 4,
-  "required": ["source", "artifacts", "reports"],
+  "required": ["kind", "id", "version", "manifest", "source", "artifacts", "evidence"],
   "properties": {
-    "plugin": { "$ref": "#/$defs/reference" },
-    "sidecar": { "$ref": "#/$defs/reference" },
-    "kit": { "$ref": "#/$defs/reference" },
-    "contract": { "$ref": "#/$defs/reference" },
-    "spec": { "$ref": "#/$defs/reference" },
-    "source": { "$ref": "#/$defs/source" },
-    "artifacts": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/artifact" } },
-    "reports": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/integrity" } }
+    "kind": { "enum": ["plugin", "sidecar", "kit", "contract", "spec"] },
+    "id": { "$ref": "#/$defs/id" },
+    "version": { "$ref": "#/$defs/version" },
+    "manifest": { "$ref": "#/$defs/integrity" },
+    "source": { "type": "object", "additionalProperties": false, "required": ["repository", "commit"], "properties": { "repository": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" }, "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" } } },
+    "artifacts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/artifact" } },
+    "runtimeDependencies": { "$ref": "#/$defs/runtimeDependencies" },
+    "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/integrity" } }
   },
-  "not": { "type": "object", "properties": { "plugin": false, "sidecar": false, "kit": false, "contract": false, "spec": false } },
-  "dependentSchemas": {
-    "plugin": { "type": "object", "properties": { "artifacts": { "type": "array", "maxItems": 1, "items": { "$ref": "#/$defs/pluginArtifact" } } } },
-    "kit": { "type": "object", "properties": { "artifacts": { "type": "array", "maxItems": 1, "items": { "$ref": "#/$defs/kitArtifact" } } } },
-    "sidecar": { "type": "object", "properties": { "artifacts": { "type": "array", "items": { "$ref": "#/$defs/sidecarArtifact" } } } },
-    "contract": { "type": "object", "properties": { "artifacts": { "type": "array", "maxItems": 1, "items": { "$ref": "#/$defs/contractArtifact" } } } },
-    "spec": { "type": "object", "properties": { "artifacts": { "type": "array", "maxItems": 1, "items": { "$ref": "#/$defs/specArtifact" } } } }
-  },
+  "allOf": [
+    { "if": { "properties": { "kind": { "const": "plugin" } } }, "then": { "properties": { "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "plugin.json" } } } } } } },
+    { "if": { "properties": { "kind": { "const": "sidecar" } } }, "then": { "properties": { "artifacts": { "type": "array", "items": { "type": "object", "properties": { "manifest": { "const": "sidecar.json" } } } } } } },
+    { "if": { "properties": { "kind": { "const": "kit" } } }, "then": { "properties": { "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "kit.json" } } } } } } },
+    { "if": { "properties": { "kind": { "const": "contract" } } }, "then": { "properties": { "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "contract.json" } } } } } } },
+    { "if": { "properties": { "kind": { "const": "spec" } } }, "then": { "properties": { "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "spec.json" } } } } } } }
+  ],
   "$defs": {
-    "componentId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
-    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version"], "properties": { "id": { "$ref": "#/$defs/componentId" }, "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" } } },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
-    "repository": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
-    "releaseAsset": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9][A-Za-z0-9._-]{0,99}/releases/download/v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?/[a-z0-9][a-z0-9._-]{0,254}$" },
-    "source": { "type": "object", "additionalProperties": false, "required": ["repository", "commit"], "properties": { "repository": { "$ref": "#/$defs/repository" }, "commit": { "$ref": "#/$defs/commit" } } },
-    "integrity": { "type": "object", "additionalProperties": false, "required": ["url", "sha256"], "properties": { "url": { "$ref": "#/$defs/releaseAsset" }, "sha256": { "$ref": "#/$defs/sha256" } } },
-    "target": { "enum": ["any", "aarch64-apple-darwin", "aarch64-pc-windows-msvc", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"] },
-    "nativeTarget": { "enum": ["aarch64-apple-darwin", "aarch64-pc-windows-msvc", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"] },
-    "artifact": { "type": "object", "additionalProperties": false, "required": ["target", "url", "size", "sha256", "format", "manifest"], "properties": { "target": { "$ref": "#/$defs/target" }, "url": { "$ref": "#/$defs/releaseAsset" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "format": { "enum": ["tar.gz", "tgz"] }, "manifest": { "enum": ["plugin.json", "sidecar.json", "kit.json", "contract.json", "spec.json"] } } },
-    "pluginArtifact": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "plugin.json" } } }] },
-    "kitArtifact": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "kit.json" } } }] },
-    "contractArtifact": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "contract.json" } } }] },
-    "specArtifact": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "type": "object", "properties": { "target": { "const": "any" }, "manifest": { "const": "spec.json" } } }] },
-    "sidecarArtifact": { "allOf": [{ "$ref": "#/$defs/artifact" }, { "type": "object", "properties": { "target": { "$ref": "#/$defs/nativeTarget" }, "manifest": { "const": "sidecar.json" } } }] }
+    "integrity": { "type": "object", "additionalProperties": false, "required": ["url", "size", "sha256"], "properties": { "url": { "type": "string", "format": "uri" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version", "url", "size", "sha256"], "properties": { "id": { "$ref": "#/$defs/id" }, "version": { "$ref": "#/$defs/version" }, "url": { "type": "string", "format": "uri" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "runtimeDependencies": { "type": "object", "additionalProperties": false, "minProperties": 1, "properties": { "plugins": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } }, "sidecars": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } } } },
+    "artifact": { "type": "object", "additionalProperties": false, "required": ["url", "size", "sha256", "target", "format", "manifest"], "properties": { "url": { "type": "string", "format": "uri" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "target": { "type": "string" }, "format": { "enum": ["tar.gz", "tgz"] }, "manifest": { "enum": ["plugin.json", "sidecar.json", "kit.json", "contract.json", "spec.json"] } } }
   }
 }

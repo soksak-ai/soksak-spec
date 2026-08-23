@@ -177,7 +177,7 @@ function verifyArchive(path, identity) {
   return { names, packed };
 }
 
-export function buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize, identity }) {
+export function buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize, identity, manifestBytes }) {
   const version = strictSemver(identity?.version, "release identity version");
   const releaseTag = `v${version}`;
   const repository = identity.repository;
@@ -194,19 +194,20 @@ export function buildPlatformRelease({ commit, archiveName, archiveDigest, archi
     validator: { name: "soksak-conformance", version },
     artifacts: [{ target: "any", sha256: archiveDigest }],
   });
-  const reports = [
+  const evidenceFiles = [
     ["conformance-manifest.json", report({ manifest: true })],
     ["conformance-release.json", report({ release: true })],
   ].map(([name, value]) => {
     const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-    return { name, bytes, reference: { url: `${repository}/releases/download/${releaseTag}/${name}`, sha256: createHash("sha256").update(bytes).digest("hex") } };
+    return { name, bytes, reference: { url: `${repository}/releases/download/${releaseTag}/${name}`, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") } };
   });
   return {
-    spec: { id: identity.id, version },
+    kind: "spec", id: identity.id, version,
+    manifest: { url: `${repository}/releases/download/${releaseTag}/spec.json`, size: manifestBytes.length, sha256: createHash("sha256").update(manifestBytes).digest("hex") },
     source: { repository: identity.repository, commit },
     artifacts: [artifact],
-    reports: reports.map(({ reference }) => reference),
-    reportFiles: reports,
+    evidence: evidenceFiles.map(({ reference }) => reference),
+    evidenceFiles,
   };
 }
 
@@ -246,8 +247,9 @@ export function verifyRelease(argv = process.argv.slice(2)) {
       throw new Error(`unexpected archive name: ${archiveName}`);
     }
     const archiveDigest = sha256(first);
-    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize: firstBytes.length, identity });
-    const { reportFiles, ...manifest } = built;
+    const specManifestBytes = readFileSync(join(root, "packages/plugin-spec/spec.json"));
+    const built = buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize: firstBytes.length, identity, manifestBytes: specManifestBytes });
+    const { evidenceFiles, ...manifest } = built;
     const parsed = parseReleaseManifest(manifest);
     if (!parsed.ok) {
       throw new Error(`generated platform release is invalid:\n${parsed.errors.join("\n")}`);
@@ -256,8 +258,9 @@ export function verifyRelease(argv = process.argv.slice(2)) {
     const finalArchive = join(artifacts, archiveName);
     const manifestPath = join(artifacts, identity.manifest);
     copyFileSync(first, finalArchive);
+    writeFileSync(join(artifacts, "spec.json"), specManifestBytes);
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-    for (const report of reportFiles) writeFileSync(join(artifacts, report.name), report.bytes);
+    for (const item of evidenceFiles) writeFileSync(join(artifacts, item.name), item.bytes);
     if (sha256(finalArchive) !== archiveDigest) {
       throw new Error("copied release archive digest changed");
     }

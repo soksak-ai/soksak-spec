@@ -81,7 +81,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
 
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json")).toString());
     expect(release).toMatchObject({
-      plugin: { id: "soksak-plugin-example", version: "0.0.1" },
+      kind: "plugin", id: "soksak-plugin-example", version: "0.0.1",
       source: { repository: "https://github.com/soksak-ai/soksak-plugin-example", commit: COMMIT },
     });
     expect(release.artifacts[0]).toMatchObject({ target: "any", format: "tgz", sha256: out.sha256 });
@@ -99,7 +99,7 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     const report = JSON.parse(fs.readFileSync(path.join(outDir, "conformance-contract-01.json"), "utf8"));
     expect(report.claim).toEqual({ contract: { id: "soksak-spec-plugin-terminal", version: "0.0.1" } });
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    const urls = release.reports.map((item: { url: string }) => item.url);
+    const urls = release.evidence.map((item: { url: string }) => item.url);
     expect(urls).toContain(
       "https://github.com/soksak-ai/soksak-plugin-example/releases/download/v0.0.1/conformance-contract-01.json",
     );

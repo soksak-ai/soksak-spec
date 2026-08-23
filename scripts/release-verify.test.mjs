@@ -41,18 +41,19 @@ test("spec release projects the derived owner identity", () => {
   const { workspace, pluginSpec } = metadata();
   const release = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.18.tgz",
+    archiveName: "soksak-ai-plugin-spec-0.0.19.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
+    manifestBytes: Buffer.from('{}\n'),
   });
-  assert.deepEqual(release.spec, { id: "soksak-spec", version: "0.0.18" });
+  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.19" });
   assert.equal(release.source.repository, "https://github.com/soksak-ai/soksak-spec");
   assert.equal(release.source.commit, commit);
   assert.equal(release.artifacts[0].sha256, digest);
   assert.equal(release.artifacts[0].size, 81840);
   assert.equal(release.artifacts[0].manifest, "spec.json");
-  assert.equal(release.reportFiles.length, 2);
+  assert.equal(release.evidenceFiles.length, 2);
 });
 
 test("spec release identity rejects mismatched versions", () => {

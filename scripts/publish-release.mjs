@@ -125,10 +125,10 @@ export function collectReleaseAssets({ repository, commit, artifacts, manifest }
     }
     artifactNames.push(name);
   }
-  for (const report of value.reports) {
-    const name = basename(new URL(report.url).pathname);
-    const bytes = readRegularFile(join(artifactsPath, name), `conformance report ${name}`);
-    if (report.sha256 !== digest(bytes).slice("sha256:".length)) throw new Error(`conformance report digest mismatch: ${name}`);
+  for (const item of [value.manifest, ...value.evidence]) {
+    const name = basename(new URL(item.url).pathname);
+    const bytes = readRegularFile(join(artifactsPath, name), `release metadata ${name}`);
+    if (item.size !== bytes.length || item.sha256 !== digest(bytes).slice("sha256:".length)) throw new Error(`release metadata mismatch: ${name}`);
     artifactNames.push(name);
   }
   if (artifactNames.length === 0 || new Set(artifactNames).size !== artifactNames.length) {

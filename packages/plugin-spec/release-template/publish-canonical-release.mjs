@@ -44,18 +44,18 @@ export function collectCanonicalReleaseAssets({ repository, commit, artifacts, m
     throw new Error("release identity does not match repository and commit");
   }
   const expected = new Map([["release.json", null]]);
+  for (const metadata of [parsed.value.manifest, ...parsed.value.evidence]) {
+    const name = basename(new URL(metadata.url).pathname);
+    if (!ASSET_RE.test(name)) throw new Error("unsafe release metadata name");
+    const bytes = regularFile(join(directory, name), `release metadata ${name}`);
+    if (bytes.length !== metadata.size || digest(bytes) !== metadata.sha256) throw new Error(`release metadata mismatch: ${name}`);
+    expected.set(name, null);
+  }
   for (const artifact of parsed.value.artifacts) {
     const name = basename(new URL(artifact.url).pathname);
     if (!ASSET_RE.test(name)) throw new Error("unsafe release artifact name");
     const bytes = regularFile(join(directory, name), `release artifact ${name}`);
     if (bytes.length !== artifact.size || digest(bytes) !== artifact.sha256) throw new Error(`release artifact digest mismatch: ${name}`);
-    expected.set(name, null);
-  }
-  for (const report of parsed.value.reports) {
-    const name = basename(new URL(report.url).pathname);
-    if (!/^conformance-[a-z0-9-]+\.json$/.test(name)) throw new Error("invalid conformance report name");
-    const bytes = regularFile(join(directory, name), `conformance report ${name}`);
-    if (digest(bytes) !== report.sha256) throw new Error(`conformance report digest mismatch: ${name}`);
     expected.set(name, null);
   }
   const actual = readdirSync(directory, { withFileTypes: true }).map((entry) => {

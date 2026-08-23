@@ -4,7 +4,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import { parseConformanceReport } from "../src/conformanceWire.js";
-import { parseRegistryPublicKey, parseSignedRegistryIndex } from "../src/registry.js";
+import { parseRegistry, parseRegistryPublicKey } from "../src/registry.js";
 import { parseReleaseManifest } from "../src/release.js";
 
 const PACKAGE_ROOT = join(import.meta.dirname, "..");
@@ -35,14 +35,10 @@ describe("portable platform wire artifacts", () => {
     expect(registry.$id).toBe("urn:soksak:spec:registry:0.0.1");
     expect(registryPublicKey.$id).toBe("urn:soksak:spec:registry-public-key:0.0.1");
 
-    expect(release.minProperties).toBe(4);
-    expect(release.maxProperties).toBe(4);
-    expect(release.$defs.reference.properties.version.pattern).toContain("[0-9]");
-    expect(registry.properties.plugins.items.allOf[0].$ref).toBe(release.$id);
-    expect(registry.properties.sidecars.items.allOf[0].$ref).toBe(release.$id);
-    expect(registry.properties.kits.items.allOf[0].$ref).toBe(release.$id);
-    expect(registry.properties.contracts.items.allOf[0].$ref).toBe(release.$id);
-    expect(registry.properties.specs.items.allOf[0].$ref).toBe(release.$id);
+    expect(release.required).toContain("evidence");
+    expect(release.$defs.reference.properties.version.$ref).toContain("version");
+    expect(registry.properties.plugins.items.$ref).toContain("reference");
+    expect(registry.properties).not.toHaveProperty("sidecars");
     expect(registry.properties).not.toHaveProperty(["un", "its"].join(""));
   });
 
@@ -61,7 +57,7 @@ describe("portable platform wire artifacts", () => {
     ]) {
       expect(parseConformanceReport(json(join(FIXTURES, name))).ok, name).toBe(true);
     }
-    expect(parseSignedRegistryIndex(json(join(FIXTURES, "registry-signed.json"))).ok).toBe(true);
+    expect(parseRegistry(json(join(FIXTURES, "registry.json"))).ok).toBe(true);
     expect(parseRegistryPublicKey(json(join(FIXTURES, "registry-public-key.json"))).ok).toBe(true);
   });
 
@@ -94,7 +90,7 @@ describe("portable platform wire artifacts", () => {
       expect(valid, `${name}: ${JSON.stringify(validators.conformance.errors)}`).toBe(true);
     }
     expect(
-      validators.registry(json(join(FIXTURES, "registry-signed.json")),),
+      validators.registry(json(join(FIXTURES, "registry.json")),),
       JSON.stringify(validators.registry.errors),
     ).toBe(true);
     expect(
@@ -108,8 +104,7 @@ describe("portable platform wire artifacts", () => {
     addFormats(ajv);
     const validate = ajv.compile(json(join(SCHEMAS, "release.schema.json")));
     const generic = json(join(FIXTURES, "release-plugin.json"));
-    delete generic.plugin;
-    Object.assign(generic, { kind: "plugin", id: "weather-plugin", version: "0.0.1" });
+    generic.plugin = { id: generic.id, version: generic.version };
     expect(validate(generic)).toBe(false);
     const wrongManifest = json(join(FIXTURES, "release-plugin.json"));
     wrongManifest.artifacts[0].manifest = "sidecar.json";
