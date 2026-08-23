@@ -4,6 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   buildPlatformRelease,
+  projectPackageToolchain,
   resolveSourceCommit,
   specReleaseIdentity,
   validateArchiveEntries,
@@ -41,13 +42,13 @@ test("spec release projects the derived owner identity", () => {
   const { workspace, pluginSpec } = metadata();
   const release = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.25.tgz",
+    archiveName: "soksak-ai-plugin-spec-0.0.26.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
     manifestBytes: Buffer.from('{}\n'),
   });
-  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.25" });
+  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.26" });
   assert.equal(release.source.repository, "https://github.com/soksak-ai/soksak-spec");
   assert.equal(release.source.commit, commit);
   assert.equal(release.artifacts[0].sha256, digest);
@@ -69,6 +70,18 @@ test("spec release identity rejects mismatched versions", () => {
   assert.throws(
     () => specReleaseIdentity(mismatchedWorkspace, pluginSpec),
     /must both equal/,
+  );
+});
+
+test("the public package projects the workspace toolchain owner", () => {
+  const { workspace, pluginSpec } = metadata();
+  const projected = projectPackageToolchain(workspace, pluginSpec);
+  assert.deepEqual(projected.engines, { node: "26.7.0" });
+  assert.equal(projected.packageManager, "pnpm@11.22.0");
+  assert.equal(pluginSpec.engines, undefined);
+  assert.throws(
+    () => projectPackageToolchain({ ...workspace, engines: { node: "latest" } }, pluginSpec),
+    /Node toolchain must be exact/,
   );
 });
 

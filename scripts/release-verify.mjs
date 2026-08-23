@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   copyFileSync,
   mkdirSync,
   readFileSync,
@@ -75,6 +76,20 @@ export function specReleaseIdentity(workspace, pluginSpec) {
   };
 }
 
+export function projectPackageToolchain(workspace, pluginSpec) {
+  if (!/^\d+\.\d+\.\d+$/.test(workspace?.engines?.node ?? "")) {
+    throw new Error("workspace Node toolchain must be exact");
+  }
+  if (!/^pnpm@\d+\.\d+\.\d+$/.test(workspace?.packageManager ?? "")) {
+    throw new Error("workspace pnpm toolchain must be exact");
+  }
+  return {
+    ...pluginSpec,
+    engines: { node: workspace.engines.node },
+    packageManager: workspace.packageManager,
+  };
+}
+
 export function resolveSourceCommit(explicit, checkoutHead = tryRun(
   "git",
   ["rev-parse", "--verify", "HEAD"],
@@ -139,15 +154,24 @@ function exactCargoVersion(path, expected) {
   }
 }
 
-function packOnce(destination) {
+function packOnce(destination, workspace) {
   mkdirSync(destination, { recursive: true });
-  run("pnpm", [
-    "--filter",
-    "@soksak-ai/plugin-spec",
-    "pack",
-    "--pack-destination",
-    destination,
-  ]);
+  const source = join(root, "packages/plugin-spec");
+  const staging = join(dirname(destination), `${basename(destination)}-source`);
+  rmSync(staging, { recursive: true, force: true });
+  cpSync(source, staging, {
+    recursive: true,
+    preserveTimestamps: true,
+    filter: (path) => path !== join(source, "node_modules") && !path.startsWith(`${join(source, "node_modules")}/`),
+  });
+  const manifestPath = join(staging, "package.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  writeFileSync(manifestPath, `${JSON.stringify(projectPackageToolchain(workspace, manifest), null, 2)}\n`);
+  try {
+    run("pnpm", ["pack", "--pack-destination", destination], { cwd: staging });
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
   const archives = readdirSync(destination).filter((name) => name.endsWith(".tgz"));
   if (archives.length !== 1) {
     throw new Error(`expected one plugin-spec archive, found: ${archives.join(", ")}`);
@@ -155,7 +179,7 @@ function packOnce(destination) {
   return join(destination, archives[0]);
 }
 
-function verifyArchive(path, identity) {
+function verifyArchive(path, identity, workspace) {
   const verbose = run("tar", ["-tvzf", path]).split("\n").filter(Boolean);
   const names = run("tar", ["-tzf", path]).split("\n").filter(Boolean);
   validateArchiveEntries(verbose, names);
@@ -164,9 +188,11 @@ function verifyArchive(path, identity) {
     packed.name !== identity.packageName ||
     packed.version !== identity.version ||
     packed.private !== true ||
-    packed.publishConfig !== undefined
+    packed.publishConfig !== undefined ||
+    packed.engines?.node !== workspace.engines.node ||
+    packed.packageManager !== workspace.packageManager
   ) {
-    throw new Error("packed plugin-spec identity, version, or publication policy is invalid");
+    throw new Error("packed plugin-spec identity, toolchain, or publication policy is invalid");
   }
   for (const required of [
     "package/release-template/build-portable-release.mjs",
@@ -233,15 +259,15 @@ export function verifyRelease(argv = process.argv.slice(2)) {
   rmSync(artifacts, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
   try {
-    const first = packOnce(join(work, "first"));
-    const second = packOnce(join(work, "second"));
+    const first = packOnce(join(work, "first"), workspace);
+    const second = packOnce(join(work, "second"), workspace);
     const firstBytes = readFileSync(first);
     const secondBytes = readFileSync(second);
     if (!firstBytes.equals(secondBytes)) {
       throw new Error("plugin-spec archive is not byte-reproducible");
     }
-    const { names } = verifyArchive(first, identity);
-    verifyArchive(second, identity);
+    const { names } = verifyArchive(first, identity, workspace);
+    verifyArchive(second, identity, workspace);
 
     const archiveName = basename(first);
     if (archiveName !== packageArchiveName(identity.packageName, identity.version)) {
