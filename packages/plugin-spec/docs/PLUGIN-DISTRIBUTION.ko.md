@@ -27,6 +27,8 @@ fallback은 없다. dependency가 없으면 필드와 빈 배열을 생략한다
 릴리스한다. 최종 Registry는 plugin과 직접 `runtimeDependencies`만 포함한다. 전이 dependency는
 각자의 해시 고정 release에 남는다. `installs`, `packages`, 독립 Sidecar 배열, 빌드 dependency
 catalogue는 없다.
+패키지 CLI가 `registry-verify`, `registry-build`, `registry-authenticate`를 제공하며 Registry
+저장소에는 별도 parser나 signer 구현을 두지 않는다.
 
 신뢰 공개키는 Core에 내장하며 Registry에서 받지 않는다. Core는 서명, ID, 만료, sequence,
 rollback, equivocation, 모든 release 참조와 artifact를 사용 전에 검증한다.

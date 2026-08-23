@@ -95,6 +95,8 @@ The registry workflow validates every immutable release and publishes an authent
 `registry.json`. It projects only each plugin's direct runtime dependencies; transitive
 dependencies remain in their own hash-pinned releases. There are no `installs`, `packages`,
 independent sidecar arrays, or build-dependency catalogues.
+The packaged CLI provides `registry-verify`, `registry-build`, and `registry-authenticate`; the
+registry repository contains no separate parser or signer implementation.
 
 ```json
 {

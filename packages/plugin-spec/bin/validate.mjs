@@ -2,7 +2,7 @@
 // Public, headless validation boundary. Every mode calls the same parser/verifier that
 // consumers import from dist/spec.js; the CLI does not maintain a second wire grammar.
 
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
   C2_STATIC_ENFORCEMENT,
@@ -10,22 +10,27 @@ import {
   parseConformanceReport,
   parseManifest,
   parseRegistryPublicKey,
+  parseReleaseReference,
   parseReleaseManifest,
   parseSidecarManifest,
   releaseIdentity,
   transparencyViolations,
   verifyConformanceReport,
 } from "../dist/spec.js";
+import { authenticateRegistry, buildRegistry, verifyReleaseClosure } from "../dist/registryPublication.js";
 
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
   soksak-validate release <release.json>...
   soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json> | --sidecar-manifest <sidecar.json>]
   soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id> [--at <ISO-8601>] [--high-water <sequence>:<sha256>]
+  soksak-validate registry-verify <plugins-directory>
+  soksak-validate registry-build <plugins-directory> --id <id> --sequence <n> --issued-at <RFC3339> --expires-at <RFC3339> --out <registry.json>
+  SOKSAK_REGISTRY_ED25519_SEED=<base64> soksak-validate registry-authenticate <unsigned-registry.json> --out <registry.json>
 
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
-const MODES = new Set(["plugin", "release", "conformance", "registry"]);
+const MODES = new Set(["plugin", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate"]);
 
 function usageExit(message) {
   if (message) console.error(message);
@@ -283,6 +288,48 @@ async function validateRegistry(args) {
   );
   return 0;
 }
+function registryPlugins(directory) {
+  if (!statSync(directory).isDirectory()) throw new Error("registry plugins path must be a directory");
+  return readdirSync(directory, { withFileTypes: true }).map((entry) => {
+    if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) throw new Error(`registry entry must be a regular JSON file: ${entry.name}`);
+    const value = readDocument(join(directory, entry.name)); if (!value) throw new Error(`invalid registry entry: ${entry.name}`);
+    const reference = parseReleaseReference(value.raw, `registry entry ${entry.name}`);
+    if (!reference.ok) throw new Error(reference.errors.join("; "));
+    if (entry.name !== `${reference.value.id}.json`) throw new Error(`registry filename does not match id: ${entry.name}`);
+    return reference.value;
+  }).sort((left, right) => left.id.localeCompare(right.id));
+}
+async function readRemoteRelease(reference) {
+  const response = await fetch(reference.url);
+  if (!response.ok) throw new Error(`GET ${reference.url}: ${response.status}`);
+  const declared = response.headers.get("content-length");
+  if (declared !== null && Number(declared) !== reference.size) throw new Error(`GET ${reference.url}: content length mismatch`);
+  if (!response.body) throw new Error(`GET ${reference.url}: response body missing`);
+  const reader = response.body.getReader(); const chunks = []; let size = 0;
+  for (;;) { const next = await reader.read(); if (next.done) break; size += next.value.byteLength; if (size > reference.size) { await reader.cancel(); throw new Error(`GET ${reference.url}: response exceeds declared size`); } chunks.push(next.value); }
+  const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return { bytes, value: JSON.parse(new TextDecoder().decode(bytes)) };
+}
+async function registryPublication(mode, args) {
+  if (mode === "registry-verify") {
+    if (args.length !== 1) return usageExit("registry-verify: plugins directory required");
+    const plugins = registryPlugins(args[0]); await verifyReleaseClosure(plugins, readRemoteRelease);
+    console.log(`✓ ${args[0]} (${plugins.length} plugins)`); return 0;
+  }
+  if (mode === "registry-build") {
+    const parsed = parseOptions(args, new Set(["--id", "--sequence", "--issued-at", "--expires-at", "--out"]));
+    if (!parsed.ok || parsed.positional.length !== 1) return usageExit(parsed.ok ? "registry-build: plugins directory required" : parsed.error);
+    const required = ["--id", "--sequence", "--issued-at", "--expires-at", "--out"]; if (required.some((key) => !parsed.options.has(key))) return usageExit("registry-build: all named options are required");
+    const value = await buildRegistry({ id: parsed.options.get("--id"), sequence: Number(parsed.options.get("--sequence")), issuedAt: parsed.options.get("--issued-at"), expiresAt: parsed.options.get("--expires-at"), plugins: registryPlugins(parsed.positional[0]), read: readRemoteRelease });
+    writeFileSync(parsed.options.get("--out"), `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" }); return 0;
+  }
+  const parsed = parseOptions(args, new Set(["--out"]));
+  if (!parsed.ok || parsed.positional.length !== 1 || !parsed.options.has("--out")) return usageExit(parsed.ok ? "registry-authenticate: input and --out required" : parsed.error);
+  const input = readDocument(parsed.positional[0]); if (!input) return 1;
+  const seed = process.env.SOKSAK_REGISTRY_ED25519_SEED; if (!seed) throw new Error("SOKSAK_REGISTRY_ED25519_SEED is required");
+  const value = authenticateRegistry(input.raw, seed);
+  writeFileSync(parsed.options.get("--out"), `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" }); return 0;
+}
 
 async function main(argv) {
   if (argv.includes("--help") || argv.includes("-h")) {
@@ -297,6 +344,7 @@ async function main(argv) {
   if (mode === "plugin") return validatePlugins(args);
   if (mode === "release") return validateReleases(args);
   if (mode === "conformance") return validateConformance(args);
+  if (mode.startsWith("registry-")) return registryPublication(mode, args);
   return validateRegistry(args);
 }
 
