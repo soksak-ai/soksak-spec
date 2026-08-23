@@ -151,6 +151,7 @@ test("repository owns a complete reproducible release boundary", () => {
   }
 
   const verifyWorkflow = readFileSync(".github/workflows/verify.yml", "utf8");
+  assert.doesNotMatch(verifyWorkflow, /^\s*push:/m, "release validation must not repeat on main push");
   for (const required of [
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
     "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86",
