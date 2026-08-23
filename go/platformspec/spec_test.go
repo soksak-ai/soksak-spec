@@ -5,41 +5,53 @@ import (
 	"testing"
 )
 
-func TestSettingsAndInstalledKeepSeparateFacts(t *testing.T) {
-	settings := EmptySettings()
-	settings.Plugins["demo"] = PluginPreference{Enabled: true, Providers: map[string]string{"terminal": "terminal-provider"}}
-	if err := ValidateSettings(settings); err != nil {
+func TestEnvironmentOwnsLocalMaterializationAndUserChoices(t *testing.T) {
+	environment := EmptyEnvironment()
+	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource, Registry: "official"}, Enabled: true, Providers: map[string]string{"terminal": "terminal-provider"}}
+	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
+	if err := ValidateEnvironment(environment); err != nil {
 		t.Fatal(err)
-	}
-	installed := EmptyInstalled()
-	installed.Plugins["demo"] = InstalledComponent{Version: "0.0.1", Path: "/installed/demo", RegistryID: "official", Repository: "https://github.com/example/demo", SourceCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ManifestSHA256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", ArtifactSHA256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
-	if err := ValidateInstalled(installed); err != nil {
-		t.Fatal(err)
-	}
-	body, _ := json.Marshal(map[string]any{"revision": 1, "plugins": map[string]any{"demo": map[string]any{"enabled": true, "installPath": "/installed"}}, "sidecars": map[string]any{}, "kits": map[string]any{}, "contracts": map[string]any{}, "specs": map[string]any{}})
-	if _, err := ParseSettings(body); err == nil {
-		t.Fatal("settings accepted install path")
 	}
 }
 
-func TestInstalledComponentsAcceptStrictPatchVersions(t *testing.T) {
-	installed := EmptyInstalled()
-	installed.Plugins["terminal-ghostty"] = InstalledComponent{
-		Version: "0.0.2", Path: "/installed/ghostty", RegistryID: "official",
-		Repository: "https://github.com/example/ghostty", SourceCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		ManifestSHA256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-		ArtifactSHA256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+func TestEnvironmentRejectsInvalidMaterialization(t *testing.T) {
+	for _, version := range []string{"0.0", "v0.0.2", "latest", "01.0.0"} {
+		environment := EmptyEnvironment()
+		environment.Kits["demo"] = Component{Version: version, Path: "/installed/demo", Source: RegistrySource, Registry: "official"}
+		if err := ValidateEnvironment(environment); err == nil {
+			t.Errorf("accepted version %q", version)
+		}
 	}
-	if err := ValidateInstalled(installed); err != nil {
+	for name, component := range map[string]Component{
+		"relative path":           {Version: "0.0.1", Path: "relative", Source: RegistrySource, Registry: "official"},
+		"registry missing":        {Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource},
+		"registry on development": {Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource, Registry: "official"},
+		"unknown source":          {Version: "0.0.1", Path: "/work/demo", Source: "local"},
+	} {
+		environment := EmptyEnvironment()
+		environment.Kits["demo"] = component
+		if err := ValidateEnvironment(environment); err == nil {
+			t.Errorf("accepted %s", name)
+		}
+	}
+}
+
+func TestEnvironmentIsTheOnlyLocalComponentDiscoveryDocument(t *testing.T) {
+	if EnvironmentFile != "environment.json" {
+		t.Fatalf("environment file=%q", EnvironmentFile)
+	}
+	environment := EmptyEnvironment()
+	environment.Sidecars["pty"] = Component{Version: "0.0.1", Path: "/local/pty", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
+	body, err := json.Marshal(environment)
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, version := range []string{"0.0", "v0.0.2", "latest", "01.0.0"} {
-		component := installed.Plugins["terminal-ghostty"]
-		component.Version = version
-		installed.Plugins["terminal-ghostty"] = component
-		if err := ValidateInstalled(installed); err == nil {
-			t.Errorf("accepted installed version %q", version)
-		}
+	parsed, err := ParseEnvironment(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Sidecars["pty"].Path != "/local/pty" {
+		t.Fatalf("sidecar path=%q", parsed.Sidecars["pty"].Path)
 	}
 }
 

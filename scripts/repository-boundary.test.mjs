@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const releaseVersion = "0.0.14";
+const releaseVersion = "0.0.15";
 
 function read(path) {
   return readFileSync(join(root, path), "utf8");
@@ -54,6 +54,21 @@ function assertCargoPackage(path) {
 
 test("repository owns a complete reproducible release boundary", () => {
   assert.match(read("Cargo.toml"), /^edition\s*=\s*"2024"$/m, "workspace Rust edition");
+  for (const file of [
+    "go/platformspec/spec.go",
+    "packages/plugin-spec/src/installation.ts",
+    "packages/plugin-spec/docs/VERSIONING.md",
+    "packages/plugin-spec/docs/VERSIONING.ko.md",
+  ]) {
+    const source = read(file);
+    for (const obsolete of ["settings.json", "installed.json", "parseSettingsDocument", "parseInstalledDocument", "InstalledDocument", "SettingsDocument"]) {
+      assert.equal(source.includes(obsolete), false, file + ": obsolete environment split " + obsolete);
+    }
+  }
+  const versioning = read("packages/plugin-spec/docs/VERSIONING.md").replaceAll("`", "");
+  for (const rule of ["environment.json is the only local runtime discovery surface", "injected repository root", "workspace checkout path", "sibling-source topology"]) {
+    assert.ok(versioning.includes(rule), "versioning policy omits " + rule);
+  }
   for (const path of [
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",

@@ -1,7 +1,7 @@
 # Versioning
 
 This is the normative versioning specification for Soksak plugins, sidecars, kits, contracts,
-specs, releases, registries, settings, and installed records.
+specs, releases, registries, and local environments.
 
 [한국어 번역](VERSIONING.ko.md)
 
@@ -144,7 +144,7 @@ interfaces at `0.0.1`. A package correction is not evidence that those contracts
 
 <!-- rule:plugin-sidecar-interface -->
 
-A plugin names the interface it needs, not a provider repository. Settings select a provider.
+A plugin names the interface it needs, not a provider repository. The environment selects a provider.
 The selected sidecar must provide the same interface ID at an accepted version.
 
 <!-- example:terminal-plugin-valid:valid-plugin -->
@@ -215,7 +215,7 @@ package manifest states author intent; the lock or checksum records exact select
 
 <!-- rule:development-source -->
 
-A development path changes where Soksak reads one plugin, sidecar, kit, contract, or spec and
+A development component changes where Soksak reads one plugin, sidecar, kit, contract, or spec and
 excludes only that item from managed updates. It does not disable validation.
 
 <!-- example:development-path-valid:settings-fragment -->
@@ -223,17 +223,18 @@ excludes only that item from managed updates. It does not disable validation.
 {
   "sidecars": {
     "terminal-provider": {
-      "development": {
-        "path": "/absolute/development/terminal-provider"
-      }
+      "version": "0.0.1",
+      "path": "/absolute/development/terminal-provider",
+      "source": "development",
+      "target": "aarch64-apple-darwin"
     }
   }
 }
 ```
 
 The development manifest still passes identity, version, application requirement where
-applicable, interface, permission, and path checks. A separate `development: true` flag is not
-stored beside the path.
+applicable, interface, permission, and path checks. Source is one closed value; no second
+development flag or installed document duplicates it.
 
 ## 7. Releases and installed content
 
@@ -264,13 +265,21 @@ dependencies.
 }
 ```
 
-The registry publishes exact releases and verified descriptors. Settings record user choices.
-The Core-owned installed record stores the exact version, target, absolute path, source commit,
-manifest digest, and artifact digest. These facts are not copied into each other.
+The registry publishes exact releases, dependencies, source commits, artifact URLs, sizes, and
+digests. `environment.json` is the single local state: exact selected version, registry ID,
+absolute materialized path, source kind, target where applicable, plugin activation, and provider
+selection. It does not copy repository, commit, or digest facts out of the registry.
 
-The installer downloads separately, checks size and SHA-256 before extraction, validates the
-manifest and requirements, and replaces content and its record in one transaction. Any error
-leaves the existing installation unchanged.
+The installer downloads into a transaction directory, checks size and SHA-256 before extraction,
+validates every manifest and requirement, moves all content into place, and atomically replaces
+`environment.json`. The write lock exists only for the transaction; there is no persistent lock
+document. Any error leaves the existing environment unchanged.
+
+`environment.json` is the only local runtime discovery surface. A repository never discovers
+another repository through `../`, an injected repository root, a workspace checkout path, PATH,
+or a symbolic link. Build-time relationships use package dependencies. Runtime relationships use
+component IDs resolved through the environment. Remote bytes are reached through registry releases.
+Tests use the same public interfaces and do not invent a sibling-source topology.
 
 ## 8. Conflicts and updates
 
@@ -283,7 +292,7 @@ without a fallback or compatibility layer. The error names every consumer and re
 VERSION_REQUIREMENT_CONFLICT
 terminal-view@2.0.0 requires terminal-contract >=2.0.0 <3.0.0
 other-terminal@1.5.0 requires terminal-contract >=1.6.0 <2.0.0
-The installed state was not changed.
+The environment was not changed.
 ```
 
 A major version marks an intentionally incompatible public change. A requirement is widened only
@@ -303,8 +312,8 @@ after compatibility tests, never to make a failing implementation pass.
 | External source dependencies | Package manifest and lock/checksum |
 | Published bytes | Release descriptor and attestation |
 | Discoverable releases | Registry |
-| Activation, provider, development path | Settings |
-| Installed bytes | Core-owned installed record |
+| Selected version, local path, source kind, activation, provider | `environment.json` |
+| Download URL, source commit, artifact digest, dependencies | Registry release |
 
 There is no public unit, dependency scope, installation profile, dependency closure, composition
 graph, execution graph, or deployment graph. Temporary local validation data is not a stored

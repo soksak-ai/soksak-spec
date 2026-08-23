@@ -221,16 +221,17 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 {
   "sidecars": {
     "terminal-provider": {
-      "development": {
-        "path": "/absolute/development/terminal-provider"
-      }
+      "version": "0.0.1",
+      "path": "/absolute/development/terminal-provider",
+      "source": "development",
+      "target": "aarch64-apple-darwin"
     }
   }
 }
 ```
 
 개발 manifest도 정체성, 버전, 해당되는 경우 앱 조건, 인터페이스, 권한 및 경로 검사를
-통과해야 한다. 경로와 별도로 `development: true`를 저장하지 않는다.
+통과해야 한다. Source는 하나의 닫힌 값이며 별도 개발 flag나 설치 문서가 이를 복제하지 않는다.
 
 ## 7. 릴리스와 설치 내용
 
@@ -260,13 +261,20 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 }
 ```
 
-레지스트리는 정확한 릴리스와 검증된 descriptor를 게시한다. 설정은 사용자 선택을 기록한다.
-Core 소유 설치 기록은 실제 exact 버전, target, 절대 경로, source commit, manifest digest 및
-artifact digest를 저장한다. 이 사실들을 서로 복사하지 않는다.
+레지스트리는 정확한 릴리스, dependency, source commit, artifact URL, 크기와 digest를 게시한다.
+`environment.json`은 exact 선택 버전, registry ID, 절대 local path, source kind, 해당되는 target,
+plugin 활성화와 provider 선택을 기록하는 유일한 local state다. repository, commit, digest를
+레지스트리에서 복제하지 않는다.
 
-인스톨러는 별도 위치에 다운로드하고 압축 해제 전에 크기와 SHA-256을 검사하며 manifest와
-조건을 검증한 후 내용과 기록을 한 transaction으로 교체한다. 오류가 발생하면 기존 설치를
+인스톨러는 transaction 디렉터리에 다운로드하고 압축 해제 전에 크기와 SHA-256을 검사하며
+모든 manifest와 조건을 검증한 후 내용을 배치하고 `environment.json`을 원자적으로 교체한다.
+write lock은 transaction 동안만 존재하며 영구 lock 문서는 없다. 오류가 발생하면 기존 환경을
 변경하지 않는다.
+
+`environment.json`만 local runtime discovery를 소유한다. 저장소는 `../`, 주입된 저장소 root,
+workspace checkout path, PATH 또는 symbolic link로 다른 저장소를 찾지 않는다. build-time 관계는
+package dependency를 사용하고 runtime 관계는 environment에서 component ID로 해석하며 remote byte는
+registry release로 접근한다. 테스트도 같은 공개 interface를 사용하고 sibling source topology를 만들지 않는다.
 
 ## 8. 충돌과 업데이트
 
@@ -279,7 +287,7 @@ artifact digest를 저장한다. 이 사실들을 서로 복사하지 않는다.
 VERSION_REQUIREMENT_CONFLICT
 terminal-view@2.0.0 requires terminal-contract >=2.0.0 <3.0.0
 other-terminal@1.5.0 requires terminal-contract >=1.6.0 <2.0.0
-The installed state was not changed.
+The environment was not changed.
 ```
 
 Major 버전은 의도적으로 호환되지 않는 공개 변경을 표시한다. Requirement는 호환 테스트
@@ -299,8 +307,8 @@ Major 버전은 의도적으로 호환되지 않는 공개 변경을 표시한�
 | 외부 source dependency | Package manifest 및 lock/checksum |
 | 게시된 바이트 | Release descriptor 및 attestation |
 | 발견 가능한 릴리스 | Registry |
-| 활성화, provider, 개발 경로 | Settings |
-| 설치된 바이트 | Core 소유 설치 기록 |
+| 선택 버전, local path, source kind, 활성화, provider | `environment.json` |
+| 다운로드 URL, source commit, artifact digest, dependency | Registry release |
 
 공개 unit, dependency scope, install profile, dependency closure, composition graph, execution
 graph, deployment graph는 없다. 일시적인 로컬 검증 데이터는 저장 계약이나 사용자 개념이

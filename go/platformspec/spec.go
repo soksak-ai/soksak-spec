@@ -9,10 +9,7 @@ import (
 	"regexp"
 )
 
-const (
-	SettingsFile  = "settings.json"
-	InstalledFile = "installed.json"
-)
+const EnvironmentFile = "environment.json"
 
 type Reference struct {
 	ID      string `json:"id"`
@@ -24,47 +21,35 @@ type SidecarManifest struct {
 	Interface Reference `json:"interface"`
 	Process   string    `json:"process"`
 }
-type Development struct {
-	Path string `json:"path"`
+
+const (
+	RegistrySource    = "registry"
+	DevelopmentSource = "development"
+)
+
+type Component struct {
+	Version  string `json:"version"`
+	Path     string `json:"path"`
+	Source   string `json:"source"`
+	Registry string `json:"registry,omitempty"`
+	Target   string `json:"target,omitempty"`
 }
-type PluginPreference struct {
-	Enabled     bool              `json:"enabled"`
-	Development *Development      `json:"development,omitempty"`
-	Providers   map[string]string `json:"providers,omitempty"`
+type Plugin struct {
+	Component
+	Enabled   bool              `json:"enabled"`
+	Providers map[string]string `json:"providers,omitempty"`
 }
-type ComponentPreference struct {
-	Development *Development `json:"development,omitempty"`
-}
-type Settings struct {
-	Revision  uint64                         `json:"revision"`
-	Plugins   map[string]PluginPreference    `json:"plugins"`
-	Sidecars  map[string]ComponentPreference `json:"sidecars"`
-	Kits      map[string]ComponentPreference `json:"kits"`
-	Contracts map[string]ComponentPreference `json:"contracts"`
-	Specs     map[string]ComponentPreference `json:"specs"`
-}
-type InstalledComponent struct {
-	Version        string `json:"version"`
-	Path           string `json:"path"`
-	RegistryID     string `json:"registryId"`
-	Repository     string `json:"repository"`
-	SourceCommit   string `json:"sourceCommit"`
-	ManifestSHA256 string `json:"manifestSha256"`
-	ArtifactSHA256 string `json:"artifactSha256"`
-	Target         string `json:"target,omitempty"`
-}
-type Installed struct {
-	Revision  uint64                        `json:"revision"`
-	Plugins   map[string]InstalledComponent `json:"plugins"`
-	Sidecars  map[string]InstalledComponent `json:"sidecars"`
-	Kits      map[string]InstalledComponent `json:"kits"`
-	Contracts map[string]InstalledComponent `json:"contracts"`
-	Specs     map[string]InstalledComponent `json:"specs"`
+type Environment struct {
+	Revision  uint64               `json:"revision"`
+	Plugins   map[string]Plugin    `json:"plugins"`
+	Sidecars  map[string]Component `json:"sidecars"`
+	Kits      map[string]Component `json:"kits"`
+	Contracts map[string]Component `json:"contracts"`
+	Specs     map[string]Component `json:"specs"`
 }
 
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,127}$`)
-var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
-var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+var registryPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 func decode(body []byte, value any) error {
 	decoder := json.NewDecoder(bytes.NewReader(body))
@@ -88,23 +73,20 @@ func ParseSidecarManifest(body []byte) (SidecarManifest, error) {
 	}
 	return value, nil
 }
-func ParseSettings(body []byte) (Settings, error) {
-	var value Settings
+func ParseEnvironment(body []byte) (Environment, error) {
+	var value Environment
 	if err := decode(body, &value); err != nil {
-		return Settings{}, err
+		return Environment{}, err
 	}
-	return value, ValidateSettings(value)
+	return value, ValidateEnvironment(value)
 }
-func ValidateSettings(value Settings) error {
+func ValidateEnvironment(value Environment) error {
 	if value.Revision < 1 || value.Plugins == nil || value.Sidecars == nil || value.Kits == nil || value.Contracts == nil || value.Specs == nil {
-		return fmt.Errorf("settings requires revision and all component maps")
+		return fmt.Errorf("environment requires revision and all component maps")
 	}
 	for id, plugin := range value.Plugins {
-		if !idPattern.MatchString(id) {
+		if !idPattern.MatchString(id) || validComponent(plugin.Component, false) != nil {
 			return fmt.Errorf("invalid plugin id")
-		}
-		if err := validDevelopment(plugin.Development); err != nil {
-			return err
 		}
 		for name, provider := range plugin.Providers {
 			if !idPattern.MatchString(name) || !idPattern.MatchString(provider) {
@@ -112,50 +94,42 @@ func ValidateSettings(value Settings) error {
 			}
 		}
 	}
-	for _, values := range []map[string]ComponentPreference{value.Sidecars, value.Kits, value.Contracts, value.Specs} {
+	for index, values := range []map[string]Component{value.Sidecars, value.Kits, value.Contracts, value.Specs} {
 		for id, item := range values {
 			if !idPattern.MatchString(id) {
 				return fmt.Errorf("invalid component id")
 			}
-			if err := validDevelopment(item.Development); err != nil {
+			if err := validComponent(item, index == 0); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
 }
-func validDevelopment(value *Development) error {
-	if value != nil && (!filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path) {
-		return fmt.Errorf("development path must be absolute")
+func validComponent(value Component, sidecar bool) error {
+	if !strictSemver(value.Version) || !filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path {
+		return fmt.Errorf("component requires exact version and absolute path")
 	}
-	return nil
-}
-func EmptySettings() Settings {
-	return Settings{Revision: 1, Plugins: map[string]PluginPreference{}, Sidecars: map[string]ComponentPreference{}, Kits: map[string]ComponentPreference{}, Contracts: map[string]ComponentPreference{}, Specs: map[string]ComponentPreference{}}
-}
-func ParseInstalled(body []byte) (Installed, error) {
-	var value Installed
-	if err := decode(body, &value); err != nil {
-		return Installed{}, err
-	}
-	return value, ValidateInstalled(value)
-}
-func ValidateInstalled(value Installed) error {
-	if value.Revision < 1 || value.Plugins == nil || value.Sidecars == nil || value.Kits == nil || value.Contracts == nil || value.Specs == nil {
-		return fmt.Errorf("installed state requires revision and all component maps")
-	}
-	for kind, values := range map[string]map[string]InstalledComponent{"plugin": value.Plugins, "sidecar": value.Sidecars, "kit": value.Kits, "contract": value.Contracts, "spec": value.Specs} {
-		for id, item := range values {
-			if !idPattern.MatchString(id) || !strictSemver(item.Version) || !filepath.IsAbs(item.Path) || item.RegistryID == "" || item.Repository == "" || !commitPattern.MatchString(item.SourceCommit) || !digestPattern.MatchString(item.ManifestSHA256) || !digestPattern.MatchString(item.ArtifactSHA256) {
-				return fmt.Errorf("invalid installed %s %s", kind, id)
-			}
-			if kind == "sidecar" && item.Target == "" {
-				return fmt.Errorf("sidecar target required")
-			}
+	switch value.Source {
+	case RegistrySource:
+		if !registryPattern.MatchString(value.Registry) {
+			return fmt.Errorf("registry source requires registry id")
 		}
+	case DevelopmentSource:
+		if value.Registry != "" {
+			return fmt.Errorf("development source cannot declare registry")
+		}
+	default:
+		return fmt.Errorf("invalid component source")
+	}
+	if sidecar && value.Target == "" {
+		return fmt.Errorf("sidecar target required")
+	}
+	if !sidecar && value.Target != "" {
+		return fmt.Errorf("target belongs only to sidecars")
 	}
 	return nil
 }
-func EmptyInstalled() Installed {
-	return Installed{Revision: 1, Plugins: map[string]InstalledComponent{}, Sidecars: map[string]InstalledComponent{}, Kits: map[string]InstalledComponent{}, Contracts: map[string]InstalledComponent{}, Specs: map[string]InstalledComponent{}}
+func EmptyEnvironment() Environment {
+	return Environment{Revision: 1, Plugins: map[string]Plugin{}, Sidecars: map[string]Component{}, Kits: map[string]Component{}, Contracts: map[string]Component{}, Specs: map[string]Component{}}
 }
