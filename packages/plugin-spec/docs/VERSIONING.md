@@ -261,6 +261,13 @@ source commit, and removes all staging locators. The exit command rejects any ch
 declared generated outputs, runs the canonical builder and validator, and records dependency
 digests beside the candidate archive rather than inside it.
 
+An owner may transfer that completed output to a product certification workflow only after
+`release-template/seal-candidate-artifact.mjs` writes `candidate-artifact.json`. The envelope binds
+the canonical release manifest, every local release asset and explicit build evidence to their
+sizes and SHA-256 values. `verify-candidate-artifact.mjs` rejects any extra, missing or changed file
+after download. This transport creates no release identity: source manifests keep immutable release
+URLs, while the Actions artifact remains candidate-only and is discarded on failure.
+
 ## 7. Releases and installed content
 
 <!-- rule:release-install-separation -->

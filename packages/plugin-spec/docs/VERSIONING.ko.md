@@ -258,6 +258,13 @@ setting을 복원하기 전까지 release builder가 이를 거부한다. Exit c
 canonical builder와 validator를 실행하고 dependency digest는 candidate archive 내부가 아니라 옆의
 report에 기록한다.
 
+Owner는 완성된 output에 `release-template/seal-candidate-artifact.mjs`가
+`candidate-artifact.json`을 기록한 뒤에만 제품 인증 workflow로 전달할 수 있습니다. Envelope는
+canonical release manifest, 모든 local release asset, 명시적 build evidence를 size와 SHA-256으로
+결합합니다. Download 뒤 `verify-candidate-artifact.mjs`는 추가, 누락, 변경된 파일을 모두
+거부합니다. 이 transport는 release identity를 만들지 않습니다. Source manifest는 immutable release
+URL을 유지하고 Actions artifact는 candidate-only이며 실패하면 폐기합니다.
+
 ## 7. 릴리스와 설치 내용
 
 <!-- rule:release-install-separation -->

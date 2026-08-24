@@ -22,7 +22,9 @@ workstation 상태를 source에 직렬화하지 않습니다.
   주입된 `PATH`, symlink, cache 위치, fallback tool을 source에 기록하지 않습니다. 개발자는 표준
   수단으로 환경을 선택하며 다른 tool이 함께 설치되어 있어도 됩니다. Clean CI job은 선언된
   version을 주입합니다. `make preflight`는 주소 지정된 executable만 확인하고 제품 command 전에
-  불일치를 거부하며 다른 설치본을 탐색하거나 설치하지 않습니다.
+  불일치를 거부하며 다른 설치본을 탐색하거나 설치하지 않습니다. Bootstrap executable에서 위임하는
+  package manager는 bootstrap package 자체 version이 아니라 대상 repository에서 반환한 effective
+  version으로 판정합니다.
 - **BR4 — 읽기 전용 preflight.** Preflight는 요구·실제 version, OS, architecture를 보고합니다.
   Tool을 설치·삭제·복구·선택하지 않습니다. 환경 불일치는 제품 RED가 아니라 precondition
   실패입니다.
@@ -42,6 +44,12 @@ workstation 상태를 source에 직렬화하지 않습니다.
 - **BR9 — Repository 소유권.** Repository Makefile은 자기 구현과 경계만 검증합니다. Contract
   fixture는 contract owner가 정의하고 각 구현이 실행합니다. 여러 실제 component의 조합은 제품
   composition repository가 검증합니다.
+- **BR10 — Candidate artifact는 seal하며 공개하지 않습니다.** Release 전에 각 component owner가
+  자기 candidate output을 `candidate-artifact.json`으로 seal합니다. Envelope는 canonical
+  `release.json` 하나, 모든 local release asset, build evidence, source commit, component identity,
+  byte size와 SHA-256을 결합합니다. Actions는 tag나 release를 만들지 않고 해당 directory를 upload할
+  수 있습니다. 제품 workflow는 그 byte를 download하고 검증하며 형제 source를 build하지 않습니다.
+  파일 추가, 누락, 변경은 artifact 전체를 무효로 만듭니다.
 
 ## Command 경계
 
@@ -59,3 +67,17 @@ export, machine-specific path 없이 동작해야 합니다. 필요한 tool이 �
 GitHub Actions는 선언적 owner에서 tool을 clean job에 주입한 뒤 같은 target을 호출합니다. Release 전용
 target은 명시적 target triple과 staging directory를 받을 수 있지만 publication credential과
 GitHub release 변경은 Actions에만 둡니다.
+
+Repository 소유 build와 canonical release packager가 평면 output directory 하나를 만든 뒤 다음
+공개 release-template command로 seal 및 검증합니다.
+
+```sh
+node <plugin-spec>/release-template/seal-candidate-artifact.mjs \
+  --directory <absolute-output-directory> \
+  --evidence <optional-build-evidence.json>
+node <plugin-spec>/release-template/verify-candidate-artifact.mjs \
+  --directory <absolute-output-directory>
+```
+
+Node candidate의 `candidate-build.json`은 자동으로 발견합니다. 그 밖의 build evidence는 명시적으로
+이름을 전달합니다. 두 command 모두 upload나 publish를 수행하지 않습니다.
