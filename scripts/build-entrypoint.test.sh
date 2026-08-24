@@ -11,7 +11,8 @@ fail() {
 [ -f "$root/.node-version" ] || fail '.node-version is missing'
 
 node_owner=$(awk 'NF { value=$0; count++ } END { if (count == 1) print value; else exit 1 }' "$root/.node-version" 2>/dev/null || true)
-node_projection=$(sed -n 's/^[[:space:]]*"node": "\([^"]*\)".*/\1/p' "$root/package.json")
+manifest_flat=$(tr '\n' ' ' < "$root/package.json")
+node_projection=$(printf '%s\n' "$manifest_flat" | sed -n 's/.*"engines"[[:space:]]*:[[:space:]]*{[^}]*"node"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 [ -n "$node_owner" ] && [ "$node_owner" = "$node_projection" ] || fail '.node-version and package.json engines.node differ'
 
 for target in preflight prepare build verify; do

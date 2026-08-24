@@ -86,7 +86,8 @@ case "$(uname -s)" in
   *) exit 1 ;;
 esac
 
-output=$(PATH="$fixture/bin:/usr/bin:/bin" \
+fixture_path="$fixture/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+output=$(PATH="$fixture_path" \
   FIXTURE_NODE_VERSION=26.7.0 FIXTURE_NODE_PLATFORM="$fixture_platform" FIXTURE_NODE_ARCH="$fixture_node_arch" \
   FIXTURE_PNPM_VERSION=11.22.0 \
   FIXTURE_GO_VERSION=1.26.3 FIXTURE_GO_OS="$fixture_go_os" FIXTURE_GO_ARCH="$fixture_go_arch" \
@@ -95,7 +96,7 @@ output=$(PATH="$fixture/bin:/usr/bin:/bin" \
 printf '%s\n' "$output" | grep -Fq "BUILD_ENVIRONMENT_READY required=$fixture_platform/$fixture_required_arch node=v26.7.0 nodeRuntime=$fixture_platform/$fixture_node_arch pnpm=11.22.0 rust=1.98.0 rustHost=$fixture_rust_host go=go1.26.3 goRuntime=$fixture_go_os/$fixture_go_arch lockSHA256="
 
 set +e
-PATH="$fixture/bin:/usr/bin:/bin" \
+PATH="$fixture_path" \
   FIXTURE_NODE_VERSION=25.9.0 FIXTURE_NODE_PLATFORM="$fixture_platform" FIXTURE_NODE_ARCH="$fixture_node_arch" \
   FIXTURE_PNPM_VERSION=11.22.0 \
   FIXTURE_GO_VERSION=1.26.3 FIXTURE_GO_OS="$fixture_go_os" FIXTURE_GO_ARCH="$fixture_go_arch" \
