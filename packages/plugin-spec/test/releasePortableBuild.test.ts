@@ -125,4 +125,16 @@ describe("portable contract and kit release builder", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("local dependency is not a release input");
   });
+
+  it("refuses local dependency state retained only in portable pnpm workspace settings", () => {
+    writeFixture("kit", "soksak-kit-example");
+    fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), [
+      "overrides:",
+      "  '@soksak/example': file:../candidate/example.tgz",
+      "",
+    ].join("\n"));
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local dependency is not a release input");
+  });
 });

@@ -177,6 +177,18 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(result.stderr).toContain("local dependency is not a release input");
   });
 
+  it("refuses a local dependency retained only in pnpm workspace settings", () => {
+    writeFixture({ frontendPackage: true });
+    fs.writeFileSync(path.join(root, "frontend", "pnpm-workspace.yaml"), [
+      "overrides:",
+      "  '@soksak/example': file:../candidate/example.tgz",
+      "",
+    ].join("\n"));
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local dependency is not a release input");
+  });
+
   it("refuses an obsolete schema discriminator", () => {
     writeFixture({ plugin: { schema: "soksak-spec-plugin@0.0.1" } });
     const r = build();
