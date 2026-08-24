@@ -142,11 +142,6 @@ jobs:
         id: python-tools
         shell: bash
         run: echo "python=$(jq -r '.dependencies[0].tools.python' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
-      - name: Set up Python
-        if: inputs.profile == 'kitty' || inputs.profile == 'shitty'
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: ${{ steps.python-tools.outputs.python }}
       - name: Install Kitty native libraries
         if: inputs.profile == 'kitty'
         run: brew install harfbuzz little-cms2 libpng openssl@3 pkgconf simde xxhash zlib
@@ -175,6 +170,11 @@ jobs:
           brew install ragel
           actual=$(ragel -v | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p')
           test "$actual.0" = "$EXPECTED_RAGEL" || test "$actual" = "$EXPECTED_RAGEL"
+      - name: Set up Python
+        if: inputs.profile == 'kitty' || inputs.profile == 'shitty'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ steps.python-tools.outputs.python }}
       - name: Verify and stage the owner implementation
         working-directory: source
         shell: bash
