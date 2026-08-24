@@ -35,18 +35,32 @@ export function assertNoLocalPackageDependencies(packagePath) {
   }
 
   const lockPath = path.join(path.dirname(packagePath), "pnpm-lock.yaml");
-  if (!fs.existsSync(lockPath)) return;
-  const lines = fs.readFileSync(lockPath, "utf8").split(/\r?\n/);
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const values = [...line.matchAll(/(?:specifier|version|tarball):\s*([^,}\s]+|['"][^'"]+['"])/g)]
-      .map((match) => match[1]);
-    const packageKey = line.match(/@(?:file|link|workspace|portal|catalog):[^'"\s]+/i)?.[0];
-    if (packageKey) values.push(packageKey.slice(1));
-    for (const value of values) {
-      if (localDependency(value)) {
-        throw new Error(`local dependency is not a release input: ${lockPath}:${index + 1} ${value}`);
+  if (fs.existsSync(lockPath)) {
+    const lines = fs.readFileSync(lockPath, "utf8").split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
+      const values = [...line.matchAll(/(?:specifier|version|tarball):\s*([^,}\s]+|['"][^'"]+['"])/g)]
+        .map((match) => match[1]);
+      const packageKey = line.match(/@(?:file|link|workspace|portal|catalog):[^'"\s]+/i)?.[0];
+      if (packageKey) values.push(packageKey.slice(1));
+      for (const value of values) {
+        if (localDependency(value)) {
+          throw new Error(`local dependency is not a release input: ${lockPath}:${index + 1} ${value}`);
+        }
       }
+    }
+  }
+
+  const workspacePath = path.join(path.dirname(packagePath), "pnpm-workspace.yaml");
+  if (!fs.existsSync(workspacePath)) return;
+  const workspaceLines = fs.readFileSync(workspacePath, "utf8").split(/\r?\n/);
+  for (let index = 0; index < workspaceLines.length; index += 1) {
+    const line = workspaceLines[index];
+    const separator = line.indexOf(":");
+    if (separator < 0) continue;
+    const value = line.slice(separator + 1).replace(/\s+#.*$/, "").trim();
+    if (localDependency(value)) {
+      throw new Error(`local dependency is not a release input: ${workspacePath}:${index + 1} ${value}`);
     }
   }
 }

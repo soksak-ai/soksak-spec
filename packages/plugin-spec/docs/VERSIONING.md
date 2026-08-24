@@ -255,7 +255,11 @@ An unpublished Node package dependency is verified with
 `release-template/stage-node-candidate.mjs`. The command copies one clean exact Git commit,
 verifies every dependency archive SHA-256, and writes `pnpm.overrides` only in the separate output
 checkout. The source checkout remains unchanged. The staged checkout is development input and the
-release builders reject it until immutable dependency releases replace every override.
+release builders reject it until `release-template/build-node-candidate.mjs` completes the source
+checks and build, restores the exact package manifest, lockfile and workspace settings from the
+source commit, and removes all staging locators. The exit command rejects any change outside its
+declared generated outputs, runs the canonical builder and validator, and records dependency
+digests beside the candidate archive rather than inside it.
 
 ## 7. Releases and installed content
 
