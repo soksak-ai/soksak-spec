@@ -23,7 +23,7 @@ for target in preflight prepare build verify; do
 done
 grep -Eq '^[A-Z0-9_]*(VERSION|REPOSITORY|COMMIT|TARGETS)[[:space:]]*:=' "$root/Makefile" && fail 'Makefile duplicates declarative build metadata'
 
-for workflow in "$root/.github/workflows/verify.yml" "$root/.github/workflows/release.yml"; do
+for workflow in "$root/.github/workflows/candidate.yml" "$root/.github/workflows/verify.yml" "$root/.github/workflows/release.yml"; do
   grep -Fq 'node-version-file: .node-version' "$workflow" || fail "workflow does not inject the Node owner: $workflow"
   grep -Fq 'package_json_file: package.json' "$workflow" || fail "workflow does not inject the pnpm owner: $workflow"
   grep -Fq 'rust-toolchain.toml' "$workflow" || fail "workflow does not inject the Rust owner: $workflow"
@@ -32,5 +32,6 @@ done
 
 grep -Fq 'make verify' "$root/.github/workflows/verify.yml" || fail 'verify workflow does not call make verify'
 grep -Fq 'make verify' "$root/.github/workflows/release.yml" || fail 'release workflow does not call make verify'
+grep -Fq 'make verify' "$root/.github/workflows/candidate.yml" || fail 'candidate workflow does not call make verify'
 
 printf 'BUILD_ENTRYPOINT_READY node=%s\n' "$node_owner"

@@ -1,0 +1,75 @@
+name: candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-${{ github.repository }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          package_json_file: package.json
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Read Rust toolchain
+        id: rust-toolchain
+        shell: bash
+        run: echo "channel=$(sed -n 's/^channel = \"\(.*\)\"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go/platformspec/go.mod
+          cache-dependency-path: go/platformspec/go.sum
+      - name: Build and verify the exact source
+        run: make verify
+      - name: Seal the candidate output
+        shell: bash
+        run: |
+          mkdir candidate-output
+          cp artifacts/spec.json candidate-output/spec.json
+          cp artifacts/conformance-manifest.json candidate-output/conformance-manifest.json
+          cp artifacts/conformance-release.json candidate-output/conformance-release.json
+          cp artifacts/soksak-ai-plugin-spec-*.tgz candidate-output/
+          cp artifacts/soksak-spec-release.json candidate-output/release.json
+          node packages/plugin-spec/release-template/seal-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/candidate-output"
+          node packages/plugin-spec/release-template/verify-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/candidate-output"
+      - name: Upload the sealed candidate
+        id: candidate-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: candidate-soksak-spec-${{ github.sha }}
+          path: candidate-output/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - name: Record transport identity
+        shell: bash
+        run: |
+          printf 'artifact-id=%s\nartifact-digest=%s\nsource-commit=%s\n' \
+            '${{ steps.candidate-upload.outputs.artifact-id }}' \
+            '${{ steps.candidate-upload.outputs.artifact-digest }}' \
+            "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

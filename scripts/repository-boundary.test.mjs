@@ -71,6 +71,7 @@ test("repository owns a complete reproducible release boundary", () => {
   }
   for (const path of [
     ".node-version",
+    ".github/workflows/candidate.yml",
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
     ".gitignore",
@@ -169,7 +170,7 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.doesNotMatch(verifier, /(?:node|golang|rust):\d/);
   assert.match(verifier, /--no-update-notifier --no-fund/);
 
-  for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
+  for (const workflow of [".github/workflows/candidate.yml", ".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
     const source = read(workflow);
     assert.match(source, /actions\/setup-go@[a-f0-9]{40}/);
     assert.match(source, /go-version-file:\s*go\/platformspec\/go\.mod/);
