@@ -108,4 +108,21 @@ describe("portable contract and kit release builder", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("local dependency is not a release input");
   });
+
+  it("refuses local dependency state retained only in a portable lockfile", () => {
+    writeFixture("contract", "soksak-contract-example");
+    fs.writeFileSync(path.join(root, "pnpm-lock.yaml"), [
+      "lockfileVersion: '9.0'",
+      "packages:",
+      "  '@soksak/example@file:../../tmp/example.tgz':",
+      "    resolution: {tarball: file:../../tmp/example.tgz}",
+      "",
+    ].join("\n"));
+    const files = JSON.parse(fs.readFileSync(path.join(root, "release-files.json"), "utf8"));
+    files.push("pnpm-lock.yaml");
+    fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(files)}\n`);
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local dependency is not a release input");
+  });
 });
