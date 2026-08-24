@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -90,5 +90,19 @@ describe("build dependency CLI", () => {
     ]);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("terminal-engine-sdk");
+  });
+
+  it("creates the canonical receipt directly from declared file and tree outputs", () => {
+    const input = fixture();
+    const created = join(input.root, "created-receipt.json");
+    const result = run([
+      "build-receipt-create", input.dependencyPath,
+      "--dependency", "terminal-engine-sdk",
+      "--target", input.target,
+      "--output-root", input.outputRoot,
+      "--out", created,
+    ]);
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(created, "utf8"))).toEqual(JSON.parse(readFileSync(input.receiptPath, "utf8")));
   });
 });
