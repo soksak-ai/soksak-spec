@@ -246,6 +246,12 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 개발 manifest도 정체성, 버전, 해당되는 경우 앱 조건, 인터페이스, 권한 및 경로 검사를
 통과해야 한다. Source는 하나의 닫힌 값이며 별도 개발 flag나 설치 문서가 이를 복제하지 않는다.
 
+공개되지 않은 Node package dependency는 `release-template/stage-node-candidate.mjs`로 검증한다.
+이 command는 clean 상태의 정확한 Git commit 하나를 복사하고 모든 dependency archive SHA-256을
+검증한 뒤 별도 output checkout에만 `pnpm.overrides`를 기록한다. Source checkout은 변경하지 않는다.
+Staged checkout은 development input이며 immutable dependency release가 모든 override를 교체하기
+전까지 release builder가 이를 거부한다.
+
 ## 7. 릴리스와 설치 내용
 
 <!-- rule:release-install-separation -->
