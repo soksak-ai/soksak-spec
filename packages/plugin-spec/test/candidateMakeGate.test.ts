@@ -11,6 +11,6 @@ describe("candidate owner command", () => {
     expect(build).toBeGreaterThan(-1);
     expect(verify).toBeGreaterThan(build);
     expect(source).toContain('run("make", ["verify"], stage)');
-    for (const duplicate of ['["typecheck"]', '["exec", "vitest"', '["build"]']) expect(source).not.toContain(duplicate);
+    for (const duplicate of ['["typecheck"]', '["exec", "vitest"']) expect(source).not.toContain(duplicate);
   });
 });

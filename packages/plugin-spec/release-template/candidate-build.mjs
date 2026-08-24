@@ -13,6 +13,7 @@ function run(command, args, cwd) {
 
 function defaultCandidateChecks({ stage, packageDirectory }) {
   run("pnpm", ["install", "--no-frozen-lockfile"], packageDirectory);
+  run("make", ["build"], stage);
   run("make", ["verify"], stage);
 }
 
