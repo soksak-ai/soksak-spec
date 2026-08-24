@@ -21,31 +21,27 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Read build versions from Makefile
-        id: build-versions
-        shell: bash
-        run: |
-          echo "node=$(make --no-print-directory -s print-node-version)" >> "$GITHUB_OUTPUT"
-          echo "pnpm=$(make --no-print-directory -s print-pnpm-version)" >> "$GITHUB_OUTPUT"
-          echo "rust=$(make --no-print-directory -s print-rust-version)" >> "$GITHUB_OUTPUT"
-          echo "go=$(make --no-print-directory -s print-go-version)" >> "$GITHUB_OUTPUT"
       - name: Set up pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
-          version: ${{ steps.build-versions.outputs.pnpm }}
+          package_json_file: package.json
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: ${{ steps.build-versions.outputs.node }}
+          node-version-file: .node-version
           cache: pnpm
+      - name: Read Rust toolchain
+        id: rust-toolchain
+        shell: bash
+        run: echo "channel=$(sed -n 's/^channel = \"\(.*\)\"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
-          toolchain: ${{ steps.build-versions.outputs.rust }}
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: ${{ steps.build-versions.outputs.go }}
+          go-version-file: go/platformspec/go.mod
           cache-dependency-path: go/platformspec/go.sum
       - name: Prove the complete release from the clean checkout
         run: make verify

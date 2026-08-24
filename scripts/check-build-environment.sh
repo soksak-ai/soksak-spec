@@ -7,16 +7,7 @@ fail_declaration() {
   exit 78
 }
 
-if [ "$#" -ne 8 ] || [ "$1" != --node ] || [ "$3" != --pnpm ] || [ "$5" != --rust ] || [ "$7" != --go ]; then
-  fail_declaration 'usage: check-build-environment.sh --node <version> --pnpm <version> --rust <version> --go <version>'
-fi
-node_expected=$2
-pnpm_expected=$4
-rust_expected=$6
-go_expected=$8
-for expected in "$node_expected" "$pnpm_expected" "$rust_expected" "$go_expected"; do
-  case "$expected" in ''|*[!0-9.]*) fail_declaration 'Makefile tool versions must be exact numeric versions' ;; esac
-done
+[ "$#" -eq 0 ] || fail_declaration 'usage: check-build-environment.sh'
 
 selection=$root/.node-version
 manifest=$root/package.json
@@ -27,17 +18,16 @@ for required_file in "$selection" "$manifest" "$lockfile" "$go_manifest" "$rust_
   [ -f "$required_file" ] || fail_declaration "required owner file is missing: ${required_file#$root/}"
 done
 
-node_selection=$(awk 'NF { value=$0; count++ } END { if (count == 1) print value; else exit 1 }' "$selection" 2>/dev/null || true)
+node_expected=$(awk 'NF { value=$0; count++ } END { if (count == 1) print value; else exit 1 }' "$selection" 2>/dev/null || true)
 manifest_flat=$(tr '\n' ' ' < "$manifest")
 node_declared=$(printf '%s\n' "$manifest_flat" | sed -n 's/.*"engines"[[:space:]]*:[[:space:]]*{[^}]*"node"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 package_manager=$(printf '%s\n' "$manifest_flat" | sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-case "$package_manager" in pnpm@*) pnpm_projection=${package_manager#pnpm@} ;; *) pnpm_projection= ;; esac
-go_projection=$(awk '$1 == "go" && NF == 2 { print $2; count++ } END { if (count != 1) exit 1 }' "$go_manifest" 2>/dev/null || true)
-rust_projection=$(sed -n 's/^channel = "\([^"]*\)"$/\1/p' "$rust_manifest")
-if [ "$node_expected" != "$node_selection" ] || [ "$node_expected" != "$node_declared" ] || \
-   [ "$pnpm_expected" != "$pnpm_projection" ] || [ "$go_expected" != "$go_projection" ] || \
-   [ "$rust_expected" != "$rust_projection" ]; then
-  fail_declaration 'Makefile versions and ecosystem projections must be exact and aligned'
+case "$package_manager" in pnpm@*) pnpm_expected=${package_manager#pnpm@} ;; *) pnpm_expected= ;; esac
+go_expected=$(awk '$1 == "go" && NF == 2 { print $2; count++ } END { if (count != 1) exit 1 }' "$go_manifest" 2>/dev/null || true)
+rust_expected=$(sed -n 's/^channel = "\([^"]*\)"$/\1/p' "$rust_manifest")
+if [ -z "$node_expected" ] || [ "$node_expected" != "$node_declared" ] || [ -z "$pnpm_expected" ] || \
+   [ -z "$go_expected" ] || [ -z "$rust_expected" ]; then
+  fail_declaration '.node-version, package.json, go.mod, and rust-toolchain.toml must contain exact aligned versions'
 fi
 
 host_system=$(uname -s)
@@ -91,9 +81,9 @@ pnpm_actual=$(cd "$root" && pnpm --version 2>/dev/null || true)
 rust_actual=$(rustc --version 2>/dev/null | awk '{print $2}' || true)
 rust_host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p' || true)
 cargo_actual=$(cargo --version 2>/dev/null || true)
-go_actual=$(go env GOVERSION 2>/dev/null || true)
-go_host_os=$(go env GOHOSTOS 2>/dev/null || true)
-go_host_arch=$(go env GOHOSTARCH 2>/dev/null || true)
+go_actual=$(go -C "$root/go/platformspec" env GOVERSION 2>/dev/null || true)
+go_host_os=$(go -C "$root/go/platformspec" env GOHOSTOS 2>/dev/null || true)
+go_host_arch=$(go -C "$root/go/platformspec" env GOHOSTARCH 2>/dev/null || true)
 
 if [ "$node_actual" != "v$node_expected" ] || [ "$node_platform" != "$required_platform" ] || \
    [ "$node_arch" != "$node_required_arch" ] || [ "$pnpm_actual" != "$pnpm_expected" ] || \
