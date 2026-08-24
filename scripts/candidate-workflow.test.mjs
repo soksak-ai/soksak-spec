@@ -10,8 +10,8 @@ test("spec owner emits a sealed candidate artifact without publication authority
   for (const required of [
     "workflow_dispatch:",
     "workflow_call:",
+    "source_repository:",
     "source_ref:",
-    "github.workflow_ref",
     "contents: read",
     "persist-credentials: false",
     "git -C source rev-parse HEAD",
@@ -29,6 +29,7 @@ test("spec owner emits a sealed candidate artifact without publication authority
     "publish-release",
     "gh release",
     "gh api",
+    "github.workflow_ref",
     "repository: soksak-ai/soksak-spec",
   ]) assert.doesNotMatch(workflow, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
