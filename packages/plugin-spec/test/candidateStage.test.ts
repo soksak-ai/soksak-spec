@@ -81,6 +81,7 @@ describe("candidate dependency staging", () => {
       dependencies: [{ name: "@soksak/dependency", artifact, sha256: digest }],
     });
     fs.writeFileSync(path.join(output, "pnpm-lock.yaml"), "candidate lock\n");
+    fs.writeFileSync(path.join(output, ".DS_Store"), "ambient Finder metadata");
     fs.mkdirSync(path.join(output, "dist"));
     fs.writeFileSync(path.join(output, "dist", "index.js"), "export const value = 2;\n");
 
@@ -91,6 +92,7 @@ describe("candidate dependency staging", () => {
     expect(fs.readFileSync(path.join(output, "dist", "index.js"), "utf8")).toContain("value = 2");
     expect(fs.existsSync(path.join(output, ".candidate-inputs"))).toBe(false);
     expect(fs.existsSync(path.join(output, ".candidate-stage.json"))).toBe(false);
+    expect(fs.existsSync(path.join(output, ".DS_Store"))).toBe(false);
     expect(report).toMatchObject({ generated: ["dist"] });
     expect(() => assertNoLocalPackageDependencies(path.join(output, "package.json"))).not.toThrow();
   });
