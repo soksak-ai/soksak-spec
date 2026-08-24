@@ -16,7 +16,7 @@ test("canonical macOS workflow builds sealed native sidecar candidates", () => {
     "dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30",
     "mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29",
     "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
-    "KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0",
+    'formula="llvm@${EXPECTED_LLVM%%.*}"', 'echo "$tool_root" >> "$GITHUB_PATH"',
     "make verify", "make stage",
     "npm install --global --ignore-scripts ./spec-candidate/soksak-ai-plugin-spec-*.tgz",
     "stage-candidate-package.mjs", "pack-target.mjs", "build-candidate.mjs",
@@ -27,6 +27,7 @@ test("canonical macOS workflow builds sealed native sidecar candidates", () => {
   for (const forbidden of [
     "repository: soksak-ai/", "{ value: ${{", "contents: write", "create-github-app-token",
     "publish-canonical-release", "gh release", "gh api", "x86_64-apple-darwin",
+    "KyleMayes/install-llvm-action",
   ]) assert.doesNotMatch(workflow, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   const python = workflow.indexOf("- name: Set up Python");
   for (const prerequisite of ["- name: Install Kitty native libraries", "- name: Install the declared Shitty Ragel"]) {
