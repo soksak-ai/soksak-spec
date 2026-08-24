@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { stageNodeCandidate } from "../release-template/candidate-stage.mjs";
+import { finalizeNodeCandidate, stageNodeCandidate } from "../release-template/candidate-stage.mjs";
 import { assertNoLocalPackageDependencies } from "../release-template/package-dependencies.mjs";
 
 let root = "";
@@ -23,6 +23,8 @@ beforeEach(() => {
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
   fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), "allowBuilds:\n  esbuild: true\n");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "index.ts"), "export const value = 1;\n");
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["config", "user.email", "candidate@example.invalid"], { cwd: root });
   execFileSync("git", ["config", "user.name", "Candidate Test"], { cwd: root });
@@ -41,7 +43,7 @@ describe("candidate dependency staging", () => {
     const digest = createHash("sha256").update(fs.readFileSync(artifact)).digest("hex");
     const before = fs.readFileSync(path.join(root, "package.json"));
     const report = stageNodeCandidate({
-      source: root, output, packagePath: "package.json",
+      source: root, output, packagePath: "package.json", generated: ["dist"],
       dependencies: [{ name: "@soksak/dependency", artifact, sha256: digest }],
     });
 
@@ -58,9 +60,40 @@ describe("candidate dependency staging", () => {
 
   it("rejects a changed candidate artifact", () => {
     expect(() => stageNodeCandidate({
-      source: root, output, packagePath: "package.json",
+      source: root, output, packagePath: "package.json", generated: ["dist"],
       dependencies: [{ name: "@soksak/dependency", artifact, sha256: "0".repeat(64) }],
     })).toThrow("candidate dependency digest mismatch");
     expect(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" })).toBe("");
+  });
+
+  it("restores canonical metadata and keeps only declared generated output", () => {
+    const digest = createHash("sha256").update(fs.readFileSync(artifact)).digest("hex");
+    stageNodeCandidate({
+      source: root, output, packagePath: "package.json", generated: ["dist"],
+      dependencies: [{ name: "@soksak/dependency", artifact, sha256: digest }],
+    });
+    fs.writeFileSync(path.join(output, "pnpm-lock.yaml"), "candidate lock\n");
+    fs.mkdirSync(path.join(output, "dist"));
+    fs.writeFileSync(path.join(output, "dist", "index.js"), "export const value = 2;\n");
+
+    const report = finalizeNodeCandidate({ output });
+    for (const name of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
+      expect(fs.readFileSync(path.join(output, name))).toEqual(fs.readFileSync(path.join(root, name)));
+    }
+    expect(fs.readFileSync(path.join(output, "dist", "index.js"), "utf8")).toContain("value = 2");
+    expect(fs.existsSync(path.join(output, ".candidate-inputs"))).toBe(false);
+    expect(fs.existsSync(path.join(output, ".candidate-stage.json"))).toBe(false);
+    expect(report).toMatchObject({ generated: ["dist"] });
+    expect(() => assertNoLocalPackageDependencies(path.join(output, "package.json"))).not.toThrow();
+  });
+
+  it("refuses source drift outside declared generated output", () => {
+    const digest = createHash("sha256").update(fs.readFileSync(artifact)).digest("hex");
+    stageNodeCandidate({
+      source: root, output, packagePath: "package.json", generated: ["dist"],
+      dependencies: [{ name: "@soksak/dependency", artifact, sha256: digest }],
+    });
+    fs.writeFileSync(path.join(output, "src", "index.ts"), "export const value = 99;\n");
+    expect(() => finalizeNodeCandidate({ output })).toThrow("candidate build changed undeclared source");
   });
 });
