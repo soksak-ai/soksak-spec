@@ -173,9 +173,9 @@ test("repository owns a complete reproducible release boundary", () => {
   for (const workflow of [".github/workflows/candidate.yml", ".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
     const source = read(workflow);
     assert.match(source, /actions\/setup-go@[a-f0-9]{40}/);
-    assert.match(source, /go-version-file:\s*go\/platformspec\/go\.mod/);
-    assert.match(source, /node-version-file:\s*[.]node-version/);
-    assert.match(source, /package_json_file:\s*package\.json/);
+    assert.match(source, /go-version-file:\s*(?:source\/)?go\/platformspec\/go\.mod/);
+    assert.match(source, /node-version-file:\s*(?:source\/)?[.]node-version/);
+    assert.match(source, /package_json_file:\s*(?:source\/)?package\.json/);
     assert.doesNotMatch(source, /node-version:\s*["']?\d/);
     assert.doesNotMatch(source, /pnpm\/action-setup@[a-f0-9]{40}\n\s+with:\n\s+version:/);
     assert.match(source, /rust-toolchain\.toml/);

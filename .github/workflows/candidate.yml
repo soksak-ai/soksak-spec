@@ -2,37 +2,95 @@ name: candidate
 
 on:
   workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact 40-character source commit to build
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      source_ref:
+        description: Exact 40-character source commit to build
+        required: true
+        type: string
+    outputs:
+      artifact_name:
+        value: ${{ jobs.candidate.outputs.artifact_name }}
+      artifact_id:
+        value: ${{ jobs.candidate.outputs.artifact_id }}
+      artifact_digest:
+        value: ${{ jobs.candidate.outputs.artifact_digest }}
+      candidate_manifest_sha256:
+        value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }}
+      source_commit:
+        value: ${{ jobs.candidate.outputs.source_commit }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: candidate-${{ github.repository }}-${{ github.sha }}
+  group: candidate-${{ github.workflow_ref }}-${{ inputs.source_ref }}
   cancel-in-progress: false
 
 jobs:
   candidate:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      artifact_name: ${{ steps.source.outputs.artifact_name }}
+      artifact_id: ${{ steps.candidate-upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.candidate-upload.outputs.artifact-digest }}
+      candidate_manifest_sha256: ${{ steps.seal.outputs.manifest_sha256 }}
+      source_commit: ${{ steps.source.outputs.commit }}
     steps:
+      - name: Resolve this workflow's owner repository
+        id: source-owner
+        shell: bash
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          repository=${WORKFLOW_REF%%/.github/workflows/*}
+          case "$repository" in
+            */*) ;;
+            *) echo "workflow_ref has no owner repository" >&2; exit 1 ;;
+          esac
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
       - name: Check out the exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          repository: ${{ steps.source-owner.outputs.repository }}
+          ref: ${{ inputs.source_ref }}
+          path: source
           fetch-depth: 0
           persist-credentials: false
+      - name: Bind the run to the exact source commit
+        id: source
+        shell: bash
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          case "$SOURCE_REF" in
+            *[!a-f0-9]*|'') echo "source_ref must be a lowercase commit" >&2; exit 1 ;;
+          esac
+          test "${#SOURCE_REF}" -eq 40
+          commit=$(git -C source rev-parse HEAD)
+          test "$commit" = "$SOURCE_REF"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=candidate-soksak-spec-$commit" >> "$GITHUB_OUTPUT"
       - name: Set up pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
-          package_json_file: package.json
+          package_json_file: source/package.json
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version-file: .node-version
+          node-version-file: source/.node-version
           cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
       - name: Read Rust toolchain
         id: rust-toolchain
         shell: bash
-        run: echo "channel=$(sed -n 's/^channel = \"\(.*\)\"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+        run: echo "channel=$(sed -n 's/^channel = \"\(.*\)\"/\1/p' source/rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
@@ -40,28 +98,31 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version-file: go/platformspec/go.mod
-          cache-dependency-path: go/platformspec/go.sum
+          go-version-file: source/go/platformspec/go.mod
+          cache-dependency-path: source/go/platformspec/go.sum
       - name: Build and verify the exact source
+        working-directory: source
         run: make verify
       - name: Seal the candidate output
+        id: seal
         shell: bash
         run: |
           mkdir candidate-output
-          cp artifacts/spec.json candidate-output/spec.json
-          cp artifacts/conformance-manifest.json candidate-output/conformance-manifest.json
-          cp artifacts/conformance-release.json candidate-output/conformance-release.json
-          cp artifacts/soksak-ai-plugin-spec-*.tgz candidate-output/
-          cp artifacts/soksak-spec-release.json candidate-output/release.json
-          node packages/plugin-spec/release-template/seal-candidate-artifact.mjs \
+          cp source/artifacts/spec.json candidate-output/spec.json
+          cp source/artifacts/conformance-manifest.json candidate-output/conformance-manifest.json
+          cp source/artifacts/conformance-release.json candidate-output/conformance-release.json
+          cp source/artifacts/soksak-ai-plugin-spec-*.tgz candidate-output/
+          cp source/artifacts/soksak-spec-release.json candidate-output/release.json
+          node source/packages/plugin-spec/release-template/seal-candidate-artifact.mjs \
             --directory "$GITHUB_WORKSPACE/candidate-output"
-          node packages/plugin-spec/release-template/verify-candidate-artifact.mjs \
+          node source/packages/plugin-spec/release-template/verify-candidate-artifact.mjs \
             --directory "$GITHUB_WORKSPACE/candidate-output"
+          echo "manifest_sha256=$(sha256sum candidate-output/candidate-artifact.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Upload the sealed candidate
         id: candidate-upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: candidate-soksak-spec-${{ github.sha }}
+          name: ${{ steps.source.outputs.artifact_name }}
           path: candidate-output/
           if-no-files-found: error
           compression-level: 0
@@ -72,4 +133,4 @@ jobs:
           printf 'artifact-id=%s\nartifact-digest=%s\nsource-commit=%s\n' \
             '${{ steps.candidate-upload.outputs.artifact-id }}' \
             '${{ steps.candidate-upload.outputs.artifact-digest }}' \
-            "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+            '${{ steps.source.outputs.commit }}' >> "$GITHUB_STEP_SUMMARY"
