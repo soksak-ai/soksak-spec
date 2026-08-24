@@ -3,11 +3,13 @@
 // consumers import from dist/spec.js; the CLI does not maintain a second wire grammar.
 
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { lstatSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   C2_STATIC_ENFORCEMENT,
   certifyRegistry,
+  parseBuildDependencies,
+  parseBuildDependencyReceipt,
   parseConformanceReport,
   parseManifest,
   parseRegistry,
@@ -17,6 +19,8 @@ import {
   parseSidecarManifest,
   releaseIdentity,
   transparencyViolations,
+  resolveBuildDependency,
+  verifyBuildDependencyReceipt,
   verifyConformanceReport,
 } from "../dist/spec.js";
 import { authenticateRegistry, buildRegistry, verifyReleaseClosure } from "../dist/registryPublication.js";
@@ -24,6 +28,8 @@ import { GitHubApi, publishImmutableRelease } from "../release-template/publish-
 
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
+  soksak-validate build-dependencies <build-dependencies.json> [--dependency <id> --target <triple>]
+  soksak-validate build-receipt <receipt.json> --dependencies <build-dependencies.json> --output-root <directory>
   soksak-validate release <release.json>...
   soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json> | --sidecar-manifest <sidecar.json>]
   soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id> [--at <ISO-8601>] [--high-water <sequence>:<sha256>]
@@ -34,7 +40,7 @@ const USAGE = `사용:
 
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
-const MODES = new Set(["plugin", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
+const MODES = new Set(["plugin", "build-dependencies", "build-receipt", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
 
 function usageExit(message) {
   if (message) console.error(message);
@@ -121,6 +127,85 @@ function validatePlugins(paths) {
     for (const violation of warned) console.log(`  ⚠ C2 ${violation.rule}: ${violation.detail}`);
   }
   return failed > 0 ? 1 : 0;
+}
+
+function validateBuildDependencies(args) {
+  const parsedArgs = parseOptions(args, new Set(["--dependency", "--target"]));
+  if (!parsedArgs.ok || parsedArgs.positional.length !== 1) {
+    return usageExit(parsedArgs.ok ? "build-dependencies: manifest 경로 하나가 필요합니다" : parsedArgs.error);
+  }
+  const dependency = parsedArgs.options.get("--dependency");
+  const target = parsedArgs.options.get("--target");
+  if ((dependency === undefined) !== (target === undefined)) {
+    return usageExit("build-dependencies: --dependency와 --target은 함께 사용해야 합니다");
+  }
+  const path = parsedArgs.positional[0];
+  const document = readDocument(path);
+  if (!document) return 1;
+  try {
+    const parsed = parseBuildDependencies(document.raw);
+    if (dependency === undefined) {
+      console.log(`✓ ${path} (${parsed.dependencies.length} dependencies)`);
+      return 0;
+    }
+    const resolved = resolveBuildDependency(parsed, dependency, target);
+    process.stdout.write(`${JSON.stringify({ ...resolved, target })}\n`);
+    return 0;
+  } catch (error) {
+    printErrors(path, [error instanceof Error ? error.message : String(error)]);
+    return 1;
+  }
+}
+
+function regularOutputRoot(value) {
+  const absolute = resolve(value);
+  const stat = lstatSync(absolute);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(absolute) !== absolute) {
+    throw new Error("build output root must be a regular directory with no symbolic path");
+  }
+  return absolute;
+}
+
+function validateBuildReceipt(args) {
+  const parsedArgs = parseOptions(args, new Set(["--dependencies", "--output-root"]));
+  if (!parsedArgs.ok || parsedArgs.positional.length !== 1) {
+    return usageExit(parsedArgs.ok ? "build-receipt: receipt 경로 하나가 필요합니다" : parsedArgs.error);
+  }
+  const dependenciesPath = parsedArgs.options.get("--dependencies");
+  const outputRootValue = parsedArgs.options.get("--output-root");
+  if (!dependenciesPath || !outputRootValue) {
+    return usageExit("build-receipt: --dependencies와 --output-root가 필요합니다");
+  }
+  const receiptPath = parsedArgs.positional[0];
+  const dependencyDocument = readDocument(dependenciesPath);
+  const receiptDocument = readDocument(receiptPath);
+  if (!dependencyDocument || !receiptDocument) return 1;
+  try {
+    const dependencies = parseBuildDependencies(dependencyDocument.raw);
+    const parsedReceipt = parseBuildDependencyReceipt(receiptDocument.raw);
+    const outputRoot = regularOutputRoot(outputRootValue);
+    const verified = verifyBuildDependencyReceipt({
+      dependencies,
+      receipt: parsedReceipt,
+      inspectOutput(relative) {
+        const absolute = resolve(outputRoot, ...relative.split("/"));
+        if (!absolute.startsWith(`${outputRoot}${sep}`)) return null;
+        try {
+          const stat = lstatSync(absolute);
+          if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(absolute) !== absolute) return null;
+          const bytes = readFileSync(absolute);
+          return { size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+        } catch {
+          return null;
+        }
+      },
+    });
+    console.log(`✓ ${receiptPath} (${verified.dependency}/${verified.target})`);
+    return 0;
+  } catch (error) {
+    printErrors(receiptPath, [error instanceof Error ? error.message : String(error)]);
+    return 1;
+  }
 }
 
 function validateReleases(paths) {
@@ -357,6 +442,8 @@ async function main(argv) {
   const args = argv.slice(1);
   if (args.length === 0) return usageExit(`${mode}: 입력 경로가 필요합니다`);
   if (mode === "plugin") return validatePlugins(args);
+  if (mode === "build-dependencies") return validateBuildDependencies(args);
+  if (mode === "build-receipt") return validateBuildReceipt(args);
   if (mode === "release") return validateReleases(args);
   if (mode === "conformance") return validateConformance(args);
   if (mode.startsWith("registry-")) return registryPublication(mode, args);
