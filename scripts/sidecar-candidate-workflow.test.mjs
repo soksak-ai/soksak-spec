@@ -24,7 +24,7 @@ test("canonical macOS workflow builds sealed native sidecar candidates", () => {
     "if-no-files-found: error",
   ]) assert.match(workflow, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   for (const forbidden of [
-    "repository: soksak-ai/", "contents: write", "create-github-app-token",
+    "repository: soksak-ai/", "{ value: ${{", "contents: write", "create-github-app-token",
     "publish-canonical-release", "gh release", "gh api", "x86_64-apple-darwin",
   ]) assert.doesNotMatch(workflow, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
