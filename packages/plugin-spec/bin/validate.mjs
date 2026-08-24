@@ -29,6 +29,7 @@ import { GitHubApi, publishImmutableRelease } from "../release-template/publish-
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
   soksak-validate build-dependencies <build-dependencies.json> [--dependency <id> --target <triple>]
+  soksak-validate build-receipt-create <build-dependencies.json> --dependency <id> --target <triple> --output-root <directory> --out <receipt.json>
   soksak-validate build-receipt <receipt.json> --dependencies <build-dependencies.json> --output-root <directory>
   soksak-validate release <release.json>...
   soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json> | --sidecar-manifest <sidecar.json>]
@@ -40,7 +41,7 @@ const USAGE = `사용:
 
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
-const MODES = new Set(["plugin", "build-dependencies", "build-receipt", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
+const MODES = new Set(["plugin", "build-dependencies", "build-receipt-create", "build-receipt", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
 
 function usageExit(message) {
   if (message) console.error(message);
@@ -203,6 +204,64 @@ function inspectOutputTree(root) {
   };
 }
 
+function inspectDeclaredOutput(outputRoot, declaration) {
+  const absolute = resolve(outputRoot, ...declaration.path.split("/"));
+  if (!absolute.startsWith(`${outputRoot}${sep}`)) return null;
+  if (declaration.type === "tree") return inspectOutputTree(absolute);
+  const stat = lstatSync(absolute);
+  if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(absolute) !== absolute) return null;
+  const bytes = readFileSync(absolute);
+  return { type: "file", size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+}
+
+function createBuildReceipt(args) {
+  const parsedArgs = parseOptions(args, new Set(["--dependency", "--target", "--output-root", "--out"]));
+  if (!parsedArgs.ok || parsedArgs.positional.length !== 1) {
+    return usageExit(parsedArgs.ok ? "build-receipt-create: dependency manifest 경로 하나가 필요합니다" : parsedArgs.error);
+  }
+  const dependency = parsedArgs.options.get("--dependency");
+  const target = parsedArgs.options.get("--target");
+  const outputRootValue = parsedArgs.options.get("--output-root");
+  const outValue = parsedArgs.options.get("--out");
+  if (!dependency || !target || !outputRootValue || !outValue) {
+    return usageExit("build-receipt-create: 모든 named option이 필요합니다");
+  }
+  const manifestPath = parsedArgs.positional[0];
+  const document = readDocument(manifestPath);
+  if (!document) return 1;
+  try {
+    const dependencies = parseBuildDependencies(document.raw);
+    const resolved = resolveBuildDependency(dependencies, dependency, target);
+    const outputRoot = regularOutputRoot(outputRootValue);
+    const outputs = resolved.outputs.map((declaration) => {
+      const inspection = inspectDeclaredOutput(outputRoot, declaration);
+      if (!inspection) throw new Error(`declared build output is unavailable: ${declaration.path}`);
+      return { path: declaration.path, ...inspection };
+    });
+    const receipt = parseBuildDependencyReceipt({
+      schema: "soksak-build-dependency-receipt-v1",
+      dependency: resolved.id,
+      target,
+      repository: resolved.repository,
+      commit: resolved.commit,
+      tools: resolved.tools,
+      outputs,
+    });
+    const out = resolve(outValue);
+    const parent = dirname(out);
+    const parentStat = lstatSync(parent);
+    if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || realpathSync(parent) !== parent) {
+      throw new Error("receipt output parent must be a regular directory with no symbolic path");
+    }
+    writeFileSync(out, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx", mode: 0o644 });
+    console.log(`✓ ${out} (${receipt.dependency}/${receipt.target})`);
+    return 0;
+  } catch (error) {
+    printErrors(manifestPath, [error instanceof Error ? error.message : String(error)]);
+    return 1;
+  }
+}
+
 function validateBuildReceipt(args) {
   const parsedArgs = parseOptions(args, new Set(["--dependencies", "--output-root"]));
   if (!parsedArgs.ok || parsedArgs.positional.length !== 1) {
@@ -225,16 +284,10 @@ function validateBuildReceipt(args) {
       dependencies,
       receipt: parsedReceipt,
       inspectOutput(relative) {
-        const absolute = resolve(outputRoot, ...relative.split("/"));
-        if (!absolute.startsWith(`${outputRoot}${sep}`)) return null;
         try {
           const declaration = parsedReceipt.outputs.find((output) => output.path === relative);
           if (!declaration) return null;
-          if (declaration.type === "tree") return inspectOutputTree(absolute);
-          const stat = lstatSync(absolute);
-          if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(absolute) !== absolute) return null;
-          const bytes = readFileSync(absolute);
-          return { type: "file", size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+          return inspectDeclaredOutput(outputRoot, declaration);
         } catch {
           return null;
         }
@@ -483,6 +536,7 @@ async function main(argv) {
   if (args.length === 0) return usageExit(`${mode}: 입력 경로가 필요합니다`);
   if (mode === "plugin") return validatePlugins(args);
   if (mode === "build-dependencies") return validateBuildDependencies(args);
+  if (mode === "build-receipt-create") return createBuildReceipt(args);
   if (mode === "build-receipt") return validateBuildReceipt(args);
   if (mode === "release") return validateReleases(args);
   if (mode === "conformance") return validateConformance(args);
