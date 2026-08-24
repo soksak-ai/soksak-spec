@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createRegularFileArchive, readRegularFileArchive, sha256 } from "./archive.mjs";
+import { assertNoLocalPackageDependencies } from "./package-dependencies.mjs";
 import { parseManifest } from "../dist/spec.js";
 
 // The plugin repository root is resolved by a discoverable rule rather than cwd guessing.
@@ -60,6 +61,7 @@ if (!packagePath) throw new Error("plugin package metadata is missing");
 const packageBytes = fs.readFileSync(packagePath);
 const manifestBytes = fs.readFileSync(path.join(root, "plugin.json"));
 const pkg = JSON.parse(packageBytes);
+assertNoLocalPackageDependencies(packagePath);
 const rawPlugin = JSON.parse(manifestBytes);
 if (typeof pkg.version !== "string" || pkg.version.length > 256 || !STRICT_SEMVER_RE.test(pkg.version)) {
   throw new Error("package version must be strict SemVer");

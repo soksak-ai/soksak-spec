@@ -150,8 +150,11 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(r.stderr).toMatch(/must be private/);
   });
 
-  it("refuses a local package dependency as a release input", () => {
-    writeFixture({ pkg: { dependencies: { "@soksak/example": "file:/tmp/example.tgz" } } });
+  it.each([
+    "file:/tmp/example.tgz", "file:///tmp/example.tgz", "link:../example", "workspace:*",
+    "portal:../example", "catalog:example", "../example", "/tmp/example", "C:\\example",
+  ])("refuses local package dependency %s as a release input", (specifier) => {
+    writeFixture({ pkg: { dependencies: { "@soksak/example": specifier } } });
     const result = build();
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("local dependency is not a release input");

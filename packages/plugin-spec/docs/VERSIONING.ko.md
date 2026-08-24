@@ -219,8 +219,10 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 - Node 릴리스는 커밋된 lockfile과 frozen install을 사용한다.
 - Rust 릴리스는 `Cargo.toml`과 `Cargo.lock`을 사용하며 Git dependency는 full `rev`를 사용한다.
 - Go 릴리스는 `go.mod`와 `go.sum`을 사용한다.
-- 릴리스 빌드는 npm `file:`, Cargo `path`, Go `replace`, sibling source path 및 설치로
-  변경된 lockfile을 거부한다. 이는 이식 가능한 릴리스 입력이 아니라 로컬 구조를 나타낸다.
+- 릴리스 빌드는 npm `file:`, `link:`, `workspace:`, `portal:`, `catalog:`, 절대 경로와 상위 상대
+  경로, Cargo `path`, Go `replace`, sibling source path 및 설치로 변경된 lockfile을 거부한다.
+  이는 이식 가능한 릴리스 입력이 아니라 로컬 구조를 나타낸다. Development override는 test가
+  소유한 staging metadata에만 존재하며 source 또는 release input에 복사하지 않는다.
 
 ## 6. 개발 경로
 

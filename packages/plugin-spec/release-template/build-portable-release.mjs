@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createRegularFileArchive, readRegularFileArchive, sha256 } from "./archive.mjs";
+import { assertNoLocalPackageDependencies } from "./package-dependencies.mjs";
 import { COMPONENT_ID_RE, STRICT_SEMVER_RE } from "../dist/release-primitives.js";
 import { parseConformanceReport } from "../dist/conformanceWire.js";
 import { parseReleaseManifest } from "../dist/release.js";
@@ -50,6 +51,7 @@ const hasJavaScript = fs.existsSync(path.join(root, "package.json"));
 const hasCargo = fs.existsSync(path.join(root, "Cargo.toml"));
 if (hasJavaScript === hasCargo) throw new Error("exactly one package.json or Cargo.toml is required");
 if (hasJavaScript) {
+  assertNoLocalPackageDependencies(path.join(root, "package.json"));
   const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
   if (packageMetadata.private !== true || packageMetadata.version !== identity.version) {
     throw new Error("private package version must equal portable component version");

@@ -221,8 +221,10 @@ package manifest states author intent; the lock or checksum records exact select
 - Node releases use a committed lockfile and a frozen install.
 - Rust releases use `Cargo.toml` and `Cargo.lock`; Git dependencies use a full `rev`.
 - Go releases use `go.mod` and `go.sum`.
-- Release builds reject npm `file:`, Cargo `path`, Go `replace`, sibling source paths, and
-  lockfiles changed by installation. These describe local topology, not portable release inputs.
+- Release builds reject npm `file:`, `link:`, `workspace:`, `portal:`, `catalog:`, absolute and
+  parent-relative paths, Cargo `path`, Go `replace`, sibling source paths, and lockfiles changed by
+  installation. These describe local topology, not portable release inputs. A development override
+  exists only in test-owned staging metadata and is never copied into source or release inputs.
 
 ## 6. Development paths
 
