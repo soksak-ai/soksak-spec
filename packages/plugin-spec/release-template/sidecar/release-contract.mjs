@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import zlib from "node:zlib";
+
+export { assertNativeBinaryTarget } from "./native-binary.mjs";
+export { readSidecarReleaseArchive } from "./archive.mjs";
 
 // ROOT is the sidecar repository root, resolved by a discoverable rule rather than cwd guessing
 // The sidecar.json identity marker is discovered at or above the working directory.
@@ -116,46 +118,6 @@ export function binaryName(target) {
   return `${ID}${target.includes("windows") ? ".exe" : ""}`;
 }
 
-export function assertNativeBinaryTarget(bytes, target) {
-  if (!Buffer.isBuffer(bytes)) throw new Error(`binary target ${target}: bytes are required`);
-  const expectedArchitecture = target.startsWith("aarch64-") ? "arm64" : "x86_64";
-  let format;
-  let architecture;
-  if (target.endsWith("apple-darwin")) {
-    if (bytes.length < 8 || bytes.readUInt32LE(0) !== 0xfeedfacf) {
-      throw new Error(`binary target ${target}: thin 64-bit Mach-O required`);
-    }
-    format = "mach-o";
-    const cpu = bytes.readUInt32LE(4);
-    architecture = cpu === 0x0100000c ? "arm64" : cpu === 0x01000007 ? "x86_64" : "unknown";
-  } else if (target.includes("unknown-linux")) {
-    if (bytes.length < 20 || !bytes.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46])) ||
-        bytes[4] !== 2 || bytes[5] !== 1) {
-      throw new Error(`binary target ${target}: little-endian ELF64 required`);
-    }
-    format = "elf";
-    const machine = bytes.readUInt16LE(18);
-    architecture = machine === 183 ? "arm64" : machine === 62 ? "x86_64" : "unknown";
-  } else if (target === "x86_64-pc-windows-msvc") {
-    if (bytes.length < 0x40 || bytes.subarray(0, 2).toString("ascii") !== "MZ") {
-      throw new Error(`binary target ${target}: PE32+ required`);
-    }
-    const pe = bytes.readUInt32LE(0x3c);
-    if (pe > bytes.length - 26 || bytes.subarray(pe, pe + 4).toString("binary") !== "PE\0\0" ||
-        bytes.readUInt16LE(pe + 24) !== 0x20b) {
-      throw new Error(`binary target ${target}: PE32+ signature required`);
-    }
-    format = "pe";
-    architecture = bytes.readUInt16LE(pe + 4) === 0x8664 ? "x86_64" : "unknown";
-  } else {
-    throw new Error(`binary target ${target}: unsupported target`);
-  }
-  if (architecture !== expectedArchitecture) {
-    throw new Error(`binary target ${target}: ${format} architecture ${architecture}, want ${expectedArchitecture}`);
-  }
-  return Object.freeze({ format, architecture });
-}
-
 export function assertNoLinkPath(input, kind) {
   const absolute = path.resolve(input);
   const parsed = path.parse(absolute);
@@ -190,80 +152,6 @@ export function readRegularFile(input) {
   } finally {
     fs.closeSync(fd);
   }
-}
-
-function tarOctal(block, offset, width, label) {
-  const value = block.subarray(offset, offset + width).toString("ascii").replace(/\0.*$/, "").trim();
-  if (!/^[0-7]*$/.test(value)) throw new Error(`invalid tar ${label}`);
-  return Number.parseInt(value || "0", 8);
-}
-
-function paxPath(bytes) {
-  let offset = 0;
-  let result;
-  while (offset < bytes.length) {
-    const space = bytes.indexOf(0x20, offset);
-    if (space < 0) throw new Error("invalid PAX record length");
-    const lengthText = bytes.subarray(offset, space).toString("ascii");
-    if (!/^[1-9][0-9]*$/.test(lengthText)) throw new Error("invalid PAX record length");
-    const length = Number.parseInt(lengthText, 10);
-    const end = offset + length;
-    if (!Number.isSafeInteger(length) || end > bytes.length || bytes[end - 1] !== 0x0a) throw new Error("invalid PAX record");
-    const record = bytes.subarray(space + 1, end - 1).toString("utf8");
-    const equals = record.indexOf("=");
-    if (equals < 1) throw new Error("invalid PAX record");
-    if (record.slice(0, equals) === "path") result = record.slice(equals + 1);
-    offset = end;
-  }
-  return result;
-}
-
-export function readSidecarReleaseArchive(bytes) {
-  const blockSize = 512;
-  const tar = zlib.gunzipSync(bytes);
-  const entries = [];
-  const seen = new Set();
-  let extendedPath;
-  for (let offset = 0; offset + blockSize <= tar.length; ) {
-    const block = tar.subarray(offset, offset + blockSize);
-    if (block.every((byte) => byte === 0)) break;
-    const checksum = Buffer.from(block);
-    checksum.fill(0x20, 148, 156);
-    if (tarOctal(block, 148, 8, "checksum") !== checksum.reduce((sum, byte) => sum + byte, 0)) {
-      throw new Error("invalid tar checksum");
-    }
-    const headerName = block.subarray(0, 100).toString("utf8").replace(/\0.*$/, "");
-    const prefix = block.subarray(345, 500).toString("utf8").replace(/\0.*$/, "");
-    const rawName = extendedPath ?? (prefix ? `${prefix}/${headerName}` : headerName);
-    const size = tarOctal(block, 124, 12, "size");
-    const type = String.fromCharCode(block[156] || 0x30);
-    const dataStart = offset + blockSize;
-    const dataEnd = dataStart + size;
-    if (dataEnd > tar.length) throw new Error("truncated archive entry");
-    if (type === "L") {
-      extendedPath = tar.subarray(dataStart, dataEnd).toString("utf8").replace(/\0.*$/, "");
-    } else if (type === "x") {
-      extendedPath = paxPath(tar.subarray(dataStart, dataEnd)) ?? extendedPath;
-    } else if (type === "g") {
-      paxPath(tar.subarray(dataStart, dataEnd));
-    } else if (type === "5") {
-      if (size !== 0) throw new Error(`directory archive entry contains data: ${rawName}`);
-      extendedPath = undefined;
-    } else if (type === "0" || type === "\0") {
-      const name = rawName.replace(/^\.\//, "").replace(/\/$/, "");
-      if (!name || name.startsWith("/") || name.includes("\\") || name.split("/").some((part) => !part || part === "." || part === "..")) {
-        throw new Error(`unsafe archive path: ${rawName}`);
-      }
-      if (seen.has(name)) throw new Error(`duplicate archive path: ${name}`);
-      seen.add(name);
-      entries.push({ name, data: tar.subarray(dataStart, dataEnd) });
-      extendedPath = undefined;
-    } else {
-      throw new Error(`non-regular archive entry: ${rawName}`);
-    }
-    offset = dataStart + Math.ceil(size / blockSize) * blockSize;
-  }
-  return entries;
 }
 
 export function ensureEmptyDirectory(input) {

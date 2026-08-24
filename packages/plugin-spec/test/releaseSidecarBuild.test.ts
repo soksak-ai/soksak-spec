@@ -70,7 +70,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   };
   fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
   fs.mkdirSync(path.join(root, "release"), { recursive: true });
-  for (const name of ["release-contract.mjs", "build-release.mjs", "validate-with-spec.mjs"]) {
+  for (const name of ["archive.mjs", "native-binary.mjs", "release-contract.mjs", "build-release.mjs", "validate-with-spec.mjs"]) {
     fs.copyFileSync(path.join(TEMPLATE, name), path.join(root, "scripts", name));
   }
   fs.writeFileSync(path.join(root, "sidecar.json"), `${JSON.stringify(sidecar, null, 2)}\n`);
