@@ -18,6 +18,7 @@ test("canonical macOS workflow builds sealed native sidecar candidates", () => {
     "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
     "KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0",
     "make verify", "make stage",
+    "npm install --global --ignore-scripts ./spec-candidate/soksak-ai-plugin-spec-*.tgz",
     "stage-candidate-package.mjs", "pack-target.mjs", "build-candidate.mjs",
     "seal-candidate-artifact.mjs", "verify-candidate-artifact.mjs",
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
