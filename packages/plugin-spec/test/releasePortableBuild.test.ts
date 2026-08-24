@@ -98,6 +98,23 @@ describe("portable contract and kit release builder", () => {
     expect(release).toMatchObject({ kind: "kit", id: "soksak-kit-sidecar-example", version: "0.0.1" });
   });
 
+  it("refuses a Cargo path dependency in a portable release", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    fs.appendFileSync(path.join(root, "Cargo.toml"), '\n[dependencies]\nlocal = { path = "/tmp/local" }\n');
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local Cargo dependency is not a release input");
+  });
+
+  it("refuses a Cargo patch path in portable workspace settings", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    fs.mkdirSync(path.join(root, ".cargo"));
+    fs.writeFileSync(path.join(root, ".cargo", "config.toml"), '[patch."https://example.invalid/repository"]\nlocal = { path = "../local" }\n');
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local Cargo dependency is not a release input");
+  });
+
   it("refuses local dependency state in a portable release", () => {
     writeFixture("kit", "soksak-kit-example");
     const packagePath = path.join(root, "package.json");
