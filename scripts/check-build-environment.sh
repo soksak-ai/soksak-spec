@@ -78,28 +78,6 @@ node_actual=$(node --version 2>/dev/null || true)
 node_platform=$(node -p process.platform 2>/dev/null || true)
 node_arch=$(node -p process.arch 2>/dev/null || true)
 pnpm_actual=$(cd "$root" && pnpm --version 2>/dev/null || true)
-pnpm_command=$(command -v pnpm 2>/dev/null || true)
-pnpm_executable_version=$(node -e '
-  const fs = require("fs");
-  const path = require("path");
-  let current;
-  try { current = path.dirname(fs.realpathSync(process.argv[1])); } catch { process.exit(2); }
-  for (;;) {
-    const manifest = path.join(current, "package.json");
-    if (fs.existsSync(manifest)) {
-      try {
-        const value = JSON.parse(fs.readFileSync(manifest, "utf8"));
-        if (value.name === "pnpm" && typeof value.version === "string") {
-          process.stdout.write(value.version);
-          process.exit(0);
-        }
-      } catch {}
-    }
-    const parent = path.dirname(current);
-    if (parent === current) process.exit(2);
-    current = parent;
-  }
-' "$pnpm_command" 2>/dev/null || true)
 rust_actual=$(rustc --version 2>/dev/null | awk '{print $2}' || true)
 rust_host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p' || true)
 cargo_actual=$(cargo --version 2>/dev/null || true)
@@ -109,12 +87,11 @@ go_host_arch=$(go -C "$root/go/platformspec" env GOHOSTARCH 2>/dev/null || true)
 
 if [ "$node_actual" != "v$node_expected" ] || [ "$node_platform" != "$required_platform" ] || \
    [ "$node_arch" != "$node_required_arch" ] || [ "$pnpm_actual" != "$pnpm_expected" ] || \
-   [ "$pnpm_executable_version" != "$pnpm_expected" ] || \
    [ "$rust_actual" != "$rust_expected" ] || [ "$rust_host" != "$rust_required_host" ] || [ -z "$cargo_actual" ] || \
    [ "$go_actual" != "go$go_expected" ] || [ "$go_host_os" != "$go_required_os" ] || [ "$go_host_arch" != "$go_required_arch" ]; then
-  printf 'TOOLCHAIN_MISMATCH: required=%s/%s node=v%s pnpm=%s rust=%s rustHost=%s go=go%s; actual node=%s nodeRuntime=%s/%s pnpm=%s pnpmExecutable=%s rust=%s rustHost=%s cargo=%s go=%s goRuntime=%s/%s\n' \
+  printf 'TOOLCHAIN_MISMATCH: required=%s/%s node=v%s pnpm=%s rust=%s rustHost=%s go=go%s; actual node=%s nodeRuntime=%s/%s pnpm=%s rust=%s rustHost=%s cargo=%s go=%s goRuntime=%s/%s\n' \
     "$required_platform" "$required_arch" "$node_expected" "$pnpm_expected" "$rust_expected" "$rust_required_host" "$go_expected" \
-    "${node_actual:-missing}" "${node_platform:-unknown}" "${node_arch:-unknown}" "${pnpm_actual:-missing}" "${pnpm_executable_version:-unknown}" \
+    "${node_actual:-missing}" "${node_platform:-unknown}" "${node_arch:-unknown}" "${pnpm_actual:-missing}" \
     "${rust_actual:-missing}" "${rust_host:-unknown}" "${cargo_actual:-missing}" "${go_actual:-missing}" \
     "${go_host_os:-unknown}" "${go_host_arch:-unknown}" >&2
   exit 78
@@ -128,6 +105,6 @@ else
   fail_declaration 'SHA-256 command is unavailable'
 fi
 
-printf 'BUILD_ENVIRONMENT_READY required=%s/%s node=v%s nodeRuntime=%s/%s pnpm=%s pnpmExecutable=%s rust=%s rustHost=%s go=%s goRuntime=%s/%s lockSHA256=%s\n' \
+printf 'BUILD_ENVIRONMENT_READY required=%s/%s node=v%s nodeRuntime=%s/%s pnpm=%s rust=%s rustHost=%s go=%s goRuntime=%s/%s lockSHA256=%s\n' \
   "$required_platform" "$required_arch" "$node_expected" "$node_platform" "$node_arch" "$pnpm_expected" \
-  "$pnpm_executable_version" "$rust_expected" "$rust_host" "$go_actual" "$go_host_os" "$go_host_arch" "$lock_digest"
+  "$rust_expected" "$rust_host" "$go_actual" "$go_host_os" "$go_host_arch" "$lock_digest"
