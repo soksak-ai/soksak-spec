@@ -11,9 +11,9 @@ function run(command, args, cwd) {
   return result.stdout;
 }
 
-function defaultCandidateChecks({ packageDirectory }) {
+function defaultCandidateChecks({ stage, packageDirectory }) {
   run("pnpm", ["install", "--no-frozen-lockfile"], packageDirectory);
-  run("make", ["verify"], packageDirectory);
+  run("make", ["verify"], stage);
 }
 
 export function buildNodeCandidate({ stage, output, kind, generated, runChecks = defaultCandidateChecks }) {
