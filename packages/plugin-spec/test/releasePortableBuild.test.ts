@@ -115,6 +115,17 @@ describe("portable contract and kit release builder", () => {
     expect(result.stderr).toContain("local Cargo dependency is not a release input");
   });
 
+  it("refuses a local Cargo package retained only in Cargo.lock", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    fs.writeFileSync(path.join(root, "Cargo.lock"), [
+      "version = 4", "", "[[package]]", 'name = "soksak-kit-sidecar-example"', 'version = "0.0.1"', "",
+      "[[package]]", 'name = "local-dependency"', 'version = "0.0.1"', "",
+    ].join("\n"));
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local Cargo dependency is not a release input");
+  });
+
   it("refuses local dependency state in a portable release", () => {
     writeFixture("kit", "soksak-kit-example");
     const packagePath = path.join(root, "package.json");
