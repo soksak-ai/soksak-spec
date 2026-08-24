@@ -9,8 +9,13 @@ test("spec owner emits a sealed candidate artifact without publication authority
   const workflow = fs.readFileSync(path.join(root, ".github/workflows/candidate.yml"), "utf8");
   for (const required of [
     "workflow_dispatch:",
+    "workflow_call:",
+    "source_ref:",
+    "github.workflow_ref",
     "contents: read",
     "persist-credentials: false",
+    "git -C source rev-parse HEAD",
+    "working-directory: source",
     "make verify",
     "candidate-output/release.json",
     "seal-candidate-artifact.mjs",
@@ -24,5 +29,6 @@ test("spec owner emits a sealed candidate artifact without publication authority
     "publish-release",
     "gh release",
     "gh api",
+    "repository: soksak-ai/soksak-spec",
   ]) assert.doesNotMatch(workflow, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
