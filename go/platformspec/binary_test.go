@@ -31,6 +31,7 @@ func nativeBinaryFixture(target string) []byte {
 		binary.LittleEndian.PutUint32(value[0x3c:], 0x80)
 		copy(value[0x80:], []byte{'P', 'E', 0, 0})
 		binary.LittleEndian.PutUint16(value[0x84:], 0x8664)
+		binary.LittleEndian.PutUint16(value[0x98:], 0x20b)
 		return value
 	default:
 		panic("unsupported fixture target")
