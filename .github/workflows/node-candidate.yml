@@ -1,0 +1,227 @@
+name: node-candidate
+
+on:
+  workflow_call:
+    inputs:
+      source_repository: { required: true, type: string }
+      source_ref: { required: true, type: string }
+      package_path: { required: true, type: string }
+      kind: { required: true, type: string }
+      generated: { required: true, type: string }
+      spec_artifact_name: { required: true, type: string }
+      spec_artifact_digest: { required: true, type: string }
+      spec_candidate_manifest_sha256: { required: true, type: string }
+      spec_source_commit: { required: true, type: string }
+      dependency_one_package_name: { required: true, type: string }
+      dependency_one_artifact_name: { required: true, type: string }
+      dependency_one_artifact_digest: { required: true, type: string }
+      dependency_one_candidate_manifest_sha256: { required: true, type: string }
+      dependency_one_source_commit: { required: true, type: string }
+      dependency_one_kind: { required: true, type: string }
+      dependency_two_package_name: { required: false, type: string, default: "" }
+      dependency_two_artifact_name: { required: false, type: string, default: "" }
+      dependency_two_artifact_digest: { required: false, type: string, default: "" }
+      dependency_two_candidate_manifest_sha256: { required: false, type: string, default: "" }
+      dependency_two_source_commit: { required: false, type: string, default: "" }
+      dependency_two_kind: { required: false, type: string, default: "" }
+    outputs:
+      artifact_name: { value: ${{ jobs.candidate.outputs.artifact_name }} }
+      artifact_id: { value: ${{ jobs.candidate.outputs.artifact_id }} }
+      artifact_digest: { value: ${{ jobs.candidate.outputs.artifact_digest }} }
+      candidate_manifest_sha256: { value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }} }
+      source_commit: { value: ${{ jobs.candidate.outputs.source_commit }} }
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      artifact_name: ${{ steps.identity.outputs.artifact_name }}
+      artifact_id: ${{ steps.candidate-upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.candidate-upload.outputs.artifact-digest }}
+      candidate_manifest_sha256: ${{ steps.seal.outputs.manifest_sha256 }}
+      source_commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - name: Validate the owner request
+        shell: bash
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          KIND: ${{ inputs.kind }}
+          DEPENDENCY_TWO_NAME: ${{ inputs.dependency_two_package_name }}
+          DEPENDENCY_TWO_ARTIFACT: ${{ inputs.dependency_two_artifact_name }}
+          DEPENDENCY_TWO_DIGEST: ${{ inputs.dependency_two_artifact_digest }}
+          DEPENDENCY_TWO_MANIFEST: ${{ inputs.dependency_two_candidate_manifest_sha256 }}
+          DEPENDENCY_TWO_COMMIT: ${{ inputs.dependency_two_source_commit }}
+          DEPENDENCY_TWO_KIND: ${{ inputs.dependency_two_kind }}
+        run: |
+          case "$SOURCE_REPOSITORY" in
+            [A-Za-z0-9_.-]*/[A-Za-z0-9_.-]*) ;;
+            *) echo "source_repository must be owner/name" >&2; exit 1 ;;
+          esac
+          case "$SOURCE_REF" in *[!a-f0-9]*|'') echo "source_ref is invalid" >&2; exit 1 ;; esac
+          test "${#SOURCE_REF}" -eq 40
+          case "$KIND" in portable|plugin) ;; *) echo "kind must be portable or plugin" >&2; exit 1 ;; esac
+          count=0
+          for value in "$DEPENDENCY_TWO_NAME" "$DEPENDENCY_TWO_ARTIFACT" "$DEPENDENCY_TWO_DIGEST" \
+            "$DEPENDENCY_TWO_MANIFEST" "$DEPENDENCY_TWO_COMMIT" "$DEPENDENCY_TWO_KIND"; do
+            test -z "$value" || count=$((count + 1))
+          done
+          test "$count" -eq 0 || test "$count" -eq 6
+      - name: Check out the exact owner source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ inputs.source_repository }}
+          ref: ${{ inputs.source_ref }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bind the exact source commit
+        id: source
+        shell: bash
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          commit=$(git -C source rev-parse HEAD)
+          test "$commit" = "$SOURCE_REF"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Download the exact spec candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ inputs.spec_artifact_name }}
+          path: spec-candidate
+      - name: Download dependency one
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ inputs.dependency_one_artifact_name }}
+          path: dependency-one
+      - name: Download dependency two
+        if: inputs.dependency_two_artifact_name != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ inputs.dependency_two_artifact_name }}
+          path: dependency-two
+      - name: Verify the spec validation input
+        shell: bash
+        env:
+          ARTIFACT_NAME: ${{ inputs.spec_artifact_name }}
+          ARTIFACT_DIGEST: ${{ inputs.spec_artifact_digest }}
+          MANIFEST_SHA256: ${{ inputs.spec_candidate_manifest_sha256 }}
+          SOURCE_COMMIT: ${{ inputs.spec_source_commit }}
+        run: |
+          for digest in "$ARTIFACT_DIGEST" "$MANIFEST_SHA256"; do
+            test "${#digest}" -eq 64
+            case "$digest" in *[!a-f0-9]*) echo "spec candidate digest is invalid" >&2; exit 1 ;; esac
+          done
+          test "$(sha256sum spec-candidate/candidate-artifact.json | awk '{print $1}')" = "$MANIFEST_SHA256"
+          test "$(jq -r .source.commit spec-candidate/candidate-artifact.json)" = "$SOURCE_COMMIT"
+          test "$(jq -r .component.kind spec-candidate/candidate-artifact.json)" = "spec"
+          set -- spec-candidate/soksak-ai-plugin-spec-*.tgz
+          test "$#" -eq 1
+          mkdir spec-package
+          tar -xzf "$1" -C spec-package --strip-components=1
+          test -z "$(find spec-package -type l -print -quit)"
+          node spec-package/release-template/verify-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/spec-candidate"
+          node spec-package/release-template/write-candidate-input-receipt.mjs \
+            --directory "$GITHUB_WORKSPACE/spec-candidate" \
+            --artifact-name "$ARTIFACT_NAME" --artifact-digest "$ARTIFACT_DIGEST" \
+            --candidate-manifest-sha256 "$MANIFEST_SHA256" \
+            --out "$GITHUB_WORKSPACE/spec-validation.json"
+      - name: Prepare dependency one
+        shell: bash
+        run: >-
+          node spec-package/release-template/prepare-candidate-package-input.mjs
+          --directory "$GITHUB_WORKSPACE/dependency-one"
+          --artifact-name '${{ inputs.dependency_one_artifact_name }}'
+          --artifact-digest '${{ inputs.dependency_one_artifact_digest }}'
+          --candidate-manifest-sha256 '${{ inputs.dependency_one_candidate_manifest_sha256 }}'
+          --source-commit '${{ inputs.dependency_one_source_commit }}'
+          --kind '${{ inputs.dependency_one_kind }}'
+          --package-name '${{ inputs.dependency_one_package_name }}'
+          --receipt-out "$GITHUB_WORKSPACE/dependency-one.json"
+          > "$GITHUB_WORKSPACE/dependency-one-plan.json"
+      - name: Prepare dependency two
+        if: inputs.dependency_two_artifact_name != ''
+        shell: bash
+        run: >-
+          node spec-package/release-template/prepare-candidate-package-input.mjs
+          --directory "$GITHUB_WORKSPACE/dependency-two"
+          --artifact-name '${{ inputs.dependency_two_artifact_name }}'
+          --artifact-digest '${{ inputs.dependency_two_artifact_digest }}'
+          --candidate-manifest-sha256 '${{ inputs.dependency_two_candidate_manifest_sha256 }}'
+          --source-commit '${{ inputs.dependency_two_source_commit }}'
+          --kind '${{ inputs.dependency_two_kind }}'
+          --package-name '${{ inputs.dependency_two_package_name }}'
+          --receipt-out "$GITHUB_WORKSPACE/dependency-two.json"
+          > "$GITHUB_WORKSPACE/dependency-two-plan.json"
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          package_json_file: source/${{ inputs.package_path }}
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: source/.node-version
+      - name: Declare the isolated candidate stage
+        shell: bash
+        env:
+          PACKAGE_PATH: ${{ inputs.package_path }}
+          HAS_DEPENDENCY_TWO: ${{ inputs.dependency_two_artifact_name }}
+        run: |
+          node -e '
+            const fs=require("fs");
+            const dependencies=[JSON.parse(fs.readFileSync(process.argv[2],"utf8"))];
+            if (process.env.HAS_DEPENDENCY_TWO) dependencies.push(JSON.parse(fs.readFileSync(process.argv[3],"utf8")));
+            fs.writeFileSync(process.argv[1],JSON.stringify({packagePath:process.env.PACKAGE_PATH,dependencies},null,2)+"\n");
+          ' "$GITHUB_WORKSPACE/stage-plan.json" "$GITHUB_WORKSPACE/dependency-one-plan.json" "$GITHUB_WORKSPACE/dependency-two-plan.json"
+          mkdir stage component-output
+      - name: Stage the exact source and dependencies
+        run: >-
+          node spec-package/release-template/stage-node-candidate.mjs
+          --source "$GITHUB_WORKSPACE/source"
+          --out "$GITHUB_WORKSPACE/stage"
+          --plan "$GITHUB_WORKSPACE/stage-plan.json"
+      - name: Build and verify the candidate
+        run: >-
+          node spec-package/release-template/build-node-candidate.mjs
+          --stage "$GITHUB_WORKSPACE/stage"
+          --out "$GITHUB_WORKSPACE/component-output"
+          --kind '${{ inputs.kind }}'
+          --generated '${{ inputs.generated }}'
+      - name: Seal the component candidate
+        id: seal
+        shell: bash
+        env:
+          HAS_DEPENDENCY_TWO: ${{ inputs.dependency_two_artifact_name }}
+        run: |
+          cp spec-validation.json component-output/spec-validation.json
+          cp dependency-one.json component-output/dependency-one.json
+          set -- --evidence dependency-one.json --evidence spec-validation.json
+          if [ -n "$HAS_DEPENDENCY_TWO" ]; then
+            cp dependency-two.json component-output/dependency-two.json
+            set -- "$@" --evidence dependency-two.json
+          fi
+          node spec-package/release-template/seal-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/component-output" "$@"
+          node spec-package/release-template/verify-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/component-output"
+          echo "manifest_sha256=$(sha256sum component-output/candidate-artifact.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Name the artifact from verified component identity
+        id: identity
+        shell: bash
+        run: |
+          id=$(jq -r .component.id component-output/candidate-artifact.json)
+          echo "artifact_name=candidate-$id-${{ steps.source.outputs.commit }}" >> "$GITHUB_OUTPUT"
+      - name: Upload the sealed component candidate
+        id: candidate-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ steps.identity.outputs.artifact_name }}
+          path: component-output/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

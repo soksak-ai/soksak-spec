@@ -72,6 +72,7 @@ test("repository owns a complete reproducible release boundary", () => {
   for (const path of [
     ".node-version",
     ".github/workflows/candidate.yml",
+    ".github/workflows/node-candidate.yml",
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
     ".gitignore",
