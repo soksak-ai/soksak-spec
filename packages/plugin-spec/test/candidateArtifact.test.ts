@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  createCandidateInputReceipt,
   sealCandidateArtifact,
   verifyCandidateArtifact,
 } from "../release-template/candidate-artifact.mjs";
@@ -106,5 +107,32 @@ describe("nonpublishing candidate artifact", () => {
     const first = fs.readFileSync(path.join(directory, "candidate-artifact.json"));
     sealCandidateArtifact({ directory });
     expect(fs.readFileSync(path.join(directory, "candidate-artifact.json"))).toEqual(first);
+  });
+
+  it("records a downloaded candidate as a validation input without making it a runtime dependency", () => {
+    const manifest = sealCandidateArtifact({ directory });
+    const manifestBytes = fs.readFileSync(path.join(directory, "candidate-artifact.json"));
+    const receipt = createCandidateInputReceipt({
+      directory,
+      artifactName: `candidate-${manifest.component.id}-${manifest.source.commit}`,
+      artifactDigest: "a".repeat(64),
+      candidateManifestSHA256: digest(manifestBytes),
+    });
+    expect(receipt).toEqual({
+      schema: "soksak-candidate-input-receipt-v1",
+      artifact: {
+        name: `candidate-${manifest.component.id}-${manifest.source.commit}`,
+        sha256: "a".repeat(64),
+        candidateManifestSHA256: digest(manifestBytes),
+      },
+      component: manifest.component,
+      source: manifest.source,
+    });
+    expect(() => createCandidateInputReceipt({
+      directory,
+      artifactName: "candidate-invalid",
+      artifactDigest: "a".repeat(64),
+      candidateManifestSHA256: "0".repeat(64),
+    })).toThrow("candidate manifest digest mismatch");
   });
 });
