@@ -7,6 +7,17 @@ fail_declaration() {
   exit 78
 }
 
+if [ "$#" -ne 8 ] || [ "$1" != --node ] || [ "$3" != --pnpm ] || [ "$5" != --rust ] || [ "$7" != --go ]; then
+  fail_declaration 'usage: check-build-environment.sh --node <version> --pnpm <version> --rust <version> --go <version>'
+fi
+node_expected=$2
+pnpm_expected=$4
+rust_expected=$6
+go_expected=$8
+for expected in "$node_expected" "$pnpm_expected" "$rust_expected" "$go_expected"; do
+  case "$expected" in ''|*[!0-9.]*) fail_declaration 'Makefile tool versions must be exact numeric versions' ;; esac
+done
+
 selection=$root/.node-version
 manifest=$root/package.json
 lockfile=$root/pnpm-lock.yaml
@@ -16,16 +27,17 @@ for required_file in "$selection" "$manifest" "$lockfile" "$go_manifest" "$rust_
   [ -f "$required_file" ] || fail_declaration "required owner file is missing: ${required_file#$root/}"
 done
 
-node_expected=$(awk 'NF { value=$0; count++ } END { if (count == 1) print value; else exit 1 }' "$selection" 2>/dev/null || true)
+node_selection=$(awk 'NF { value=$0; count++ } END { if (count == 1) print value; else exit 1 }' "$selection" 2>/dev/null || true)
 manifest_flat=$(tr '\n' ' ' < "$manifest")
 node_declared=$(printf '%s\n' "$manifest_flat" | sed -n 's/.*"engines"[[:space:]]*:[[:space:]]*{[^}]*"node"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 package_manager=$(printf '%s\n' "$manifest_flat" | sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-case "$package_manager" in pnpm@*) pnpm_expected=${package_manager#pnpm@} ;; *) pnpm_expected= ;; esac
-go_expected=$(awk '$1 == "go" && NF == 2 { print $2; count++ } END { if (count != 1) exit 1 }' "$go_manifest" 2>/dev/null || true)
-rust_expected=$(sed -n 's/^channel = "\([^"]*\)"$/\1/p' "$rust_manifest")
-if [ -z "$node_expected" ] || [ "$node_expected" != "$node_declared" ] || [ -z "$pnpm_expected" ] || \
-   [ -z "$go_expected" ] || [ -z "$rust_expected" ]; then
-  fail_declaration '.node-version, package.json, go.mod, and rust-toolchain.toml must contain exact aligned owners'
+case "$package_manager" in pnpm@*) pnpm_projection=${package_manager#pnpm@} ;; *) pnpm_projection= ;; esac
+go_projection=$(awk '$1 == "go" && NF == 2 { print $2; count++ } END { if (count != 1) exit 1 }' "$go_manifest" 2>/dev/null || true)
+rust_projection=$(sed -n 's/^channel = "\([^"]*\)"$/\1/p' "$rust_manifest")
+if [ "$node_expected" != "$node_selection" ] || [ "$node_expected" != "$node_declared" ] || \
+   [ "$pnpm_expected" != "$pnpm_projection" ] || [ "$go_expected" != "$go_projection" ] || \
+   [ "$rust_expected" != "$rust_projection" ]; then
+  fail_declaration 'Makefile versions and ecosystem projections must be exact and aligned'
 fi
 
 host_system=$(uname -s)
