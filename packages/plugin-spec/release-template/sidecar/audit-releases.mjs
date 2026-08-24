@@ -77,9 +77,12 @@ async function auditArtifact({ request, repository, id, version, artifact, asset
   assertNativeBinaryTarget(executable.data, artifact.target);
 }
 
-export async function auditSidecarRepository({ repository, request = githubRequest }) {
+export async function auditSidecarRepository({ repository, tag, request = githubRequest }) {
   const match = REPOSITORY.exec(repository);
   if (!match) throw new Error("canonical GitHub sidecar repository URL required");
+  if (tag !== undefined && !/^v(?:0|[1-9][0-9]*)[.](?:0|[1-9][0-9]*)[.](?:0|[1-9][0-9]*)$/.test(tag)) {
+    throw new Error("requested release tag must be an exact stable version");
+  }
   const [, owner, id] = match;
   const releases = [];
   for (let page = 1; ; page += 1) {
@@ -90,8 +93,10 @@ export async function auditSidecarRepository({ repository, request = githubReque
     if (values.length < 100) break;
   }
 
-  const report = { schema: "soksak-sidecar-release-audit-v1", repository, releases: releases.length, artifacts: 0, failures: [] };
-  for (const release of releases) {
+  const selected = tag === undefined ? releases : releases.filter((release) => release.tag_name === tag);
+  if (tag !== undefined && selected.length !== 1) throw new Error(`requested release tag does not exist: ${tag}`);
+  const report = { schema: "soksak-sidecar-release-audit-v1", repository, releases: selected.length, artifacts: 0, failures: [] };
+  for (const release of selected) {
     const tag = typeof release.tag_name === "string" ? release.tag_name : "unknown";
     try {
       const assets = assetMap(release);
@@ -126,14 +131,24 @@ export async function auditSidecarRepository({ repository, request = githubReque
   return report;
 }
 
-function repositoryOption(argv) {
-  if (argv.length !== 2 || argv[0] !== "--repository" || !argv[1]) throw new Error("usage: audit-releases.mjs --repository <canonical-github-url>");
-  return argv[1];
+function auditOptions(argv) {
+  if (argv.length < 2 || argv.length % 2 !== 0) throw new Error("usage: audit-releases.mjs --repository <canonical-github-url> [--tag <exact-tag>]");
+  const values = {};
+  for (let index = 0; index < argv.length; index += 2) {
+    const name = argv[index];
+    const value = argv[index + 1];
+    if ((name !== "--repository" && name !== "--tag") || !value || values[name]) {
+      throw new Error("usage: audit-releases.mjs --repository <canonical-github-url> [--tag <exact-tag>]");
+    }
+    values[name] = value;
+  }
+  if (!values["--repository"]) throw new Error("--repository is required");
+  return { repository: values["--repository"], tag: values["--tag"] };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const report = await auditSidecarRepository({ repository: repositoryOption(process.argv.slice(2)) });
+    const report = await auditSidecarRepository(auditOptions(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     if (report.failures.length > 0) process.exitCode = 1;
   } catch (error) {
