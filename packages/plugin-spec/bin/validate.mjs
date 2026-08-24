@@ -166,6 +166,43 @@ function regularOutputRoot(value) {
   return absolute;
 }
 
+function inspectOutputTree(root) {
+  const rootStat = lstatSync(root);
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || realpathSync(root) !== root) return null;
+  const entries = [];
+  const walk = (directory, prefix) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const absolute = join(directory, entry.name);
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink()) throw new Error(`build output tree contains a symbolic link: ${relative}`);
+      if (entry.isDirectory()) {
+        walk(absolute, relative);
+        continue;
+      }
+      if (!entry.isFile() || realpathSync(absolute) !== absolute) {
+        throw new Error(`build output tree contains a non-regular entry: ${relative}`);
+      }
+      const stat = lstatSync(absolute);
+      const bytes = readFileSync(absolute);
+      entries.push({
+        path: relative,
+        mode: stat.mode & 0o111 ? "755" : "644",
+        size: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      });
+    }
+  };
+  walk(root, "");
+  if (entries.length === 0) return null;
+  const size = entries.reduce((total, entry) => total + entry.size, 0);
+  return {
+    type: "tree",
+    files: entries.length,
+    size,
+    sha256: createHash("sha256").update(JSON.stringify(entries)).digest("hex"),
+  };
+}
+
 function validateBuildReceipt(args) {
   const parsedArgs = parseOptions(args, new Set(["--dependencies", "--output-root"]));
   if (!parsedArgs.ok || parsedArgs.positional.length !== 1) {
@@ -191,10 +228,13 @@ function validateBuildReceipt(args) {
         const absolute = resolve(outputRoot, ...relative.split("/"));
         if (!absolute.startsWith(`${outputRoot}${sep}`)) return null;
         try {
+          const declaration = parsedReceipt.outputs.find((output) => output.path === relative);
+          if (!declaration) return null;
+          if (declaration.type === "tree") return inspectOutputTree(absolute);
           const stat = lstatSync(absolute);
           if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(absolute) !== absolute) return null;
           const bytes = readFileSync(absolute);
-          return { size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
+          return { type: "file", size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") };
         } catch {
           return null;
         }

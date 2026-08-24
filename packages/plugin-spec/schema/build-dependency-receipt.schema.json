@@ -32,15 +32,34 @@
       "propertyNames": { "$ref": "#/$defs/id" },
       "additionalProperties": { "$ref": "#/$defs/version" }
     },
-    "output": {
+    "fileOutput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "size", "sha256"],
+      "required": ["path", "type", "size", "sha256"],
       "properties": {
         "path": { "$ref": "#/$defs/path" },
+        "type": { "const": "file" },
         "size": { "type": "integer", "minimum": 1 },
         "sha256": { "$ref": "#/$defs/sha256" }
       }
+    },
+    "treeOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "type", "files", "size", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "type": { "const": "tree" },
+        "files": { "type": "integer", "minimum": 1 },
+        "size": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "output": {
+      "oneOf": [
+        { "$ref": "#/$defs/fileOutput" },
+        { "$ref": "#/$defs/treeOutput" }
+      ]
     }
   }
 }

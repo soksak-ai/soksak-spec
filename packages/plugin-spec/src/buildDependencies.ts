@@ -12,7 +12,12 @@ export interface BuildDependency {
   repository: string;
   commit: string;
   tools: Readonly<Record<string, string>>;
-  targets: Readonly<Record<string, { outputs: readonly string[] }>>;
+  targets: Readonly<Record<string, { outputs: readonly BuildOutput[] }>>;
+}
+
+export interface BuildOutput {
+  path: string;
+  type: "file" | "tree";
 }
 
 export interface BuildDependencies {
@@ -27,13 +32,16 @@ export interface BuildDependencyReceipt {
   repository: string;
   commit: string;
   tools: Readonly<Record<string, string>>;
-  outputs: readonly { path: string; size: number; sha256: string }[];
+  outputs: readonly BuildReceiptOutput[];
 }
 
-export interface BuildOutputInspection {
-  size: number;
-  sha256: string;
-}
+export type BuildReceiptOutput =
+  | { path: string; type: "file"; size: number; sha256: string }
+  | { path: string; type: "tree"; files: number; size: number; sha256: string };
+
+export type BuildOutputInspection =
+  | { type: "file"; size: number; sha256: string }
+  | { type: "tree"; files: number; size: number; sha256: string };
 
 function assertKnownKeys(value: Record<string, unknown>, allowed: readonly string[], label: string): void {
   const errors: string[] = [];
@@ -84,9 +92,9 @@ function parseTools(value: unknown, label: string): Readonly<Record<string, stri
   return Object.freeze(result);
 }
 
-function parseTargets(value: unknown): Readonly<Record<string, { outputs: readonly string[] }>> {
+function parseTargets(value: unknown): Readonly<Record<string, { outputs: readonly BuildOutput[] }>> {
   if (!isRecord(value) || Object.keys(value).length === 0) throw new Error("build dependency must declare targets");
-  const result: Record<string, { outputs: readonly string[] }> = {};
+  const result: Record<string, { outputs: readonly BuildOutput[] }> = {};
   for (const target of Object.keys(value).sort()) {
     const raw = value[target];
     if (!TARGET.test(target) || !isRecord(raw)) throw new Error(`unsupported build dependency target: ${target}`);
@@ -94,12 +102,21 @@ function parseTargets(value: unknown): Readonly<Record<string, { outputs: readon
     if (!Array.isArray(raw.outputs) || raw.outputs.length === 0) {
       throw new Error(`build dependency target ${target} must declare outputs`);
     }
-    const outputs = raw.outputs.map((output) => safePath(output, `build dependency target ${target} output`));
-    if (outputs.some((output) => !output.startsWith(`targets/${target}/`))) {
+    const outputs = raw.outputs.map((output) => {
+      if (!isRecord(output)) throw new Error(`build dependency target ${target} output must be an object`);
+      assertKnownKeys(output, ["path", "type"], `build dependency target ${target} output`);
+      const outputPath = safePath(output.path, `build dependency target ${target} output path`);
+      if (output.type !== "file" && output.type !== "tree") {
+        throw new Error(`build dependency target ${target} output type is invalid`);
+      }
+      return Object.freeze({ path: outputPath, type: output.type });
+    });
+    if (outputs.some((output) => !output.path.startsWith(`targets/${target}/`))) {
       throw new Error(`build dependency target ${target} requires a target-namespaced output`);
     }
-    assertUnique(outputs, `build dependency target ${target} outputs`);
-    if ([...outputs].sort().join("\n") !== outputs.join("\n")) {
+    const paths = outputs.map((output) => output.path);
+    assertUnique(paths, `build dependency target ${target} outputs`);
+    if ([...paths].sort().join("\n") !== paths.join("\n")) {
       throw new Error(`build dependency target ${target} outputs must be sorted`);
     }
     result[target] = Object.freeze({ outputs: Object.freeze(outputs) });
@@ -163,15 +180,27 @@ export function parseBuildDependencyReceipt(value: unknown): BuildDependencyRece
   if (!Array.isArray(value.outputs) || value.outputs.length === 0) {
     throw new Error("build dependency receipt must declare outputs");
   }
-  const outputs = value.outputs.map((raw) => {
+  const outputs: BuildReceiptOutput[] = value.outputs.map((raw) => {
     if (!isRecord(raw)) throw new Error("build dependency receipt output must be an object");
-    assertKnownKeys(raw, ["path", "size", "sha256"], "build dependency receipt output");
+    if (raw.type === "file") {
+      assertKnownKeys(raw, ["path", "type", "size", "sha256"], "build dependency receipt file output");
+    } else if (raw.type === "tree") {
+      assertKnownKeys(raw, ["path", "type", "files", "size", "sha256"], "build dependency receipt tree output");
+    } else {
+      throw new Error("build dependency receipt output type is invalid");
+    }
     const outputPath = safePath(raw.path, "build dependency receipt output path");
     if (!outputPath.startsWith(`targets/${target}/`) || typeof raw.size !== "number" ||
         !Number.isSafeInteger(raw.size) || raw.size < 1 || !SHA256.test(String(raw.sha256 ?? ""))) {
       throw new Error("build dependency receipt output is invalid");
     }
-    return Object.freeze({ path: outputPath, size: raw.size, sha256: String(raw.sha256) });
+    if (raw.type === "tree") {
+      if (typeof raw.files !== "number" || !Number.isSafeInteger(raw.files) || raw.files < 1) {
+        throw new Error("build dependency receipt tree output file count is invalid");
+      }
+      return Object.freeze({ path: outputPath, type: "tree" as const, files: raw.files, size: raw.size, sha256: String(raw.sha256) });
+    }
+    return Object.freeze({ path: outputPath, type: "file" as const, size: raw.size, sha256: String(raw.sha256) });
   });
   const paths = outputs.map((output) => output.path);
   assertUnique(paths, "build dependency receipt outputs");
@@ -203,12 +232,13 @@ export function verifyBuildDependencyReceipt(input: {
   if (JSON.stringify(receipt.tools) !== JSON.stringify(dependency.tools)) {
     throw new Error("build dependency receipt tools differ from declaration");
   }
-  if (receipt.outputs.map((output) => output.path).join("\n") !== expectedOutputs.join("\n")) {
+  if (JSON.stringify(receipt.outputs.map(({ path, type }) => ({ path, type }))) !== JSON.stringify(expectedOutputs)) {
     throw new Error("build dependency receipt output set differs from declaration");
   }
   for (const output of receipt.outputs) {
     const actual = input.inspectOutput(output.path);
-    if (!actual || actual.size !== output.size || actual.sha256 !== output.sha256) {
+    if (!actual || actual.type !== output.type || actual.size !== output.size || actual.sha256 !== output.sha256 ||
+        (output.type === "tree" && (actual.type !== "tree" || actual.files !== output.files))) {
       throw new Error(`build dependency output bytes differ from receipt: ${output.path}`);
     }
   }
