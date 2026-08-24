@@ -150,6 +150,13 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     expect(r.stderr).toMatch(/must be private/);
   });
 
+  it("refuses a local package dependency as a release input", () => {
+    writeFixture({ pkg: { dependencies: { "@soksak/example": "file:/tmp/example.tgz" } } });
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local dependency is not a release input");
+  });
+
   it("refuses an obsolete schema discriminator", () => {
     writeFixture({ plugin: { schema: "soksak-spec-plugin@0.0.1" } });
     const r = build();

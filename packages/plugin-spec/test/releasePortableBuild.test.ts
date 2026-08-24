@@ -97,4 +97,15 @@ describe("portable contract and kit release builder", () => {
     const release = JSON.parse(fs.readFileSync(path.join(out, "release.json"), "utf8"));
     expect(release).toMatchObject({ kind: "kit", id: "soksak-kit-sidecar-example", version: "0.0.1" });
   });
+
+  it("refuses local dependency state in a portable release", () => {
+    writeFixture("kit", "soksak-kit-example");
+    const packagePath = path.join(root, "package.json");
+    const pkg = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+    pkg.devDependencies = { "@soksak/example": "file:/tmp/example.tgz" };
+    fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local dependency is not a release input");
+  });
 });
