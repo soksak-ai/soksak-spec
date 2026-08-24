@@ -3,12 +3,20 @@ name: candidate
 on:
   workflow_dispatch:
     inputs:
+      source_repository:
+        description: Owner/name repository containing the source commit
+        required: true
+        type: string
       source_ref:
         description: Exact 40-character source commit to build
         required: true
         type: string
   workflow_call:
     inputs:
+      source_repository:
+        description: Owner/name repository containing the source commit
+        required: true
+        type: string
       source_ref:
         description: Exact 40-character source commit to build
         required: true
@@ -29,7 +37,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: candidate-${{ github.workflow_ref }}-${{ inputs.source_ref }}
+  group: candidate-${{ inputs.source_repository }}-${{ inputs.source_ref }}
   cancel-in-progress: false
 
 jobs:
@@ -43,22 +51,10 @@ jobs:
       candidate_manifest_sha256: ${{ steps.seal.outputs.manifest_sha256 }}
       source_commit: ${{ steps.source.outputs.commit }}
     steps:
-      - name: Resolve this workflow's owner repository
-        id: source-owner
-        shell: bash
-        env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
-        run: |
-          repository=${WORKFLOW_REF%%/.github/workflows/*}
-          case "$repository" in
-            */*) ;;
-            *) echo "workflow_ref has no owner repository" >&2; exit 1 ;;
-          esac
-          echo "repository=$repository" >> "$GITHUB_OUTPUT"
       - name: Check out the exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          repository: ${{ steps.source-owner.outputs.repository }}
+          repository: ${{ inputs.source_repository }}
           ref: ${{ inputs.source_ref }}
           path: source
           fetch-depth: 0
@@ -67,8 +63,10 @@ jobs:
         id: source
         shell: bash
         env:
+          SOURCE_REPOSITORY: ${{ inputs.source_repository }}
           SOURCE_REF: ${{ inputs.source_ref }}
         run: |
+          case "$SOURCE_REPOSITORY" in [A-Za-z0-9_.-]*/[A-Za-z0-9_.-]*) ;; *) echo "source_repository must be owner/name" >&2; exit 1 ;; esac
           case "$SOURCE_REF" in
             *[!a-f0-9]*|'') echo "source_ref must be a lowercase commit" >&2; exit 1 ;;
           esac
