@@ -1,0 +1,223 @@
+name: sidecar-candidate
+
+on:
+  workflow_call:
+    inputs:
+      source_repository: { required: true, type: string }
+      source_ref: { required: true, type: string }
+      language: { required: true, type: string }
+      profile: { required: true, type: string }
+      spec_artifact_name: { required: true, type: string }
+      spec_artifact_digest: { required: true, type: string }
+      spec_candidate_manifest_sha256: { required: true, type: string }
+      spec_source_commit: { required: true, type: string }
+    outputs:
+      artifact_name: { value: ${{ jobs.candidate.outputs.artifact_name }} }
+      artifact_id: { value: ${{ jobs.candidate.outputs.artifact_id }} }
+      artifact_digest: { value: ${{ jobs.candidate.outputs.artifact_digest }} }
+      candidate_manifest_sha256: { value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }} }
+      source_commit: { value: ${{ jobs.candidate.outputs.source_commit }} }
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      TARGET: aarch64-apple-darwin
+    outputs:
+      artifact_name: ${{ steps.identity.outputs.artifact_name }}
+      artifact_id: ${{ steps.candidate-upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.candidate-upload.outputs.artifact-digest }}
+      candidate_manifest_sha256: ${{ steps.seal.outputs.manifest_sha256 }}
+      source_commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - name: Validate the owner request
+        shell: bash
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          LANGUAGE: ${{ inputs.language }}
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$SOURCE_REPOSITORY" in [A-Za-z0-9_.-]*/[A-Za-z0-9_.-]*) ;; *) echo "source_repository must be owner/name" >&2; exit 1 ;; esac
+          case "$SOURCE_REF" in *[!a-f0-9]*|'') echo "source_ref is invalid" >&2; exit 1 ;; esac
+          test "${#SOURCE_REF}" -eq 40
+          case "$LANGUAGE" in go|rust) ;; *) echo "language must be go or rust" >&2; exit 1 ;; esac
+          case "$PROFILE" in standard|ghostty|kitty|shitty) ;; *) echo "unknown concrete sidecar profile" >&2; exit 1 ;; esac
+      - name: Check out the exact owner source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ inputs.source_repository }}
+          ref: ${{ inputs.source_ref }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bind the exact source commit
+        id: source
+        shell: bash
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          commit=$(git -C source rev-parse HEAD)
+          test "$commit" = "$SOURCE_REF"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Download the exact spec candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ inputs.spec_artifact_name }}
+          path: spec-candidate
+      - name: Verify and extract the spec candidate
+        shell: bash
+        env:
+          ARTIFACT_NAME: ${{ inputs.spec_artifact_name }}
+          ARTIFACT_DIGEST: ${{ inputs.spec_artifact_digest }}
+          MANIFEST_SHA256: ${{ inputs.spec_candidate_manifest_sha256 }}
+          SOURCE_COMMIT: ${{ inputs.spec_source_commit }}
+        run: |
+          for digest in "$ARTIFACT_DIGEST" "$MANIFEST_SHA256"; do
+            test "${#digest}" -eq 64
+            case "$digest" in *[!a-f0-9]*) echo "spec candidate digest is invalid" >&2; exit 1 ;; esac
+          done
+          test "$(sha256sum spec-candidate/candidate-artifact.json | awk '{print $1}')" = "$MANIFEST_SHA256"
+          test "$(jq -r .source.commit spec-candidate/candidate-artifact.json)" = "$SOURCE_COMMIT"
+          test "$(jq -r .component.kind spec-candidate/candidate-artifact.json)" = "spec"
+          set -- spec-candidate/soksak-ai-plugin-spec-*.tgz
+          test "$#" -eq 1
+          mkdir spec-package
+          tar -xzf "$1" -C spec-package --strip-components=1
+          test -z "$(find spec-package -type l -print -quit)"
+          node spec-package/release-template/verify-candidate-artifact.mjs --directory "$GITHUB_WORKSPACE/spec-candidate"
+          node spec-package/release-template/write-candidate-input-receipt.mjs \
+            --directory "$GITHUB_WORKSPACE/spec-candidate" \
+            --artifact-name "$ARTIFACT_NAME" --artifact-digest "$ARTIFACT_DIGEST" \
+            --candidate-manifest-sha256 "$MANIFEST_SHA256" \
+            --out "$GITHUB_WORKSPACE/spec-validation.json"
+      - name: Set up Node from the validation package
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: spec-package/package.json
+      - name: Expose the exact validator command
+        shell: bash
+        run: |
+          npm install --global --ignore-scripts spec-candidate/soksak-ai-plugin-spec-*.tgz
+          soksak-validate --help >/dev/null
+      - name: Read the Rust owner
+        if: inputs.language == 'rust'
+        id: rust-toolchain
+        shell: bash
+        run: echo "channel=$(sed -n 's/^channel = \"\(.*\)\"/\1/p' source/rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+      - name: Set up Rust
+        if: inputs.language == 'rust'
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.channel }}
+          targets: aarch64-apple-darwin
+      - name: Set up Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: source/go.mod
+          cache-dependency-path: source/go.sum
+      - name: Read Ghostty Zig version
+        if: inputs.profile == 'ghostty'
+        id: ghostty-tools
+        shell: bash
+        run: echo "zig=$(jq -r '.dependencies[0].tools.zig' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
+      - name: Set up Ghostty Zig
+        if: inputs.profile == 'ghostty'
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29
+        with:
+          version: ${{ steps.ghostty-tools.outputs.zig }}
+          use-cache: false
+      - name: Read Python tool version
+        if: inputs.profile == 'kitty' || inputs.profile == 'shitty'
+        id: python-tools
+        shell: bash
+        run: echo "python=$(jq -r '.dependencies[0].tools.python' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
+      - name: Set up Python
+        if: inputs.profile == 'kitty' || inputs.profile == 'shitty'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: ${{ steps.python-tools.outputs.python }}
+      - name: Install Kitty native libraries
+        if: inputs.profile == 'kitty'
+        run: brew install harfbuzz little-cms2 libpng openssl@3 pkgconf simde xxhash zlib
+      - name: Read Shitty LLVM and Ragel versions
+        if: inputs.profile == 'shitty'
+        id: shitty-tools
+        shell: bash
+        run: |
+          echo "llvm=$(jq -r '.dependencies[0].tools.llvm' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
+          echo "ragel=$(jq -r '.dependencies[0].tools.ragel' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
+      - name: Set up Shitty LLVM
+        if: inputs.profile == 'shitty'
+        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0
+        with:
+          version: ${{ steps.shitty-tools.outputs.llvm }}
+          env: true
+      - name: Set up Homebrew for Shitty
+        if: inputs.profile == 'shitty'
+        uses: Homebrew/actions/setup-homebrew@fd832223f9f99ebf0244dd20658680e5d4aca049
+      - name: Install the declared Shitty Ragel
+        if: inputs.profile == 'shitty'
+        shell: bash
+        env:
+          EXPECTED_RAGEL: ${{ steps.shitty-tools.outputs.ragel }}
+        run: |
+          brew install ragel
+          actual=$(ragel -v | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p')
+          test "$actual.0" = "$EXPECTED_RAGEL" || test "$actual" = "$EXPECTED_RAGEL"
+      - name: Verify and stage the owner implementation
+        working-directory: source
+        shell: bash
+        run: |
+          make verify TARGET="$TARGET" OUT="$GITHUB_WORKSPACE/owner-stage"
+          make stage TARGET="$TARGET" OUT="$GITHUB_WORKSPACE/owner-stage"
+          test -z "$(git status --porcelain)"
+      - name: Normalize and pack the owner stage
+        id: pack
+        shell: bash
+        run: |
+          mkdir package-tree packed component-output
+          node spec-package/release-template/sidecar/stage-candidate-package.mjs \
+            --source "$GITHUB_WORKSPACE/source" --stage "$GITHUB_WORKSPACE/owner-stage" \
+            --target "$TARGET" --out "$GITHUB_WORKSPACE/package-tree"
+          id=$(jq -r .id package-tree/sidecar.json)
+          version=$(jq -r .version package-tree/sidecar.json)
+          archive="$id-$version-$TARGET.tar.gz"
+          node spec-package/release-template/sidecar/pack-target.mjs \
+            --source "$GITHUB_WORKSPACE/package-tree" --target "$TARGET" \
+            --out "$GITHUB_WORKSPACE/packed/$archive"
+          node spec-package/release-template/sidecar/build-candidate.mjs \
+            --source "$GITHUB_WORKSPACE/source" --commit '${{ steps.source.outputs.commit }}' \
+            --target "$TARGET" --artifact "$GITHUB_WORKSPACE/packed/$archive" \
+            --out "$GITHUB_WORKSPACE/component-output"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+      - name: Seal the sidecar candidate
+        id: seal
+        shell: bash
+        run: |
+          cp spec-validation.json component-output/spec-validation.json
+          node spec-package/release-template/seal-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/component-output" \
+            --evidence sidecar-candidate-build.json \
+            --evidence spec-validation.json
+          node spec-package/release-template/verify-candidate-artifact.mjs \
+            --directory "$GITHUB_WORKSPACE/component-output"
+          echo "manifest_sha256=$(sha256sum component-output/candidate-artifact.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Name the artifact from verified component identity
+        id: identity
+        shell: bash
+        run: echo "artifact_name=candidate-${{ steps.pack.outputs.id }}-${{ steps.source.outputs.commit }}" >> "$GITHUB_OUTPUT"
+      - name: Upload the sealed sidecar candidate
+        id: candidate-upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ steps.identity.outputs.artifact_name }}
+          path: component-output/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

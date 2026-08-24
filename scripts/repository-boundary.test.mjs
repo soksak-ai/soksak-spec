@@ -73,6 +73,7 @@ test("repository owns a complete reproducible release boundary", () => {
     ".node-version",
     ".github/workflows/candidate.yml",
     ".github/workflows/node-candidate.yml",
+    ".github/workflows/sidecar-candidate.yml",
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
     ".gitignore",
