@@ -107,7 +107,7 @@ jobs:
       - name: Expose the exact validator command
         shell: bash
         run: |
-          npm install --global --ignore-scripts spec-candidate/soksak-ai-plugin-spec-*.tgz
+          npm install --global --ignore-scripts ./spec-candidate/soksak-ai-plugin-spec-*.tgz
           soksak-validate --help >/dev/null
       - name: Read the Rust owner
         if: inputs.language == 'rust'
