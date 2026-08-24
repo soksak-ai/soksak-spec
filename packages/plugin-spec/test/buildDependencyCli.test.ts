@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "soksak-build-dependency-cli-"));
+  const root = mkdtempSync(join(realpathSync(tmpdir()), "soksak-build-dependency-cli-"));
   temporary.push(root);
   const target = "aarch64-apple-darwin";
   const relative = `targets/${target}/lib/libterminal-engine.a`;
