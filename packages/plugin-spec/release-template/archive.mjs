@@ -17,10 +17,20 @@ function field(buffer, offset, width, value) {
   bytes.copy(buffer, offset);
 }
 
+function ustarPath(value) {
+  if (Buffer.byteLength(value) <= 100) return { name: value, prefix: "" };
+  for (let split = value.lastIndexOf("/"); split > 0; split = value.lastIndexOf("/", split - 1)) {
+    const prefix = value.slice(0, split);
+    const name = value.slice(split + 1);
+    if (Buffer.byteLength(prefix) <= 155 && Buffer.byteLength(name) <= 100) return { name, prefix };
+  }
+  throw new Error(`tar path exceeds ustar fields: ${value}`);
+}
+
 function header(name, size, mode) {
-  if (Buffer.byteLength(name) > 100) throw new Error(`tar path exceeds 100 bytes: ${name}`);
+  const pathname = ustarPath(name);
   const out = Buffer.alloc(BLOCK);
-  field(out, 0, 100, name);
+  field(out, 0, 100, pathname.name);
   field(out, 100, 8, octal(mode, 8));
   field(out, 108, 8, octal(0, 8));
   field(out, 116, 8, octal(0, 8));
@@ -32,6 +42,7 @@ function header(name, size, mode) {
   field(out, 263, 2, "00");
   field(out, 265, 32, "root");
   field(out, 297, 32, "root");
+  field(out, 345, 155, pathname.prefix);
   const checksum = out.reduce((sum, byte) => sum + byte, 0);
   field(out, 148, 8, `${checksum.toString(8).padStart(6, "0")}\0 `);
   return out;
@@ -136,7 +147,9 @@ export function readRegularFileArchive(bytes) {
     const actualChecksum = checksumBlock.reduce((sum, byte) => sum + byte, 0);
     if (storedChecksum !== actualChecksum) throw new Error("invalid tar checksum");
 
-    const name = block.subarray(0, 100).toString("utf8").replace(/\0.*$/, "");
+    const shortName = block.subarray(0, 100).toString("utf8").replace(/\0.*$/, "");
+    const prefix = block.subarray(345, 500).toString("utf8").replace(/\0.*$/, "");
+    const name = prefix ? `${prefix}/${shortName}` : shortName;
     safeRelative(name);
     if (seen.has(name)) throw new Error(`duplicate archive path: ${name}`);
     seen.add(name);
