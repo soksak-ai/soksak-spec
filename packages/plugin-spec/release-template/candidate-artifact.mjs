@@ -267,3 +267,42 @@ export function createCandidateInputReceipt({
     source: manifest.source,
   };
 }
+
+export function prepareCandidatePackageInput({
+  directory: value,
+  artifactName,
+  artifactDigest,
+  candidateManifestSHA256,
+  sourceCommit,
+  kind,
+  packageName,
+}) {
+  const directory = regularDirectory(value);
+  const receipt = createCandidateInputReceipt({
+    directory, artifactName, artifactDigest, candidateManifestSHA256,
+  });
+  if (!COMMIT.test(sourceCommit) || receipt.source.commit !== sourceCommit) {
+    throw new Error("candidate package source commit mismatch");
+  }
+  if (!(["contract", "kit", "plugin"].includes(kind)) || receipt.component.kind !== kind) {
+    throw new Error("candidate package kind mismatch");
+  }
+  const expectedPackage = `@soksak/${receipt.component.id}`;
+  if (packageName !== expectedPackage) {
+    throw new Error(`candidate package name mismatch: expected ${expectedPackage}`);
+  }
+  const release = releaseDocument(directory);
+  const candidates = release.artifacts.filter((artifact) => artifact.target === "any");
+  if (candidates.length !== 1) throw new Error("candidate package requires one any artifact");
+  const artifact = candidates[0];
+  const name = assetName(artifact.url, "candidate package artifact");
+  const file = path.join(directory, name);
+  const bytes = fs.readFileSync(file);
+  if (bytes.length !== artifact.size || digest(bytes) !== artifact.sha256) {
+    throw new Error("candidate package artifact digest mismatch");
+  }
+  return {
+    receipt,
+    dependency: { name: packageName, artifact: file, sha256: artifact.sha256 },
+  };
+}

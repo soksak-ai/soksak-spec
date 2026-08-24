@@ -151,7 +151,7 @@ describe("nonpublishing candidate artifact", () => {
     });
     expect(prepared.dependency).toEqual({
       name: "@soksak/soksak-contract-example",
-      artifact: path.join(directory, "soksak-contract-example-0.0.1-any.tgz"),
+      artifact: path.join(fs.realpathSync(directory), "soksak-contract-example-0.0.1-any.tgz"),
       sha256: digest("candidate archive bytes"),
     });
     expect(prepared.receipt.component).toEqual(manifest.component);
