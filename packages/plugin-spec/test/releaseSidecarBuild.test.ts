@@ -34,6 +34,30 @@ function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function binaryFixture(target: string): Buffer {
+  if (target.endsWith("apple-darwin")) {
+    const bytes = Buffer.alloc(32);
+    bytes.writeUInt32LE(0xfeedfacf, 0);
+    bytes.writeUInt32LE(target.startsWith("aarch64-") ? 0x0100000c : 0x01000007, 4);
+    return bytes;
+  }
+  if (target.includes("unknown-linux")) {
+    const bytes = Buffer.alloc(64);
+    bytes.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1], 0);
+    bytes.writeUInt16LE(target.startsWith("aarch64-") ? 183 : 62, 18);
+    return bytes;
+  }
+  if (target === "x86_64-pc-windows-msvc") {
+    const bytes = Buffer.alloc(256);
+    bytes.write("MZ", 0, "ascii");
+    bytes.writeUInt32LE(0x80, 0x3c);
+    bytes.write("PE\0\0", 0x80, "binary");
+    bytes.writeUInt16LE(0x8664, 0x84);
+    return bytes;
+  }
+  throw new Error(`unsupported fixture target: ${target}`);
+}
+
 function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersion?: string; targets?: string[]; language?: "rust" | "go" } = {}): void {
   const targets = overrides.targets ?? TARGETS;
   const sidecar = {
@@ -68,7 +92,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
     const process = `dist/${sidecar.id}${target.includes("windows") ? ".exe" : ""}`;
     fs.mkdirSync(path.join(archiveRoot, "dist"));
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), `${JSON.stringify({ ...sidecar, process }, null, 2)}\n`);
-    fs.writeFileSync(path.join(archiveRoot, process), "binary");
+    fs.writeFileSync(path.join(archiveRoot, process), binaryFixture(target));
     const bytes = createRegularFileArchive({ root: archiveRoot, files: ["sidecar.json", process] });
     fs.rmSync(archiveRoot, { recursive: true, force: true });
     fs.writeFileSync(path.join(artifactsDir, asset), bytes);
@@ -217,6 +241,28 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     const r = build();
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/must state the exact digest/);
+  });
+
+  it("refuses a process binary whose header does not match its declared target", () => {
+    writeFixture();
+    const target = "aarch64-apple-darwin";
+    const asset = `soksak-sidecar-example-0.0.1-${target}.tar.gz`;
+    const archiveRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "sidecar-archive-"));
+    fs.mkdirSync(path.join(archiveRoot, "dist"));
+    fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
+      id: "soksak-sidecar-example",
+      version: "0.0.1",
+      interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+      process: "dist/soksak-sidecar-example",
+    }));
+    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example"), binaryFixture("x86_64-apple-darwin"));
+    const bytes = createRegularFileArchive({ root: archiveRoot, files: ["sidecar.json", "dist/soksak-sidecar-example"] });
+    fs.rmSync(archiveRoot, { recursive: true, force: true });
+    fs.writeFileSync(path.join(artifactsDir, asset), bytes);
+    fs.writeFileSync(path.join(artifactsDir, `${asset}.sha256`), `${sha256(bytes)}  ${asset}\n`);
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/binary target.*aarch64-apple-darwin/);
   });
 
   it("refuses an artifact directory that is not exactly the declared matrix", () => {
