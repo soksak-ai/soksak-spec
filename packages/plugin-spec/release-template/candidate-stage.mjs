@@ -91,6 +91,17 @@ function underGenerated(relative, generated) {
   return generated.some((prefix) => relative === prefix || relative.startsWith(prefix + "/"));
 }
 
+function removeAmbientMetadata(directory) {
+  for (const name of fs.readdirSync(directory)) {
+    const entry = path.join(directory, name);
+    if (name === ".DS_Store") {
+      fs.rmSync(entry, { force: true });
+      continue;
+    }
+    if (fs.lstatSync(entry).isDirectory()) removeAmbientMetadata(entry);
+  }
+}
+
 function applyWorkspaceOverrides(workspacePath, overrides) {
   const original = fs.existsSync(workspacePath) ? fs.readFileSync(workspacePath, "utf8") : "";
   const lines = original.split(/\r?\n/);
@@ -209,6 +220,7 @@ export function finalizeNodeCandidate({ output, generated }) {
   }
   const packageDirectory = path.dirname(path.join(destination, report.packagePath));
   fs.rmSync(path.join(packageDirectory, "node_modules"), { recursive: true, force: true });
+  removeAmbientMetadata(destination);
 
   const ignored = new Set([".candidate-control.json", ".candidate-stage.json"]);
   const current = regularFiles(destination).filter((relative) =>
