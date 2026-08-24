@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createCandidateInputReceipt,
+  prepareCandidatePackageInput,
   sealCandidateArtifact,
   verifyCandidateArtifact,
 } from "../release-template/candidate-artifact.mjs";
@@ -134,5 +135,34 @@ describe("nonpublishing candidate artifact", () => {
       artifactDigest: "a".repeat(64),
       candidateManifestSHA256: "0".repeat(64),
     })).toThrow("candidate manifest digest mismatch");
+  });
+
+  it("turns a verified component candidate into one digest-bound package input", () => {
+    const manifest = sealCandidateArtifact({ directory });
+    const manifestBytes = fs.readFileSync(path.join(directory, "candidate-artifact.json"));
+    const prepared = prepareCandidatePackageInput({
+      directory,
+      artifactName: `candidate-${manifest.component.id}-${manifest.source.commit}`,
+      artifactDigest: "b".repeat(64),
+      candidateManifestSHA256: digest(manifestBytes),
+      sourceCommit: SOURCE_COMMIT,
+      kind: "contract",
+      packageName: "@soksak/soksak-contract-example",
+    });
+    expect(prepared.dependency).toEqual({
+      name: "@soksak/soksak-contract-example",
+      artifact: path.join(directory, "soksak-contract-example-0.0.1-any.tgz"),
+      sha256: digest("candidate archive bytes"),
+    });
+    expect(prepared.receipt.component).toEqual(manifest.component);
+    expect(() => prepareCandidatePackageInput({
+      directory,
+      artifactName: "candidate-invalid",
+      artifactDigest: "b".repeat(64),
+      candidateManifestSHA256: digest(manifestBytes),
+      sourceCommit: "2".repeat(40),
+      kind: "contract",
+      packageName: "@soksak/soksak-contract-example",
+    })).toThrow("candidate package source commit mismatch");
   });
 });
