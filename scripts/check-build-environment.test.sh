@@ -40,8 +40,8 @@ printf '%s\n' \
   'printf '\''%s\n'\'' "$FIXTURE_PNPM_VERSION"' > "$fixture/bin/pnpm"
 printf '%s\n' \
   '#!/bin/sh' \
-  '[ "$1" = env ] || exit 2' \
-  'case "$2" in' \
+  '[ "$1" = -C ] && [ "${2##*/}" = platformspec ] && [ "$3" = env ] || exit 2' \
+  'case "$4" in' \
   '  GOVERSION) printf '\''go%s\n'\'' "$FIXTURE_GO_VERSION" ;;' \
   '  GOHOSTOS) printf '\''%s\n'\'' "$FIXTURE_GO_OS" ;;' \
   '  GOHOSTARCH) printf '\''%s\n'\'' "$FIXTURE_GO_ARCH" ;;' \
@@ -92,7 +92,7 @@ output=$(PATH="$fixture_path" \
   FIXTURE_PNPM_VERSION=11.22.0 \
   FIXTURE_GO_VERSION=1.26.3 FIXTURE_GO_OS="$fixture_go_os" FIXTURE_GO_ARCH="$fixture_go_arch" \
   FIXTURE_RUST_VERSION=1.98.0 FIXTURE_RUST_HOST="$fixture_rust_host" \
-  "$fixture/scripts/check-build-environment.sh" --node 26.7.0 --pnpm 11.22.0 --rust 1.98.0 --go 1.26.3)
+  "$fixture/scripts/check-build-environment.sh")
 printf '%s\n' "$output" | grep -Fq "BUILD_ENVIRONMENT_READY required=$fixture_platform/$fixture_required_arch node=v26.7.0 nodeRuntime=$fixture_platform/$fixture_node_arch pnpm=11.22.0 rust=1.98.0 rustHost=$fixture_rust_host go=go1.26.3 goRuntime=$fixture_go_os/$fixture_go_arch lockSHA256="
 
 set +e
@@ -101,22 +101,10 @@ PATH="$fixture_path" \
   FIXTURE_PNPM_VERSION=11.22.0 \
   FIXTURE_GO_VERSION=1.26.3 FIXTURE_GO_OS="$fixture_go_os" FIXTURE_GO_ARCH="$fixture_go_arch" \
   FIXTURE_RUST_VERSION=1.98.0 FIXTURE_RUST_HOST="$fixture_rust_host" \
-  "$fixture/scripts/check-build-environment.sh" --node 26.7.0 --pnpm 11.22.0 --rust 1.98.0 --go 1.26.3 > "$fixture/mismatch.out" 2>&1
+  "$fixture/scripts/check-build-environment.sh" > "$fixture/mismatch.out" 2>&1
 status=$?
 set -e
 [ "$status" -eq 78 ] || { echo "expected mismatch exit 78, got $status" >&2; exit 1; }
 grep -Fq 'TOOLCHAIN_MISMATCH:' "$fixture/mismatch.out"
-
-set +e
-PATH="$fixture_path" \
-  FIXTURE_NODE_VERSION=26.7.0 FIXTURE_NODE_PLATFORM="$fixture_platform" FIXTURE_NODE_ARCH="$fixture_node_arch" \
-  FIXTURE_PNPM_VERSION=11.22.0 \
-  FIXTURE_GO_VERSION=1.26.3 FIXTURE_GO_OS="$fixture_go_os" FIXTURE_GO_ARCH="$fixture_go_arch" \
-  FIXTURE_RUST_VERSION=1.98.0 FIXTURE_RUST_HOST="$fixture_rust_host" \
-  "$fixture/scripts/check-build-environment.sh" --unknown > "$fixture/unknown.out" 2>&1
-status=$?
-set -e
-[ "$status" -eq 78 ] || { echo "expected unknown option exit 78, got $status" >&2; exit 1; }
-grep -Fq 'BUILD_DECLARATION_INVALID:' "$fixture/unknown.out"
 
 printf 'BUILD_ENVIRONMENT_CONTRACT_GREEN platform=%s architecture=%s\n' "$fixture_platform" "$fixture_required_arch"
