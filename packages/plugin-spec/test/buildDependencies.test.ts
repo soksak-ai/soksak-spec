@@ -13,6 +13,7 @@ const output = Buffer.from("native library bytes");
 const outputSHA256 = createHash("sha256").update(output).digest("hex");
 const target = "aarch64-apple-darwin";
 const outputPath = `targets/${target}/lib/libterminal-engine.a`;
+const fileOutput = { path: outputPath, type: "file" as const };
 
 function document() {
   return {
@@ -23,7 +24,7 @@ function document() {
       commit,
       tools: { zig: "1.2.3" },
       targets: {
-        [target]: { outputs: [outputPath] },
+        [target]: { outputs: [fileOutput] },
       },
     }],
   };
@@ -37,11 +38,11 @@ function receipt() {
     repository,
     commit,
     tools: { zig: "1.2.3" },
-    outputs: [{ path: outputPath, size: output.length, sha256: outputSHA256 }],
+    outputs: [{ ...fileOutput, size: output.length, sha256: outputSHA256 }],
   };
 }
 
-const inspection = () => ({ size: output.length, sha256: outputSHA256 });
+const inspection = () => ({ type: "file" as const, size: output.length, sha256: outputSHA256 });
 
 describe("build dependency contract", () => {
   it("resolves the exact source, tools and target outputs declared by the owner", () => {
@@ -51,7 +52,7 @@ describe("build dependency contract", () => {
       repository,
       commit,
       tools: { zig: "1.2.3" },
-      outputs: [outputPath],
+      outputs: [fileOutput],
     });
   });
 
@@ -82,12 +83,31 @@ describe("build dependency contract", () => {
     expect(() => parseBuildDependencies(local)).toThrow(/canonical HTTPS Git URL/);
 
     const absolute = document();
-    absolute.dependencies[0].targets[target].outputs = ["/tmp/libengine.a"];
+    absolute.dependencies[0].targets[target].outputs = [{ path: "/tmp/libengine.a", type: "file" }];
     expect(() => parseBuildDependencies(absolute)).toThrow(/safe relative path/);
 
     const unscoped = document();
-    unscoped.dependencies[0].targets[target].outputs = ["lib/libengine.a"];
+    unscoped.dependencies[0].targets[target].outputs = [{ path: "lib/libengine.a", type: "file" }];
     expect(() => parseBuildDependencies(unscoped)).toThrow(/target-namespaced output/);
+
+    const legacy = document();
+    Object.assign(legacy.dependencies[0].targets[target], { outputs: [outputPath] });
+    expect(() => parseBuildDependencies(legacy)).toThrow(/output must be an object/);
+  });
+
+  it("verifies a declared output tree as one canonical receipt entry", () => {
+    const treePath = `targets/${target}/kitty-provider`;
+    const treeDocument = document();
+    Object.assign(treeDocument.dependencies[0].targets[target], { outputs: [{ path: treePath, type: "tree" }] });
+    const treeReceipt = {
+      ...receipt(),
+      outputs: [{ path: treePath, type: "tree", files: 2, size: 456, sha256: "c".repeat(64) }],
+    };
+    expect(() => verifyBuildDependencyReceipt({
+      dependencies: parseBuildDependencies(treeDocument),
+      receipt: treeReceipt,
+      inspectOutput: () => ({ type: "tree", files: 2, size: 456, sha256: "c".repeat(64) }),
+    })).not.toThrow();
   });
 
   it("rejects receipt drift and changed output bytes", () => {
@@ -101,6 +121,7 @@ describe("build dependency contract", () => {
     expect(() => verifyBuildDependencyReceipt({
       dependencies: parseBuildDependencies(document()), receipt: receipt(),
       inspectOutput: () => ({
+        type: "file",
         size: changedBytes.length,
         sha256: createHash("sha256").update(changedBytes).digest("hex"),
       }),

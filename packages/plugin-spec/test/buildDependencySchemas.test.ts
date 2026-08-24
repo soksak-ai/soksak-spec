@@ -15,7 +15,7 @@ const dependency = {
     repository: "https://github.com/example/terminal-engine.git",
     commit: "a".repeat(40),
     tools: { zig: "1.2.3" },
-    targets: { [target]: { outputs: [output] } },
+    targets: { [target]: { outputs: [{ path: output, type: "file" }] } },
   }],
 };
 const receipt = {
@@ -25,7 +25,7 @@ const receipt = {
   repository: "https://github.com/example/terminal-engine.git",
   commit: "a".repeat(40),
   tools: { zig: "1.2.3" },
-  outputs: [{ path: output, size: 123, sha256: "b".repeat(64) }],
+  outputs: [{ path: output, type: "file", size: 123, sha256: "b".repeat(64) }],
 };
 
 const json = (name: string) => JSON.parse(readFileSync(join(root, "schema", name), "utf8"));

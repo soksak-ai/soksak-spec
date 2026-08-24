@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -17,7 +17,15 @@ function fixture() {
   temporary.push(root);
   const target = "aarch64-apple-darwin";
   const relative = `targets/${target}/lib/libterminal-engine.a`;
+  const tree = `targets/${target}/terminal-sdk`;
   const bytes = Buffer.from("terminal engine");
+  const tool = Buffer.from("tool executable");
+  const config = Buffer.from("configuration");
+  const treeEntries = [
+    { path: "bin/tool", mode: "755", size: tool.length, sha256: createHash("sha256").update(tool).digest("hex") },
+    { path: "config.json", mode: "644", size: config.length, sha256: createHash("sha256").update(config).digest("hex") },
+  ];
+  const treeSHA256 = createHash("sha256").update(JSON.stringify(treeEntries)).digest("hex");
   const dependencies = {
     schema: "soksak-build-dependencies-v1",
     dependencies: [{
@@ -25,7 +33,7 @@ function fixture() {
       repository: "https://github.com/example/terminal-engine.git",
       commit: "a".repeat(40),
       tools: { zig: "1.2.3" },
-      targets: { [target]: { outputs: [relative] } },
+      targets: { [target]: { outputs: [{ path: relative, type: "file" }, { path: tree, type: "tree" }] } },
     }],
   };
   const receipt = {
@@ -35,13 +43,20 @@ function fixture() {
     repository: dependencies.dependencies[0].repository,
     commit: dependencies.dependencies[0].commit,
     tools: dependencies.dependencies[0].tools,
-    outputs: [{ path: relative, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }],
+    outputs: [
+      { path: relative, type: "file", size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") },
+      { path: tree, type: "tree", files: 2, size: tool.length + config.length, sha256: treeSHA256 },
+    ],
   };
   const dependencyPath = join(root, "build-dependencies.json");
   const receiptPath = join(root, "receipt.json");
   const outputRoot = join(root, "output");
   mkdirSync(join(outputRoot, `targets/${target}/lib`), { recursive: true });
+  mkdirSync(join(outputRoot, tree, "bin"), { recursive: true });
   writeFileSync(join(outputRoot, relative), bytes);
+  writeFileSync(join(outputRoot, tree, "bin/tool"), tool);
+  chmodSync(join(outputRoot, tree, "bin/tool"), 0o755);
+  writeFileSync(join(outputRoot, tree, "config.json"), config);
   writeFileSync(dependencyPath, `${JSON.stringify(dependencies)}\n`);
   writeFileSync(receiptPath, `${JSON.stringify(receipt)}\n`);
   return { root, target, relative, dependencyPath, receiptPath, outputRoot };
@@ -59,7 +74,10 @@ describe("build dependency CLI", () => {
     expect(JSON.parse(result.stdout)).toMatchObject({
       id: "terminal-engine-sdk",
       target: input.target,
-      outputs: [input.relative],
+      outputs: [
+        { path: input.relative, type: "file" },
+        { path: `targets/${input.target}/terminal-sdk`, type: "tree" },
+      ],
     });
   });
 
