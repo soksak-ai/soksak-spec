@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildNodeCandidate, finalizeNodeCandidate, stageNodeCandidate } from "../release-template/candidate-stage.mjs";
+import { buildNodeCandidate } from "../release-template/candidate-build.mjs";
+import { finalizeNodeCandidate, stageNodeCandidate } from "../release-template/candidate-stage.mjs";
 import { assertNoLocalPackageDependencies } from "../release-template/package-dependencies.mjs";
 
 let root = "";
