@@ -30,7 +30,7 @@ test("canonical macOS workflow builds sealed native sidecar candidates", () => {
     "KyleMayes/install-llvm-action",
   ]) assert.doesNotMatch(workflow, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   const python = workflow.indexOf("- name: Set up Python");
-  for (const prerequisite of ["- name: Install Kitty native libraries", "- name: Install the declared Shitty Ragel"]) {
+  for (const prerequisite of ["- name: Install Kitty native libraries", "- name: Install the declared Shitty LLVM and Ragel"]) {
     assert.ok(workflow.indexOf(prerequisite) < python, `${prerequisite} must not replace the declared Python on PATH`);
   }
 });

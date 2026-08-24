@@ -152,24 +152,24 @@ jobs:
         run: |
           echo "llvm=$(jq -r '.dependencies[0].tools.llvm' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
           echo "ragel=$(jq -r '.dependencies[0].tools.ragel' source/build-dependencies.json)" >> "$GITHUB_OUTPUT"
-      - name: Set up Shitty LLVM
-        if: inputs.profile == 'shitty'
-        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0
-        with:
-          version: ${{ steps.shitty-tools.outputs.llvm }}
-          env: true
       - name: Set up Homebrew for Shitty
         if: inputs.profile == 'shitty'
         uses: Homebrew/actions/setup-homebrew@fd832223f9f99ebf0244dd20658680e5d4aca049
-      - name: Install the declared Shitty Ragel
+      - name: Install the declared Shitty LLVM and Ragel
         if: inputs.profile == 'shitty'
         shell: bash
         env:
+          EXPECTED_LLVM: ${{ steps.shitty-tools.outputs.llvm }}
           EXPECTED_RAGEL: ${{ steps.shitty-tools.outputs.ragel }}
         run: |
-          brew install ragel
-          actual=$(ragel -v | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p')
-          test "$actual.0" = "$EXPECTED_RAGEL" || test "$actual" = "$EXPECTED_RAGEL"
+          formula="llvm@${EXPECTED_LLVM%%.*}"
+          brew install "$formula" ragel
+          tool_root="$(brew --prefix "$formula")/bin"
+          test "$("$tool_root/clang++" --version | sed -n '1s/.*version \([0-9][0-9.]*\).*/\1/p')" = "$EXPECTED_LLVM"
+          test "$("$tool_root/llvm-ar" --version | sed -n '1s/.*version \([0-9][0-9.]*\).*/\1/p')" = "$EXPECTED_LLVM"
+          actual_ragel=$(ragel -v | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p')
+          test "$actual_ragel.0" = "$EXPECTED_RAGEL" || test "$actual_ragel" = "$EXPECTED_RAGEL"
+          echo "$tool_root" >> "$GITHUB_PATH"
       - name: Set up Python
         if: inputs.profile == 'kitty' || inputs.profile == 'shitty'
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
