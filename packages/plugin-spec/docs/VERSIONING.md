@@ -251,6 +251,12 @@ The development manifest still passes identity, version, application requirement
 applicable, interface, permission, and path checks. Source is one closed value; no second
 development flag or installed document duplicates it.
 
+An unpublished Node package dependency is verified with
+`release-template/stage-node-candidate.mjs`. The command copies one clean exact Git commit,
+verifies every dependency archive SHA-256, and writes `pnpm.overrides` only in the separate output
+checkout. The source checkout remains unchanged. The staged checkout is development input and the
+release builders reject it until immutable dependency releases replace every override.
+
 ## 7. Releases and installed content
 
 <!-- rule:release-install-separation -->
