@@ -12,11 +12,16 @@ on:
       spec_candidate_manifest_sha256: { required: true, type: string }
       spec_source_commit: { required: true, type: string }
     outputs:
-      artifact_name: { value: ${{ jobs.candidate.outputs.artifact_name }} }
-      artifact_id: { value: ${{ jobs.candidate.outputs.artifact_id }} }
-      artifact_digest: { value: ${{ jobs.candidate.outputs.artifact_digest }} }
-      candidate_manifest_sha256: { value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }} }
-      source_commit: { value: ${{ jobs.candidate.outputs.source_commit }} }
+      artifact_name:
+        value: ${{ jobs.candidate.outputs.artifact_name }}
+      artifact_id:
+        value: ${{ jobs.candidate.outputs.artifact_id }}
+      artifact_digest:
+        value: ${{ jobs.candidate.outputs.artifact_digest }}
+      candidate_manifest_sha256:
+        value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }}
+      source_commit:
+        value: ${{ jobs.candidate.outputs.source_commit }}
 
 permissions:
   contents: read

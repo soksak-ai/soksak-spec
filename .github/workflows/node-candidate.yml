@@ -25,11 +25,16 @@ on:
       dependency_two_source_commit: { required: false, type: string, default: "" }
       dependency_two_kind: { required: false, type: string, default: "" }
     outputs:
-      artifact_name: { value: ${{ jobs.candidate.outputs.artifact_name }} }
-      artifact_id: { value: ${{ jobs.candidate.outputs.artifact_id }} }
-      artifact_digest: { value: ${{ jobs.candidate.outputs.artifact_digest }} }
-      candidate_manifest_sha256: { value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }} }
-      source_commit: { value: ${{ jobs.candidate.outputs.source_commit }} }
+      artifact_name:
+        value: ${{ jobs.candidate.outputs.artifact_name }}
+      artifact_id:
+        value: ${{ jobs.candidate.outputs.artifact_id }}
+      artifact_digest:
+        value: ${{ jobs.candidate.outputs.artifact_digest }}
+      candidate_manifest_sha256:
+        value: ${{ jobs.candidate.outputs.candidate_manifest_sha256 }}
+      source_commit:
+        value: ${{ jobs.candidate.outputs.source_commit }}
 
 permissions:
   contents: read
