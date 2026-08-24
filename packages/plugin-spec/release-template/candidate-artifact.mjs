@@ -237,3 +237,33 @@ export function verifyCandidateArtifact({ directory: value }) {
   verifyNodeBuildEvidence(directory, release, actual, evidenceNames);
   return manifest;
 }
+
+export function createCandidateInputReceipt({
+  directory: value,
+  artifactName,
+  artifactDigest,
+  candidateManifestSHA256,
+}) {
+  const directory = regularDirectory(value);
+  if (typeof artifactName !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(artifactName) ||
+      typeof artifactDigest !== "string" || !SHA256.test(artifactDigest) ||
+      typeof candidateManifestSHA256 !== "string" || !SHA256.test(candidateManifestSHA256)) {
+    throw new Error("candidate input artifact identity is invalid");
+  }
+  const manifestFile = path.join(directory, CANDIDATE_MANIFEST);
+  const actualManifestDigest = digest(fs.readFileSync(manifestFile));
+  if (actualManifestDigest !== candidateManifestSHA256) {
+    throw new Error("candidate manifest digest mismatch");
+  }
+  const manifest = verifyCandidateArtifact({ directory });
+  return {
+    schema: "soksak-candidate-input-receipt-v1",
+    artifact: {
+      name: artifactName,
+      sha256: artifactDigest,
+      candidateManifestSHA256,
+    },
+    component: manifest.component,
+    source: manifest.source,
+  };
+}
