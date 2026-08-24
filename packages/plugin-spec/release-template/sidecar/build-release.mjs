@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   ID, INTERFACE, REPOSITORY, SIDECAR, TAG, VERSION,
-  assertBaseline, assertCommit, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
+  assertBaseline, assertCommit, assertNativeBinaryTarget, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
   parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
 } from "./release-contract.mjs";
 
@@ -35,7 +35,9 @@ const artifacts = readTargetMatrix().map(({ target }) => {
     manifest.id !== ID || manifest.version !== VERSION ||
     JSON.stringify(manifest.interface) !== JSON.stringify(INTERFACE) || manifest.process !== process
   ) throw new Error(`${asset}: archive sidecar manifest differs from the release identity`);
-  if (!archived.some((entry) => entry.name === process)) throw new Error(`${asset}: archive has no declared sidecar process`);
+  const archivedProcess = archived.find((entry) => entry.name === process);
+  if (!archivedProcess) throw new Error(`${asset}: archive has no declared sidecar process`);
+  assertNativeBinaryTarget(archivedProcess.data, target);
   // The .sha256 sidecar asset ships alongside the archive; it must state exactly
   // the digest of these archive bytes ("<hex>  <asset>", sha256sum/shasum shape).
   const stated = readRegularFile(path.join(artifactsDir, checksumName)).toString("utf8").trim()

@@ -53,6 +53,7 @@ function binaryFixture(target: string): Buffer {
     bytes.writeUInt32LE(0x80, 0x3c);
     bytes.write("PE\0\0", 0x80, "binary");
     bytes.writeUInt16LE(0x8664, 0x84);
+    bytes.writeUInt16LE(0x20b, 0x98);
     return bytes;
   }
   throw new Error(`unsupported fixture target: ${target}`);
@@ -285,7 +286,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
       interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
       process: "dist/soksak-sidecar-example.exe",
     }));
-    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example.exe"), "binary");
+    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example.exe"), binaryFixture(target));
     const bytes = createRegularFileArchive({ root: archiveRoot, files: ["sidecar.json", "dist/soksak-sidecar-example.exe"] });
     fs.rmSync(archiveRoot, { recursive: true, force: true });
     fs.writeFileSync(path.join(artifactsDir, asset), bytes);
@@ -309,7 +310,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
       interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
       process: "dist/soksak-sidecar-example",
     }));
-    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example"), "binary");
+    fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example"), binaryFixture(target));
     fs.writeFileSync(path.join(archiveRoot, longPath), "runtime");
     const tar = spawnSync("tar", ["-czf", path.join(artifactsDir, asset), "-C", archiveRoot, "."], { encoding: "utf8" });
     expect(tar.status, tar.stderr).toBe(0);
