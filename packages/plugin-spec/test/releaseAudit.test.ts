@@ -39,7 +39,7 @@ function archive(binary: Buffer): Buffer {
   return createRegularFileArchive({ root, files: ["sidecar.json", "dist/soksak-sidecar-example"] });
 }
 
-function requestFixture(binary: Buffer) {
+function requestFixture(binary: Buffer, includeAnotherRelease = false) {
   const artifact = archive(binary);
   const release = Buffer.from(JSON.stringify({
     kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1",
@@ -48,13 +48,15 @@ function requestFixture(binary: Buffer) {
     artifacts: [{ target: TARGET, url: ASSET_URL, size: artifact.length, sha256: sha256(artifact), format: "tar.gz", manifest: "sidecar.json" }],
     evidence: [{ url: `${REPOSITORY}/releases/download/v0.0.1/conformance.json`, size: 1, sha256: "c".repeat(64) }],
   }));
-  const releases = Buffer.from(JSON.stringify([{
+  const values = [{
     tag_name: "v0.0.1", draft: false, prerelease: false,
     assets: [
       { name: "release.json", size: release.length, digest: `sha256:${sha256(release)}`, browser_download_url: RELEASE_URL },
       { name: ASSET, size: artifact.length, digest: `sha256:${sha256(artifact)}`, browser_download_url: ASSET_URL },
     ],
-  }]));
+  }];
+  if (includeAnotherRelease) values.push({ tag_name: "v9.9.9", draft: false, prerelease: false, assets: [] });
+  const releases = Buffer.from(JSON.stringify(values));
   const routes = new Map([[API, releases], [RELEASE_URL, release], [ASSET_URL, artifact]]);
   return async (url: string) => {
     const body = routes.get(url);
@@ -82,8 +84,14 @@ describe("sidecar release audit", () => {
   });
 
   it("selects one exact current-fleet tag without auditing another release generation", async () => {
-    const request = requestFixture(macho(0x0100000c));
-    const report = await auditSidecarRepository({ repository: REPOSITORY, tag: "v9.9.9", request });
-    expect(report).toMatchObject({ repository: REPOSITORY, releases: 0, artifacts: 0, failures: [] });
+    const request = requestFixture(macho(0x0100000c), true);
+    const report = await auditSidecarRepository({ repository: REPOSITORY, tag: "v0.0.1", request });
+    expect(report).toMatchObject({ repository: REPOSITORY, releases: 1, artifacts: 1, failures: [] });
+  });
+
+  it("rejects a requested current-fleet tag that does not exist", async () => {
+    await expect(auditSidecarRepository({
+      repository: REPOSITORY, tag: "v8.8.8", request: requestFixture(macho(0x0100000c)),
+    })).rejects.toThrow(/requested release tag does not exist/);
   });
 });
