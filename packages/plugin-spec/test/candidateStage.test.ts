@@ -22,6 +22,7 @@ beforeEach(() => {
     devDependencies: { "@soksak/dependency": "https://example.invalid/dependency.tgz" },
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+  fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), "allowBuilds:\n  esbuild: true\n");
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["config", "user.email", "candidate@example.invalid"], { cwd: root });
   execFileSync("git", ["config", "user.name", "Candidate Test"], { cwd: root });
@@ -46,8 +47,10 @@ describe("candidate dependency staging", () => {
 
     expect(fs.readFileSync(path.join(root, "package.json"))).toEqual(before);
     expect(execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" })).toBe("");
-    const staged = JSON.parse(fs.readFileSync(path.join(output, "package.json"), "utf8"));
-    expect(staged.pnpm.overrides["@soksak/dependency"]).toMatch(/^file:\.candidate-inputs\//);
+    expect(fs.readFileSync(path.join(output, "package.json"))).toEqual(before);
+    const workspace = fs.readFileSync(path.join(output, "pnpm-workspace.yaml"), "utf8");
+    expect(workspace).toContain("overrides:");
+    expect(workspace).toMatch(/'@soksak\/dependency': file:\.candidate-inputs\//);
     expect(report).toMatchObject({ sourceCommit: expect.stringMatching(/^[0-9a-f]{40}$/), packagePath: "package.json" });
     expect(() => assertNoLocalPackageDependencies(path.join(output, "package.json")))
       .toThrow("local dependency is not a release input");
