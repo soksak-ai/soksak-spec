@@ -14,14 +14,15 @@ workstation 상태를 source에 직렬화하지 않습니다.
 - **BR1 — 하나의 로컬 진입점.** 모든 source repository는 해당 동작이 있을 때
   `make preflight`, `make prepare`, `make build`, `make verify`를 공개합니다. 언어별 task file은
   이 경계 뒤에서 사용할 수 있지만 두 번째 공개 진입점이 아닙니다.
-- **BR2 — 표준 version 소유자.** Version은 ecosystem의 표준 소유자에 둡니다.
-  `.node-version`과 일치하는 `package.json` engine projection, `packageManager`, `go.mod`,
-  `rust-toolchain.toml`, 외부 SDK source와 tool의 정확한 dependency manifest가 이에 해당합니다.
-  Makefile과 workflow는 이 값을 읽으며 version literal을 복제하지 않습니다.
-- **BR3 — Workstation 저장 금지.** 설치된 executable path, workspace-relative repository 탐색,
+- **BR2 — Make가 build를 소유.** Repository Makefile이 tool version, dependency source commit,
+  target, build command를 소유합니다. `.node-version`, `package.json`, `go.mod`,
+  `rust-toolchain.toml`은 ecosystem이 요구하는 projection으로 남으며 Make와 정확히 일치해야 합니다.
+  GitHub Actions는 literal을 복사하거나 projection을 독립 해석하지 않고 Make 출력을 읽습니다.
+- **BR3 — 주입된 환경.** 설치된 executable path, workspace-relative repository 탐색,
   주입된 `PATH`, symlink, cache 위치, fallback tool을 source에 기록하지 않습니다. 개발자는 표준
-  환경 관리 수단으로 선언된 tool을 선택합니다. `make preflight`는 제품 command 전에 불일치를
-  거부합니다.
+  수단으로 환경을 선택하며 다른 tool이 함께 설치되어 있어도 됩니다. Clean CI job은 Make가 소유한
+  version을 주입합니다. `make preflight`는 주소 지정된 executable만 확인하고 제품 command 전에
+  불일치를 거부하며 다른 설치본을 탐색하거나 설치하지 않습니다.
 - **BR4 — 읽기 전용 preflight.** Preflight는 요구·실제 version, OS, architecture를 보고합니다.
   Tool을 설치·삭제·복구·선택하지 않습니다. 환경 불일치는 제품 RED가 아니라 precondition
   실패입니다.
@@ -55,7 +56,6 @@ make build
 export, machine-specific path 없이 동작해야 합니다. 필요한 tool이 선택되지 않았다면 preflight가
 불일치를 이름으로 알리고 중단하며 다른 설치본을 찾지 않습니다.
 
-GitHub Actions는 같은 표준 owner file에서 tool을 선택한 뒤 같은 target을 호출합니다. Release 전용
+GitHub Actions는 Make에서 tool version을 읽어 clean job에 주입한 뒤 같은 target을 호출합니다. Release 전용
 target은 명시적 target triple과 staging directory를 받을 수 있지만 publication credential과
 GitHub release 변경은 Actions에만 둡니다.
-

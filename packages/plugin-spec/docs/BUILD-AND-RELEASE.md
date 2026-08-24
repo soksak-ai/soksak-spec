@@ -9,14 +9,17 @@ toolchain installer and does not serialize a developer workstation into source.
   `make prepare`, `make build`, and `make verify` when those operations exist. A repository
   may keep language-specific task files behind that boundary, but they are not a second public
   entrypoint.
-- **BR2 — Standard version owners.** Versions live in their ecosystem owner: `.node-version`
-  with the matching `package.json` engine projection, `packageManager`, `go.mod`,
-  `rust-toolchain.toml`, and an exact dependency manifest for external SDK source and tools.
-  Makefiles and workflows read these owners; they do not copy version literals.
-- **BR3 — No stored workstation.** Source must not contain an installed executable path,
+- **BR2 — Make owns the build.** The repository Makefile owns tool versions, dependency source
+  commits, targets, and build commands. `.node-version`, `package.json`, `go.mod`, and
+  `rust-toolchain.toml` remain required ecosystem projections and must exactly match Make.
+  GitHub Actions reads Make outputs instead of copying literals or independently interpreting
+  the projections.
+- **BR3 — Injected environment.** Source must not contain an installed executable path,
   workspace-relative repository discovery, injected `PATH`, symlink, cache location, or a
-  fallback tool. A developer selects the declared tools using their standard environment
-  manager. `make preflight` rejects a mismatch before any product command.
+  fallback tool. A clean CI job injects the Make-owned versions. A developer's selected local
+  environment may contain other tools; `make preflight` checks only the addressed executables
+  and rejects a mismatch before any product command. It never searches for or installs another
+  copy.
 - **BR4 — Read-only preflight.** Preflight reports the required and actual version, operating
   system, and architecture. It never installs, deletes, repairs, or selects a tool. An invalid
   environment is a precondition failure, not a product RED.
@@ -51,7 +54,6 @@ make build
 workspace sibling, a remembered shell export, or a machine-specific path. If a required tool is
 not selected, preflight stops and names the mismatch; it never searches for another copy.
 
-GitHub Actions select tools from the same standard owner files and then invoke the same targets.
+GitHub Actions read tool versions from Make, inject them into clean jobs, and invoke the same targets.
 Release-only targets may accept an explicit target triple and staging directory, but publication
 credentials and GitHub release mutation stay in Actions.
-
