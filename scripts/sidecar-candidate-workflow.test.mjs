@@ -28,4 +28,8 @@ test("canonical macOS workflow builds sealed native sidecar candidates", () => {
     "repository: soksak-ai/", "{ value: ${{", "contents: write", "create-github-app-token",
     "publish-canonical-release", "gh release", "gh api", "x86_64-apple-darwin",
   ]) assert.doesNotMatch(workflow, new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  const python = workflow.indexOf("- name: Set up Python");
+  for (const prerequisite of ["- name: Install Kitty native libraries", "- name: Install the declared Shitty Ragel"]) {
+    assert.ok(workflow.indexOf(prerequisite) < python, `${prerequisite} must not replace the declared Python on PATH`);
+  }
 });
