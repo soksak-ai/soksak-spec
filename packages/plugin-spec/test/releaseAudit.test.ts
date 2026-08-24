@@ -80,4 +80,10 @@ describe("sidecar release audit", () => {
     expect(report.failures[0]).toMatchObject({ tag: "v0.0.1", target: TARGET });
     expect(report.failures[0]?.error).toMatch(/binary target.*architecture x86_64.*want arm64/);
   });
+
+  it("selects one exact current-fleet tag without auditing another release generation", async () => {
+    const request = requestFixture(macho(0x0100000c));
+    const report = await auditSidecarRepository({ repository: REPOSITORY, tag: "v9.9.9", request });
+    expect(report).toMatchObject({ repository: REPOSITORY, releases: 0, artifacts: 0, failures: [] });
+  });
 });
