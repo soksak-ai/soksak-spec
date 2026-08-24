@@ -68,6 +68,7 @@ import { SEMVER_RE } from "./semver.js";
 export * from "./semver.js";
 import { COMPONENT_ID_RE } from "./release-primitives.js";
 export * from "./release-primitives.js";
+export * from "./buildDependencies.js";
 export * from "./distribution.js";
 import { parseRuntimeDependencies, type RuntimeDependencies } from "./distribution.js";
 export * from "./release.js";
