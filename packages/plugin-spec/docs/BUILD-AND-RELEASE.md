@@ -9,14 +9,13 @@ toolchain installer and does not serialize a developer workstation into source.
   `make prepare`, `make build`, and `make verify` when those operations exist. A repository
   may keep language-specific task files behind that boundary, but they are not a second public
   entrypoint.
-- **BR2 — Make owns the build.** The repository Makefile owns tool versions, dependency source
-  commits, targets, and build commands. `.node-version`, `package.json`, `go.mod`, and
-  `rust-toolchain.toml` remain required ecosystem projections and must exactly match Make.
-  GitHub Actions reads Make outputs instead of copying literals or independently interpreting
-  the projections.
+- **BR2 — Declarative owners.** Tool versions live in `.node-version`, `packageManager`,
+  `go.mod`, and `rust-toolchain.toml`. External build sources, exact commits, tool requirements,
+  and target outputs live in `build-dependencies.json`. The Makefile owns commands only and does
+  not copy this metadata.
 - **BR3 — Injected environment.** Source must not contain an installed executable path,
   workspace-relative repository discovery, injected `PATH`, symlink, cache location, or a
-  fallback tool. A clean CI job injects the Make-owned versions. A developer's selected local
+  fallback tool. A clean CI job injects the declared versions. A developer's selected local
   environment may contain other tools; `make preflight` checks only the addressed executables
   and rejects a mismatch before any product command. It never searches for or installs another
   copy.
@@ -54,6 +53,6 @@ make build
 workspace sibling, a remembered shell export, or a machine-specific path. If a required tool is
 not selected, preflight stops and names the mismatch; it never searches for another copy.
 
-GitHub Actions read tool versions from Make, inject them into clean jobs, and invoke the same targets.
+GitHub Actions inject tools from the declarative owners and invoke the same targets.
 Release-only targets may accept an explicit target triple and staging directory, but publication
 credentials and GitHub release mutation stay in Actions.
