@@ -13,13 +13,7 @@ while (!fs.existsSync(path.join(root, "release-files.json"))) { const parent = p
 if (output === root || !output.startsWith(root + path.sep)) throw new Error("--out must be inside the plugin repository");
 const run = (command, args, cwd = root) => { const result = spawnSync(command, args, { cwd, stdio: "inherit", env: process.env }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed`); };
 const capture = (command, args, cwd = root) => { const result = spawnSync(command, args, { cwd, encoding: "utf8", env: process.env }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}${result.stderr}`); return result.stdout.trim(); };
-const checker = path.join(root, "scripts/check-release-workflow.mjs");
-if (fs.existsSync(checker)) run(process.execPath, [checker]);
-run("pnpm", ["--dir", "frontend", "install", "--frozen-lockfile"]);
-run("pnpm", ["--dir", "frontend", "typecheck"]);
-run("pnpm", ["--dir", "frontend", "test"]);
-run("pnpm", ["--dir", "frontend", "build"]);
-run("git", ["diff", "--exit-code", "--", "main.js"]);
+run("make", ["verify"]);
 const template = path.dirname(fileURLToPath(import.meta.url));
 const validator = path.resolve(template, "../bin/validate.mjs");
 const first = fs.mkdtempSync(path.join(path.dirname(output), ".plugin-release-a-"));
