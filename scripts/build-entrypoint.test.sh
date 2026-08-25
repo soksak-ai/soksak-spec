@@ -18,10 +18,15 @@ printf '%s\n' "$manifest_flat" | grep -Eq '"packageManager"[[:space:]]*:[[:space
 grep -Eq '^channel = "[0-9]+[.][0-9]+[.][0-9]+"$' "$root/rust-toolchain.toml" || fail 'rust-toolchain.toml must own an exact Rust version'
 grep -Eq '^go [0-9]+[.][0-9]+[.][0-9]+$' "$root/go/platformspec/go.mod" || fail 'go.mod must own an exact Go version'
 
-for target in preflight prepare build verify; do
+for target in preflight prepare build verify release publish; do
   grep -Eq "^${target}:" "$root/Makefile" || fail "Makefile target is missing: $target"
 done
 grep -Eq '^[A-Z0-9_]*(VERSION|REPOSITORY|COMMIT|TARGETS)[[:space:]]*:=' "$root/Makefile" && fail 'Makefile duplicates declarative build metadata'
+grep -Eq '^publish: require-registry release$' "$root/Makefile" || fail 'publish must require a command-line REGISTRY and the release'
+grep -Eq '^	set -- artifacts/\*\.tgz;' "$root/Makefile" || fail 'publish must publish the single verified archive from artifacts/'
+out=$(make -f "$root/Makefile" -C "$root" publish 2>&1); [ $? -eq 2 ] && printf '%s\n' "$out" | grep -q 'REGISTRY' || fail 'make publish without REGISTRY must be refused'
+out=$(REGISTRY=http://127.0.0.1:4873 make -f "$root/Makefile" -C "$root" publish 2>&1); [ $? -eq 2 ] && printf '%s\n' "$out" | grep -q 'environment' || fail 'REGISTRY from the environment must be refused'
+out=$(make -f "$root/Makefile" -C "$root" publish REGISTRY=localhost:4873 2>&1); [ $? -eq 2 ] && printf '%s\n' "$out" | grep -q 'absolute URL' || fail 'REGISTRY without a scheme must be refused'
 
 for workflow in "$root/.github/workflows/verify.yml" "$root/.github/workflows/release.yml"; do
   grep -Eq 'node-version-file: (source/)?[.]node-version' "$workflow" || fail "workflow does not inject the Node owner: $workflow"

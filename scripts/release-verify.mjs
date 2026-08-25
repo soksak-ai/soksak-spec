@@ -195,13 +195,13 @@ function verifyArchive(path, identity, workspace) {
   if (
     packed.name !== identity.packageName ||
     packed.version !== identity.version ||
-    packed.private !== true ||
-    packed.publishConfig !== undefined ||
+    packed.private !== undefined ||
+    packed.publishConfig?.access !== "public" ||
     packed.engines?.node !== workspace.engines.node
   ) {
     throw new Error(`packed plugin-spec identity, toolchain, or publication policy is invalid: ${JSON.stringify({
       actual: { name: packed.name, version: packed.version, private: packed.private, publishConfig: packed.publishConfig, engines: packed.engines, packageManager: packed.packageManager },
-      expected: { name: identity.packageName, version: identity.version, private: true, engines: { node: workspace.engines.node } },
+      expected: { name: identity.packageName, version: identity.version, publishConfig: { access: "public" }, engines: { node: workspace.engines.node } },
     })}`);
   }
   for (const required of [

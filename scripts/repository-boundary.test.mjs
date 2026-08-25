@@ -136,8 +136,8 @@ test("repository owns a complete reproducible release boundary", () => {
 
   const pluginSpec = json("packages/plugin-spec/package.json");
   assert.equal(pluginSpec.version, releaseVersion);
-  assert.equal(pluginSpec.private, true);
-  assert.equal(pluginSpec.publishConfig, undefined);
+  assert.equal(pluginSpec.private, undefined);
+  assert.deepEqual(pluginSpec.publishConfig, { access: "public" });
   assert.ok(pluginSpec.files.includes("release-template"));
 
   for (const crate of [

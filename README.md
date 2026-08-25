@@ -19,13 +19,16 @@ protocol is not part of this repository.
 
 ## Distribution
 
-Nothing here is published to npm or crates.io.
-
 - Rust consumers use `git+https://github.com/soksak-ai/soksak-spec.git` pinned
   to an exact 40-character commit.
-- JavaScript consumers download the exact
-  `soksak-ai-plugin-spec-0.0.9.tgz` GitHub Release asset, verify its SHA-256,
-  and install those local bytes without contacting a package registry.
+- JavaScript consumers declare `"@soksak-ai/plugin-spec": "<version>"` and
+  install it from a package registry named on the make command line
+  (`make prepare REGISTRY=http://host:port/`). The lockfile records the
+  archive integrity only, so the same lockfile resolves from a local registry
+  and from `https://registry.npmjs.org`.
+- `make publish REGISTRY=http://host:port/` runs the owner proof and publishes
+  the single verified archive from `artifacts/`. The GitHub Release for the
+  same commit carries the same archive bytes.
 - Branch names, `latest`, floating tags, and unverified archives are not
   dependency pins.
 
