@@ -167,8 +167,15 @@ Node candidate의 `candidate-build.json`은 자동으로 발견합니다. 그 �
 이름을 전달합니다. 두 command 모두 upload나 publish를 수행하지 않습니다.
 
 ```sh
+soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
+soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
 soksak-local-release inspect --store <absolute-store> --kind plugin --id <id> --version <version>
 soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --version <version>
 ```
+
+`build`는 exact clean owner commit을 disposable directory에 clone하고 owner Make gate와 canonical
+packager를 실행하며 검증된 release를 atomically 저장한 뒤 clone을 제거합니다. Sidecar target은 선택한
+native 또는 관리되는 Docker 환경이 해당 owner preflight를 통과할 때만 build할 수 있습니다. Command는
+owner preflight를 약화하거나 raw compiler command로 바꾸지 않습니다.
