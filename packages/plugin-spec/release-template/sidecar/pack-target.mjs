@@ -3,13 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { COMPONENT_ID_RE, STRICT_SEMVER_RE } from "../../dist/release-primitives.js";
 import { createRegularFileArchive, sha256 } from "../archive.mjs";
 import { readSidecarReleaseArchive } from "./archive.mjs";
 import { assertNativeBinaryTarget } from "./native-binary.mjs";
 
 const TARGET = /^(?:aarch64|x86_64)-(?:apple-darwin|pc-windows-msvc|unknown-linux-(?:gnu|musl))$/;
-const ID = /^[a-z0-9][a-z0-9-]{0,127}$/;
-const VERSION = /^(?:0|[1-9][0-9]*)[.](?:0|[1-9][0-9]*)[.](?:0|[1-9][0-9]*)$/;
 
 function sourceRoot(value) {
   const absolute = path.resolve(value);
@@ -26,7 +25,7 @@ function readIdentity(root, target) {
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("staged sidecar.json must be a regular file");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const process = `dist/${manifest.id}${target.includes("windows") ? ".exe" : ""}`;
-  if (!ID.test(manifest.id ?? "") || !VERSION.test(manifest.version ?? "") || manifest.process !== process) {
+  if (!COMPONENT_ID_RE.test(manifest.id ?? "") || !STRICT_SEMVER_RE.test(manifest.version ?? "") || manifest.process !== process) {
     throw new Error("staged sidecar identity does not match its target process");
   }
   const executable = path.join(root, ...process.split("/"));
@@ -68,8 +67,9 @@ export function packSidecarTarget({ source, target, out }) {
   if (existingOutput(output, checksumPath, archive, checksum)) return result;
 
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  const temporaryArchive = `${output}.next.${process.pid}`;
-  const temporaryChecksum = `${checksumPath}.next.${process.pid}`;
+  // '~' is outside the archive name grammar, so a staging file never collides with an output.
+  const temporaryArchive = `${output}~next.${process.pid}`;
+  const temporaryChecksum = `${checksumPath}~next.${process.pid}`;
   try {
     fs.writeFileSync(temporaryArchive, archive, { flag: "wx", mode: 0o644 });
     fs.writeFileSync(temporaryChecksum, checksum, { flag: "wx", mode: 0o644 });

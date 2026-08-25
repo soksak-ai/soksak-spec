@@ -4,12 +4,12 @@ import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { RELEASE_FILE_RE } from "../dist/release-primitives.js";
 import { parseReleaseManifest, releaseIdentity } from "../dist/release.js";
 import { GitHubApi, publishImmutableRelease } from "./publish-release.mjs";
 
 const COMMIT_RE = /^[a-f0-9]{40}$/;
 const REPOSITORY_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const ASSET_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -43,17 +43,18 @@ export function collectCanonicalReleaseAssets({ repository, commit, artifacts, m
   if (parsed.value.source.repository !== repositoryURL || parsed.value.source.commit !== commit || identity.id !== repository.split("/")[1]) {
     throw new Error("release identity does not match repository and commit");
   }
+  // release.json records bare file names; each names one asset of the release directory.
   const expected = new Map([["release.json", null]]);
   for (const metadata of [parsed.value.manifest, ...parsed.value.evidence]) {
-    const name = basename(new URL(metadata.url).pathname);
-    if (!ASSET_RE.test(name)) throw new Error("unsafe release metadata name");
+    const name = metadata.file;
+    if (!RELEASE_FILE_RE.test(name)) throw new Error("unsafe release metadata name");
     const bytes = regularFile(join(directory, name), `release metadata ${name}`);
     if (bytes.length !== metadata.size || digest(bytes) !== metadata.sha256) throw new Error(`release metadata mismatch: ${name}`);
     expected.set(name, null);
   }
   for (const artifact of parsed.value.artifacts) {
-    const name = basename(new URL(artifact.url).pathname);
-    if (!ASSET_RE.test(name)) throw new Error("unsafe release artifact name");
+    const name = artifact.file;
+    if (!RELEASE_FILE_RE.test(name)) throw new Error("unsafe release artifact name");
     const bytes = regularFile(join(directory, name), `release artifact ${name}`);
     if (bytes.length !== artifact.size || digest(bytes) !== artifact.sha256) throw new Error(`release artifact digest mismatch: ${name}`);
     expected.set(name, null);

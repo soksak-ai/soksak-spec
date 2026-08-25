@@ -1,127 +1,28 @@
-#!/usr/bin/env node
-
+// Owner-immutable GitHub release publication. The asset set of one release directory is collected by
+// publish-canonical-release.mjs from the bare file names in release.json; this module uploads that
+// set under one tag and confirms the sealed release.
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+import { RELEASE_FILE_RE } from "../dist/release-primitives.js";
+
 const API_VERSION = "2026-03-10";
 const COMMIT_RE = /^[a-f0-9]{40}$/;
 const DIGEST_RE = /^sha256:[a-f0-9]{64}$/;
-const ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const CONFORMANCE_RE = /^conformance-[a-z0-9-]+\.json$/;
 const REPOSITORY_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const RELEASE_SPEC = "soksak-spec-release@0.0.1";
 
 function digest(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
-function readRegularFile(filename, label) {
-  const stat = lstatSync(filename);
-  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`${label}: regular file required`);
-  return readFileSync(filename);
-}
-
-function readOwnerConfiguration() {
-  const workspace = JSON.parse(readRegularFile(join(root, "package.json"), "workspace package").toString("utf8"));
-  const owner = workspace.soksakRelease;
-  if (
-    owner === null || typeof owner !== "object" || Array.isArray(owner) ||
-    owner.kind !== "plugin" ||
-    typeof owner.id !== "string" ||
-    typeof owner.repository !== "string" ||
-    owner.manifest !== "release.json"
-  ) {
-    throw new Error("workspace release owner metadata is invalid");
-  }
-  return owner;
-}
-
 function validateAsset(asset) {
   if (!asset || typeof asset !== "object" || Array.isArray(asset)) throw new Error("release asset must be an object");
-  if (!ASSET_NAME_RE.test(asset.name)) throw new Error(`unsafe release asset name: ${asset.name}`);
+  if (typeof asset.name !== "string" || !RELEASE_FILE_RE.test(asset.name)) throw new Error(`unsafe release asset name: ${asset.name}`);
   if (!Buffer.isBuffer(asset.bytes) || asset.bytes.length === 0) throw new Error(`release asset must contain bytes: ${asset.name}`);
   if (asset.size !== asset.bytes.length) throw new Error(`release asset size mismatch: ${asset.name}`);
   if (!DIGEST_RE.test(asset.digest) || asset.digest !== digest(asset.bytes)) throw new Error(`release asset digest mismatch: ${asset.name}`);
   if (asset.contentType !== "application/gzip" && asset.contentType !== "application/json") {
     throw new Error(`release asset content type is not allowed: ${asset.name}`);
   }
-}
-
-function describeAsset(filename) {
-  const name = basename(filename);
-  const bytes = readRegularFile(filename, `release asset ${name}`);
-  const asset = {
-    name,
-    bytes,
-    size: bytes.length,
-    digest: digest(bytes),
-    contentType: name.endsWith(".json") ? "application/json" : "application/gzip",
-  };
-  validateAsset(asset);
-  return asset;
-}
-
-function exactReleaseUrl(repository, tag, name) {
-  return `https://github.com/${repository}/releases/download/${tag}/${name}`;
-}
-
-export function collectReleaseAssets({ repository, commit, artifacts, manifest }) {
-  if (!REPOSITORY_RE.test(repository)) throw new Error("repository must be an owner/name slug");
-  if (!COMMIT_RE.test(commit)) throw new Error("commit must be an exact lowercase 40-character SHA");
-  if (!isAbsolute(artifacts) || !isAbsolute(manifest)) throw new Error("artifact directory and manifest paths must be absolute");
-  const artifactsPath = resolve(artifacts);
-  const manifestPath = resolve(manifest);
-  const directoryStat = lstatSync(artifactsPath);
-  if (directoryStat.isSymbolicLink() || !directoryStat.isDirectory()) throw new Error("artifact input must be a real directory");
-  if (dirname(manifestPath) !== artifactsPath) throw new Error("release manifest must be inside the artifact directory");
-
-  const owner = readOwnerConfiguration();
-  if (owner.repository !== `https://github.com/${repository}` || basename(manifestPath) !== owner.manifest) {
-    throw new Error("release owner does not match the requested repository or manifest");
-  }
-  const value = JSON.parse(readRegularFile(manifestPath, "release manifest").toString("utf8"));
-  if (
-    value.spec !== RELEASE_SPEC || value.kind !== owner.kind || value.id !== owner.id ||
-    typeof value.version !== "string" ||
-    value.source?.repository !== owner.repository || value.source?.commit !== commit ||
-    value.releaseTag !== `v${value.version}` ||
-    !Array.isArray(value.artifacts) || value.artifacts.length !== 1
-  ) {
-    throw new Error("release manifest identity is invalid");
-  }
-  const declared = value.artifacts[0];
-  const url = new URL(declared.url);
-  const archiveName = basename(url.pathname);
-  if (
-    !ASSET_NAME_RE.test(archiveName) ||
-    url.href !== exactReleaseUrl(repository, value.releaseTag, archiveName) ||
-    declared.format !== "tgz"
-  ) {
-    throw new Error("release manifest artifact is invalid");
-  }
-  const archiveBytes = readRegularFile(join(artifactsPath, archiveName), `package artifact ${archiveName}`);
-  if (declared.sha256 !== digest(archiveBytes).slice("sha256:".length)) {
-    throw new Error(`release artifact digest mismatch: ${archiveName}`);
-  }
-
-  const actualNames = readdirSync(artifactsPath, { withFileTypes: true }).map((entry) => {
-    if (!entry.isFile() || entry.isSymbolicLink()) throw new Error("artifact input must contain only regular files");
-    return entry.name;
-  });
-  const conformance = actualNames.filter((name) => CONFORMANCE_RE.test(name));
-  if (conformance.length === 0) throw new Error("release must include conformance evidence");
-  const expectedNames = [archiveName, basename(manifestPath), basename(value.manifest.url), ...conformance]
-    .sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
-  if (new Set(expectedNames).size !== expectedNames.length) throw new Error("duplicate declared release asset");
-  const sortedActual = [...actualNames].sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
-  if (JSON.stringify(sortedActual) !== JSON.stringify(expectedNames)) {
-    throw new Error("artifact input does not equal the declared release asset set");
-  }
-  const assets = expectedNames.map((name) => describeAsset(join(artifactsPath, name)));
-  return { assets, prerelease: value.version.includes("-"), tag: value.releaseTag };
 }
 
 function validateRelease(release, tag, prerelease) {
@@ -160,7 +61,7 @@ const defaultSleep = (ms) => new Promise((settle) => setTimeout(settle, ms));
 
 // Publishing a draft under owner-immutable enforcement seals the release ASYNCHRONOUSLY on GitHub's
 // side — the release read immediately after PATCH draft:false transiently reports a mid-seal identity
-// before it settles. Re-read until the release reaches a coherent terminal state (valid identity, no
+// before it settles. Re-read until the release is in a coherent terminal state (valid identity, no
 // longer a draft, immutable stamped, tag still pinned, every declared asset present). This is what
 // separates a real, complete publication from a mid-seal transient.
 async function confirmSealed({ api, tag, commit, prerelease, assets }) {
@@ -194,7 +95,8 @@ export async function publishImmutableRelease({
 }) {
   if (!REPOSITORY_RE.test(repository)) throw new Error("repository must be an owner/name slug");
   if (!COMMIT_RE.test(commit)) throw new Error("commit must be an exact lowercase 40-character SHA");
-  if (!ASSET_NAME_RE.test(tag) || typeof prerelease !== "boolean") throw new Error("release tag or prerelease identity is invalid");
+  // The tag is one bare segment of the download url, the same grammar as a release file name.
+  if (typeof tag !== "string" || !RELEASE_FILE_RE.test(tag) || typeof prerelease !== "boolean") throw new Error("release tag or prerelease identity is invalid");
   if (!Array.isArray(assets) || assets.length === 0) throw new Error("release assets are required");
   const seen = new Set();
   for (const asset of assets) {
@@ -324,35 +226,5 @@ export class GitHubApi {
     return this.request("PATCH", `${this.apiRoot}/releases/${release.id}`, {
       body: { draft: false, prerelease, make_latest: prerelease ? "false" : "true" },
     });
-  }
-}
-
-function parseOptions(argv) {
-  const allowed = new Set(["repository", "commit", "artifacts", "manifest"]);
-  if (argv.length !== allowed.size * 2) {
-    throw new Error("usage: publish-release.mjs --repository <owner/name> --commit <sha> --artifacts <absolute> --manifest <absolute>");
-  }
-  const values = {};
-  for (let index = 0; index < argv.length; index += 2) {
-    const flag = argv[index];
-    const key = flag.startsWith("--") ? flag.slice(2) : "";
-    if (!allowed.has(key) || values[key] !== undefined || typeof argv[index + 1] !== "string") {
-      throw new Error("invalid or duplicate publication option");
-    }
-    values[key] = argv[index + 1];
-  }
-  return values;
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  try {
-    const options = parseOptions(process.argv.slice(2));
-    const release = collectReleaseAssets(options);
-    const api = new GitHubApi({ repository: options.repository, token: process.env.SOKSAK_RELEASE_TOKEN });
-    const result = await publishImmutableRelease({ ...options, ...release, api });
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
   }
 }

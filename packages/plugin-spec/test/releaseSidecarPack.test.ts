@@ -64,6 +64,15 @@ describe("sidecar target packer", () => {
       .toThrow(/symbolic link/);
   });
 
+  it("stages the archive beside the output as <output>~next.<pid> and leaves no output on failure", () => {
+    stage();
+    fs.mkdirSync(`${output}~next.${process.pid}`);
+    expect(() => packSidecarTarget({ source: root, target: "aarch64-apple-darwin", out: output }))
+      .toThrow(/EEXIST|EISDIR/);
+    expect(fs.existsSync(output)).toBe(false);
+    expect(fs.existsSync(`${output}.sha256`)).toBe(false);
+  });
+
   it("preserves existing evidence when the same output name receives different inputs", () => {
     stage();
     const first = packSidecarTarget({ source: root, target: "aarch64-apple-darwin", out: output });

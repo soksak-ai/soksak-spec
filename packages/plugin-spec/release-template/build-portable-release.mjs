@@ -5,7 +5,7 @@ import path from "node:path";
 import { createRegularFileArchive, readRegularFileArchive, sha256 } from "./archive.mjs";
 import { assertNoLocalPackageDependencies } from "./package-dependencies.mjs";
 import { assertNoLocalCargoDependencies } from "./cargo-dependencies.mjs";
-import { COMPONENT_ID_RE, STRICT_SEMVER_RE } from "../dist/release-primitives.js";
+import { COMPONENT_ID_RE, GITHUB_ORG, RELEASE_FILE_RE, STRICT_SEMVER_RE } from "../dist/release-primitives.js";
 import { parseConformanceReport } from "../dist/conformanceWire.js";
 import { parseReleaseManifest } from "../dist/release.js";
 
@@ -47,7 +47,7 @@ if (fs.existsSync(out) && fs.readdirSync(out).length !== 0) throw new Error("rel
 fs.mkdirSync(out, { recursive: true });
 
 const identity = exactIdentity(root);
-const repository = `https://github.com/soksak-ai/${identity.id}`;
+const repository = `https://github.com/${GITHUB_ORG}/${identity.id}`;
 const hasJavaScript = fs.existsSync(path.join(root, "package.json"));
 const hasCargo = fs.existsSync(path.join(root, "Cargo.toml"));
 if (hasJavaScript === hasCargo) throw new Error("exactly one package.json or Cargo.toml is required");
@@ -108,10 +108,9 @@ if (!archivedManifest || !archivedManifest.data.equals(fs.readFileSync(path.join
 }
 
 const digest = sha256(archive);
-const tag = `v${identity.version}`;
 const archiveName = `${identity.id}-${identity.version}-any.tgz`;
 const artifact = {
-  target: "any", url: `${repository}/releases/download/${tag}/${archiveName}`,
+  target: "any", file: archiveName,
   sha256: digest, size: archive.length, format: "tgz", manifest: identity.manifestName,
 };
 const subject = { [identity.kind]: { id: identity.id, version: identity.version } };
@@ -126,17 +125,24 @@ const evidenceFiles = [
 ].map(([name, value]) => {
   if (!parseConformanceReport(value).ok) throw new Error(`${name} is invalid`);
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-  return { name, bytes, reference: { url: `${repository}/releases/download/${tag}/${name}`, size: bytes.length, sha256: sha256(bytes) } };
+  return { name, bytes, reference: { file: name, size: bytes.length, sha256: sha256(bytes) } };
 });
 const release = {
   kind: identity.kind, id: identity.id, version: identity.version,
-  manifest: { url: `${repository}/releases/download/${tag}/${identity.manifestName}`, size: archivedManifest.data.length, sha256: sha256(archivedManifest.data) },
+  manifest: { file: identity.manifestName, size: archivedManifest.data.length, sha256: sha256(archivedManifest.data) },
   source: { repository, commit }, artifacts: [artifact], evidence: evidenceFiles.map(({ reference }) => reference),
 };
+// Every emitted file name satisfies the release file grammar before any byte is written.
+const outputs = [
+  [archiveName, archive],
+  [identity.manifestName, archivedManifest.data],
+  ["release.json", Buffer.from(`${JSON.stringify(release, null, 2)}\n`)],
+  ...evidenceFiles.map(({ name, bytes }) => [name, bytes]),
+];
+for (const [name] of outputs) {
+  if (!RELEASE_FILE_RE.test(name)) throw new Error(`release file name is invalid: ${name}`);
+}
 if (!parseReleaseManifest(release).ok) throw new Error("generated release manifest is invalid");
 
-fs.writeFileSync(path.join(out, archiveName), archive);
-fs.writeFileSync(path.join(out, identity.manifestName), archivedManifest.data);
-fs.writeFileSync(path.join(out, "release.json"), `${JSON.stringify(release, null, 2)}\n`);
-for (const item of evidenceFiles) fs.writeFileSync(path.join(out, item.name), item.bytes);
+for (const [name, bytes] of outputs) fs.writeFileSync(path.join(out, name), bytes);
 process.stdout.write(`${JSON.stringify({ archive: archiveName, sha256: digest })}\n`);

@@ -17,13 +17,28 @@ export function findSidecarRoot(startDir = process.cwd(), marker = "sidecar.json
   }
 }
 export const ROOT = findSidecarRoot();
-const SEMVER = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+// This module is vendored byte-identical into sidecar repositories with no access to dist/, so the
+// component id grammar, the strict SemVer grammar, the release file grammar, and the GitHub
+// organization are restated here. The three regex sources equal COMPONENT_ID_RE.source,
+// STRICT_SEMVER_RE.source, and RELEASE_FILE_RE.source of dist/release-primitives.js exactly,
+// including the SemVer length bound; the org equals GITHUB_ORG.
+const COMPONENT_ID_RE = /^[a-z0-9][a-z0-9-]{0,127}$/;
+const SEMVER = /^(?=.{1,256}$)(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const RELEASE_FILE_RE = /^(?!\.\.?$)[A-Za-z0-9._-]+$/;
+const GITHUB_ORG = "soksak-ai";
+
+// Every file name the release document records or the builder writes satisfies the release file
+// grammar.
+function releaseFileName(name) {
+  if (!RELEASE_FILE_RE.test(name)) throw new Error(`release file name is invalid: ${name}`);
+  return name;
+}
 
 export function parseSidecarManifest(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("sidecar manifest must be an object");
   const keys = Object.keys(raw).sort();
   if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "version"])) throw new Error("sidecar manifest keys are closed");
-  if (!/^[a-z0-9][a-z0-9-]{0,127}$/.test(raw.id) || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
+  if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id) || typeof raw.version !== "string" || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
   if (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`) throw new Error("sidecar process path must match its platform executable");
   if (
     !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
@@ -42,10 +57,10 @@ export const SIDECAR = readSidecarManifest();
 export const ID = SIDECAR.id;
 export const VERSION = SIDECAR.version;
 export const TAG = `v${VERSION}`;
-export const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
+export const REPOSITORY = `https://github.com/${GITHUB_ORG}/${ID}`;
 export const INTERFACE = SIDECAR.interface;
 export function releaseAssetName(target, sidecar = SIDECAR) {
-  return `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
+  return releaseFileName(`${sidecar.id}-${sidecar.version}-${target}.tar.gz`);
 }
 
 export function releaseIdentity(commit, sidecar = SIDECAR) {
@@ -168,6 +183,7 @@ export function ensureEmptyDirectory(input) {
 
 export function writeRegularFile(filename, bytes, mode = 0o644) {
   const absolute = path.resolve(filename);
+  releaseFileName(path.basename(absolute));
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
   if (fs.existsSync(absolute) && !fs.lstatSync(absolute).isFile()) throw new Error(`regular output file required: ${absolute}`);
   const fd = fs.openSync(absolute, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), mode);
@@ -195,7 +211,7 @@ export function assertBaseline() {
   }
   if (fs.existsSync(goModPath)) {
     const goMod = fs.readFileSync(goModPath, "utf8");
-    if (!goMod.split(/\r?\n/).includes(`module github.com/soksak-ai/${ID}`)) throw new Error("Go module must match sidecar identity");
+    if (!goMod.split(/\r?\n/).includes(`module github.com/${GITHUB_ORG}/${ID}`)) throw new Error("Go module must match sidecar identity");
     return;
   }
   throw new Error("sidecar repository must declare Cargo.toml or go.mod");

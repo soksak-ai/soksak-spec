@@ -11,10 +11,10 @@ import {
   parseBuildDependencies,
   parseBuildDependencyReceipt,
   parseConformanceReport,
+  parseDependencyIntent,
   parseManifest,
   parseRegistry,
   parseRegistryPublicKey,
-  parseReleaseReference,
   parseReleaseManifest,
   parseSidecarManifest,
   releaseIdentity,
@@ -25,6 +25,7 @@ import {
 } from "../dist/spec.js";
 import { authenticateRegistry, buildRegistry, verifyReleaseClosure } from "../dist/registryPublication.js";
 import { GitHubApi, publishImmutableRelease } from "../release-template/publish-release.mjs";
+import { githubResolver } from "../release-template/resolve-release.mjs";
 
 const USAGE = `사용:
   soksak-validate plugin <플러그인 폴더 | plugin.json>...
@@ -470,27 +471,35 @@ async function validateRegistry(args) {
   );
   return 0;
 }
+// plugins/<id>.json is an intent { id, version }. Its release reference { id, version, size, sha256 }
+// is resolved by fetching release.json at the derived https url and hashing the bytes.
 function registryPlugins(directory) {
   if (!statSync(directory).isDirectory()) throw new Error("registry plugins path must be a directory");
   return readdirSync(directory, { withFileTypes: true }).map((entry) => {
     if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) throw new Error(`registry entry must be a regular JSON file: ${entry.name}`);
     const value = readDocument(join(directory, entry.name)); if (!value) throw new Error(`invalid registry entry: ${entry.name}`);
-    const reference = parseReleaseReference(value.raw, `registry entry ${entry.name}`);
-    if (!reference.ok) throw new Error(reference.errors.join("; "));
-    if (entry.name !== `${reference.value.id}.json`) throw new Error(`registry filename does not match id: ${entry.name}`);
-    return reference.value;
+    const intent = parseDependencyIntent(value.raw, `registry entry ${entry.name}`);
+    if (!intent.ok) throw new Error(intent.errors.join("; "));
+    if (entry.name !== `${intent.value.id}.json`) throw new Error(`registry filename does not match id: ${entry.name}`);
+    return intent.value;
   }).sort((left, right) => left.id.localeCompare(right.id));
 }
-async function readRemoteRelease(reference) {
-  const response = await fetch(reference.url);
-  if (!response.ok) throw new Error(`GET ${reference.url}: ${response.status}`);
-  const declared = response.headers.get("content-length");
-  if (declared !== null && Number(declared) !== reference.size) throw new Error(`GET ${reference.url}: content length mismatch`);
-  if (!response.body) throw new Error(`GET ${reference.url}: response body missing`);
-  const reader = response.body.getReader(); const chunks = []; let size = 0;
-  for (;;) { const next = await reader.read(); if (next.done) break; size += next.value.byteLength; if (size > reference.size) { await reader.cancel(); throw new Error(`GET ${reference.url}: response exceeds declared size`); } chunks.push(next.value); }
-  const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return { bytes, value: JSON.parse(new TextDecoder().decode(bytes)) };
+// One bounded read per identity. The read receives the full reference { kind, id, version, size,
+// sha256 } and is bounded by size; a root intent has no reference and is bounded by the document
+// maximum. The caller verifies the bytes against its reference after the read.
+const remoteReleases = new Map();
+function readRemoteRelease(reference) {
+  const key = `${reference.kind}/${reference.id}@${reference.version}`;
+  if (!remoteReleases.has(key)) remoteReleases.set(key, githubResolver().read(reference).then(({ bytes }) => bytes));
+  return remoteReleases.get(key);
+}
+async function resolveRegistryPlugins(intents) {
+  const references = [];
+  for (const { id, version } of intents) {
+    const bytes = await readRemoteRelease({ kind: "plugin", id, version });
+    references.push({ id, version, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
+  }
+  return references;
 }
 async function registryPublication(mode, args) {
   if (mode === "registry-publish") {
@@ -506,14 +515,14 @@ async function registryPublication(mode, args) {
   }
   if (mode === "registry-verify") {
     if (args.length !== 1) return usageExit("registry-verify: plugins directory required");
-    const plugins = registryPlugins(args[0]); await verifyReleaseClosure(plugins, readRemoteRelease);
+    const plugins = await resolveRegistryPlugins(registryPlugins(args[0])); await verifyReleaseClosure(plugins, readRemoteRelease);
     console.log(`✓ ${args[0]} (${plugins.length} plugins)`); return 0;
   }
   if (mode === "registry-build") {
     const parsed = parseOptions(args, new Set(["--id", "--sequence", "--issued-at", "--expires-at", "--out"]));
     if (!parsed.ok || parsed.positional.length !== 1) return usageExit(parsed.ok ? "registry-build: plugins directory required" : parsed.error);
     const required = ["--id", "--sequence", "--issued-at", "--expires-at", "--out"]; if (required.some((key) => !parsed.options.has(key))) return usageExit("registry-build: all named options are required");
-    const value = await buildRegistry({ id: parsed.options.get("--id"), sequence: Number(parsed.options.get("--sequence")), issuedAt: parsed.options.get("--issued-at"), expiresAt: parsed.options.get("--expires-at"), plugins: registryPlugins(parsed.positional[0]), read: readRemoteRelease });
+    const value = await buildRegistry({ id: parsed.options.get("--id"), sequence: Number(parsed.options.get("--sequence")), issuedAt: parsed.options.get("--issued-at"), expiresAt: parsed.options.get("--expires-at"), plugins: await resolveRegistryPlugins(registryPlugins(parsed.positional[0])), read: readRemoteRelease });
     writeFileSync(parsed.options.get("--out"), `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" }); return 0;
   }
   const parsed = parseOptions(args, new Set(["--out"]));

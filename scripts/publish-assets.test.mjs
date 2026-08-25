@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -26,13 +26,14 @@ function fixture() {
   const evidence = ["conformance-manifest.json", "conformance-release.json"].map((name) => {
     const bytes = Buffer.from(name);
     writeFileSync(join(directory, name), bytes);
-    return { url: `https://github.com/${repository}/releases/download/${tag}/${name}`, size: bytes.length, sha256: sha256(bytes) };
+    return { file: name, size: bytes.length, sha256: sha256(bytes) };
   });
+  // release.json names every file by bare name; the tag is derived from the version.
   const manifest = {
     kind: "spec", id: "soksak-spec", version,
-    manifest: { url: `https://github.com/${repository}/releases/download/${tag}/spec.json`, size: specManifest.length, sha256: sha256(specManifest) },
+    manifest: { file: "spec.json", size: specManifest.length, sha256: sha256(specManifest) },
     source: { repository: `https://github.com/${repository}`, commit },
-    artifacts: [{ target: "any", url: `https://github.com/${repository}/releases/download/${tag}/${archiveName}`, size: archive.length, sha256: sha256(archive), format: "tgz", manifest: "spec.json" }],
+    artifacts: [{ target: "any", file: archiveName, size: archive.length, sha256: sha256(archive), format: "tgz", manifest: "spec.json" }],
     evidence,
   };
   writeFileSync(join(directory, archiveName), archive);
@@ -51,6 +52,20 @@ test("release assets and tag are derived from the verified owner manifest", (con
   });
   assert.equal(result.tag, value.tag);
   assert.deepEqual(result.assets.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json", value.manifestName, value.archiveName, "spec.json"]);
+});
+
+test("asset collection rejects a release whose version differs from the workspace", (context) => {
+  const value = fixture();
+  context.after(() => rmSync(value.directory, { recursive: true, force: true }));
+  const manifestPath = join(value.directory, value.manifestName);
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, version: "0.0.1" }, null, 2)}\n`);
+  assert.throws(() => collectReleaseAssets({
+    repository,
+    commit,
+    artifacts: value.directory,
+    manifest: manifestPath,
+  }), /identity/);
 });
 
 test("asset collection fails closed on undeclared or changed files", (context) => {

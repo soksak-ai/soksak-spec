@@ -10,6 +10,7 @@ import {
   specReleaseIdentity,
   validateArchiveEntries,
 } from "./release-verify.mjs";
+import { GITHUB_ORG, MAX_SEMVER_LENGTH } from "../packages/plugin-spec/dist/release-primitives.js";
 
 const root = join(import.meta.dirname, "..");
 const commit = "a".repeat(40);
@@ -56,6 +57,54 @@ test("spec release projects the derived owner identity", () => {
   assert.equal(release.artifacts[0].size, 81840);
   assert.equal(release.artifacts[0].manifest, "spec.json");
   assert.equal(release.evidenceFiles.length, 2);
+});
+
+test("spec release names every file by bare name; the location is derived by the reader", () => {
+  const { workspace, pluginSpec } = metadata();
+  const { evidenceFiles, ...release } = buildPlatformRelease({
+    commit,
+    archiveName: "soksak-ai-plugin-spec-0.0.32.tgz",
+    archiveDigest: digest,
+    archiveSize: 81840,
+    identity: specReleaseIdentity(workspace, pluginSpec),
+    manifestBytes: Buffer.from('{}\n'),
+  });
+  assert.equal(release.artifacts[0].file, "soksak-ai-plugin-spec-0.0.32.tgz");
+  assert.equal(release.manifest.file, "spec.json");
+  assert.deepEqual(release.evidence.map(({ file }) => file), ["conformance-manifest.json", "conformance-release.json"]);
+  assert.deepEqual(evidenceFiles.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json"]);
+  assert.deepEqual(Object.keys(release.manifest).sort(), ["file", "sha256", "size"]);
+  for (const artifact of release.artifacts) assert.deepEqual(Object.keys(artifact).sort(), ["file", "format", "manifest", "sha256", "size", "target"]);
+  for (const item of release.evidence) assert.deepEqual(Object.keys(item).sort(), ["file", "sha256", "size"]);
+});
+
+test("spec release repository is derived from the org and the spec id; the workspace must restate it exactly", () => {
+  const { workspace, pluginSpec } = metadata();
+  assert.equal(specReleaseIdentity(workspace, pluginSpec).repository, `https://github.com/${GITHUB_ORG}/soksak-spec`);
+  for (const repository of ["https://github.com/example/soksak-spec", `https://github.com/${GITHUB_ORG}/other`, `https://github.com/${GITHUB_ORG}/soksak-spec/`]) {
+    assert.throws(
+      () => specReleaseIdentity({ ...workspace, soksakRelease: { ...workspace.soksakRelease, repository } }, pluginSpec),
+      /soksakRelease\.repository must equal/,
+    );
+  }
+});
+
+test("spec release takes the strict SemVer grammar and its length bound from the spec package", () => {
+  const source = readFileSync(join(root, "scripts/release-verify.mjs"), "utf8");
+  assert.match(source, /import \{[^}]*\bSTRICT_SEMVER_RE\b[^}]*\} from "\.\.\/packages\/plugin-spec\/dist\/spec\.js"/);
+  const { workspace, pluginSpec } = metadata();
+  const identity = specReleaseIdentity(workspace, pluginSpec);
+  const build = (version) => buildPlatformRelease({
+    commit,
+    archiveName: `soksak-ai-plugin-spec-${version}.tgz`,
+    archiveDigest: digest,
+    archiveSize: 1,
+    identity: { ...identity, version },
+    manifestBytes: Buffer.from("{}\n"),
+  });
+  assert.equal(build("1.2.3-rc.1").version, "1.2.3-rc.1");
+  assert.throws(() => build(`1.0.0-${"a".repeat(MAX_SEMVER_LENGTH)}`), /strict SemVer required/);
+  assert.throws(() => build("v1.0.0"), /strict SemVer required/);
 });
 
 test("spec release identity rejects mismatched versions", () => {

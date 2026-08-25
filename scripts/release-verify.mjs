@@ -13,11 +13,9 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { parseReleaseManifest, releaseIdentity } from "../packages/plugin-spec/dist/spec.js";
+import { GITHUB_ORG, STRICT_SEMVER_RE, parseReleaseManifest } from "../packages/plugin-spec/dist/spec.js";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const STRICT_SEMVER_RE = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const RUST_CRATES = ["soksak-spec-contract", "soksak-spec-service", "soksak-spec-socket"];
-
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -53,7 +51,7 @@ export function canonicalizeGzipPlatform(bytes) {
 }
 
 function strictSemver(value, label) {
-  if (typeof value !== "string" || value.length > 256 || !STRICT_SEMVER_RE.test(value)) {
+  if (typeof value !== "string" || !STRICT_SEMVER_RE.test(value)) {
     throw new Error(`${label}: strict SemVer required`);
   }
   return value;
@@ -68,18 +66,20 @@ export function specReleaseIdentity(workspace, pluginSpec) {
   if (
     release === null || typeof release !== "object" || Array.isArray(release) ||
     !release.spec || typeof release.spec !== "object" || release.spec.id !== "soksak-spec" || release.spec.version !== workspace.version ||
-    typeof release.repository !== "string" ||
     release.manifest !== "release.json"
   ) {
     throw new Error("workspace soksakRelease metadata is invalid");
   }
+  // source.repository is derived from the org and the spec id; the workspace restates it exactly.
+  const repository = `https://github.com/${GITHUB_ORG}/${release.spec.id}`;
+  if (release.repository !== repository) throw new Error(`workspace soksakRelease.repository must equal ${repository}`);
   const version = strictSemver(workspace.version, "workspace.version");
   if (pluginSpec?.version !== version || typeof pluginSpec?.name !== "string") {
     throw new Error("workspace and plugin-spec versions must both equal the same SemVer");
   }
   return {
     id: release.spec.id,
-    repository: release.repository,
+    repository,
     manifest: release.manifest,
     version,
     packageName: pluginSpec.name,
@@ -214,13 +214,13 @@ function verifyArchive(path, identity, workspace) {
   return { names, packed };
 }
 
+// release.json names every file by bare name; the release directory is derived from id and version
+// by the reader.
 export function buildPlatformRelease({ commit, archiveName, archiveDigest, archiveSize, identity, manifestBytes }) {
   const version = strictSemver(identity?.version, "release identity version");
-  const releaseTag = `v${version}`;
-  const repository = identity.repository;
   const artifact = {
     target: "any",
-    url: `${repository}/releases/download/${releaseTag}/${archiveName}`,
+    file: archiveName,
     sha256: archiveDigest,
     size: archiveSize,
     format: "tgz",
@@ -236,11 +236,11 @@ export function buildPlatformRelease({ commit, archiveName, archiveDigest, archi
     ["conformance-release.json", report({ release: true })],
   ].map(([name, value]) => {
     const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-    return { name, bytes, reference: { url: `${repository}/releases/download/${releaseTag}/${name}`, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") } };
+    return { name, bytes, reference: { file: name, size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") } };
   });
   return {
     kind: "spec", id: identity.id, version,
-    manifest: { url: `${repository}/releases/download/${releaseTag}/spec.json`, size: manifestBytes.length, sha256: createHash("sha256").update(manifestBytes).digest("hex") },
+    manifest: { file: "spec.json", size: manifestBytes.length, sha256: createHash("sha256").update(manifestBytes).digest("hex") },
     source: { repository: identity.repository, commit },
     artifacts: [artifact],
     evidence: evidenceFiles.map(({ reference }) => reference),

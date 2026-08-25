@@ -2,6 +2,7 @@
 // plugin runs to create its release. The fixture plugin declares only its file set; identity and
 // version derive from plugin manifests, outputs are deterministic, and malformed plugins fail.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,13 +10,33 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { readRegularFileArchive } from "../release-template/archive.mjs";
+import { releaseDirectory } from "../release-template/resolve-release.mjs";
+import { GITHUB_ORG } from "../src/release-primitives.js";
 
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template");
 const COMMIT = "a".repeat(40);
 const FILES = ["LICENSE", "NOTICE", "README.ko.md", "README.md", "main.js", "plugin.json"];
+const SIDECAR_ID = "soksak-sidecar-example";
+const sha256 = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
 
 let root = "";
 let outDir = "";
+let store = "";
+
+// A local store holding one sidecar release; the dependency composer reads its release.json bytes.
+function writeStoreSidecar(version = "0.0.1"): Buffer {
+  const directory = releaseDirectory(store, "sidecar", SIDECAR_ID, version);
+  fs.mkdirSync(directory, { recursive: true });
+  const bytes = Buffer.from(`${JSON.stringify({
+    kind: "sidecar", id: SIDECAR_ID, version,
+    manifest: { file: "sidecar.json", size: 1, sha256: "b".repeat(64) },
+    source: { repository: `https://github.com/${GITHUB_ORG}/${SIDECAR_ID}`, commit: "c".repeat(40) },
+    artifacts: [{ target: "aarch64-apple-darwin", file: `${SIDECAR_ID}-${version}-aarch64-apple-darwin.tar.gz`, size: 2, sha256: "d".repeat(64), format: "tar.gz", manifest: "sidecar.json" }],
+    evidence: [{ file: "conformance-release.json", size: 3, sha256: "e".repeat(64) }],
+  }, null, 2)}\n`);
+  fs.writeFileSync(path.join(directory, "release.json"), bytes);
+  return bytes;
+}
 
 function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Record<string, unknown>; frontendPackage?: boolean; releaseDependencies?: unknown[] } = {}): void {
   const pkg = {
@@ -52,9 +73,9 @@ function writeFixture(overrides: { pkg?: Record<string, unknown>; plugin?: Recor
   fs.writeFileSync(path.join(root, "README.ko.md"), "# 예제\n");
 }
 
-function build(out = outDir): { status: number | null; stdout: string; stderr: string } {
+function build(out = outDir, extra: string[] = []): { status: number | null; stdout: string; stderr: string } {
   // Run from the fixture plugin root discovered by release-files.json.
-  const r = spawnSync("node", [path.join(TEMPLATE, "build-release.mjs"), "--commit", COMMIT, "--out", out], {
+  const r = spawnSync("node", [path.join(TEMPLATE, "build-release.mjs"), "--commit", COMMIT, "--out", out, ...extra], {
     encoding: "utf8",
     cwd: root,
   });
@@ -64,11 +85,13 @@ function build(out = outDir): { status: number | null; stdout: string; stderr: s
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "relbuild-root-"));
   outDir = fs.mkdtempSync(path.join(os.tmpdir(), "relbuild-out-"));
+  store = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "relbuild-store-"));
 });
 
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
   fs.rmSync(outDir, { recursive: true, force: true });
+  fs.rmSync(store, { recursive: true, force: true });
 });
 
 describe("release-template/build-release.mjs — canonical plugin release", () => {
@@ -79,12 +102,17 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     const out = JSON.parse(r.stdout);
     expect(out.archive).toBe("soksak-plugin-example-0.0.1-any.tgz");
 
-    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json")).toString());
+    const releaseBytes = fs.readFileSync(path.join(outDir, "release.json"));
+    const release = JSON.parse(releaseBytes.toString());
     expect(release).toMatchObject({
       kind: "plugin", id: "soksak-plugin-example", version: "0.0.1",
-      source: { repository: "https://github.com/soksak-ai/soksak-plugin-example", commit: COMMIT },
+      source: { repository: `https://github.com/${GITHUB_ORG}/soksak-plugin-example`, commit: COMMIT },
     });
-    expect(release.artifacts[0]).toMatchObject({ target: "any", format: "tgz", sha256: out.sha256 });
+    expect(release.artifacts).toEqual([{ target: "any", file: out.archive, size: expect.any(Number), sha256: out.sha256, format: "tgz", manifest: "plugin.json" }]);
+    const manifestBytes = fs.readFileSync(path.join(root, "plugin.json"));
+    expect(release.manifest).toEqual({ file: "plugin.json", size: manifestBytes.length, sha256: sha256(manifestBytes) });
+    expect(releaseBytes.toString()).not.toContain("url");
+    expect(release.runtimeDependencies).toBeUndefined();
 
     const names = readRegularFileArchive(fs.readFileSync(path.join(outDir, out.archive))).map((e) => e.name);
     expect(names).toEqual(FILES);
@@ -99,11 +127,46 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     const report = JSON.parse(fs.readFileSync(path.join(outDir, "conformance-contract-01.json"), "utf8"));
     expect(report.claim).toEqual({ contract: { id: "soksak-spec-plugin-terminal", version: "0.0.1" } });
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
-    const urls = release.evidence.map((item: { url: string }) => item.url);
-    expect(urls).toContain(
-      "https://github.com/soksak-ai/soksak-plugin-example/releases/download/v0.0.1/conformance-contract-01.json",
-    );
-    expect(urls).toEqual([...urls].sort());
+    const files = release.evidence.map((item: { file: string }) => item.file);
+    expect(files).toEqual(["conformance-contract-01.json", "conformance-plugin.json", "conformance-release.json"]);
+    const bytes = fs.readFileSync(path.join(outDir, "conformance-contract-01.json"));
+    expect(release.evidence[0]).toEqual({ file: "conformance-contract-01.json", size: bytes.length, sha256: sha256(bytes) });
+  });
+
+  it("composes runtime dependencies from the local store: the manifest names id and version, the release records the release.json digest", () => {
+    const dependencyBytes = writeStoreSidecar();
+    writeFixture({ plugin: { permissions: ["sidecar"], runtimeDependencies: { sidecars: [{ id: SIDECAR_ID, version: "0.0.1" }] } } });
+    const result = build(outDir, ["--store", store]);
+    expect(result.status, result.stderr).toBe(0);
+    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
+    expect(release.runtimeDependencies).toEqual({
+      sidecars: [{ id: SIDECAR_ID, version: "0.0.1", size: dependencyBytes.length, sha256: sha256(dependencyBytes) }],
+    });
+  });
+
+  it("fails by name when a runtime dependency is absent from the store", () => {
+    writeFixture({ plugin: { permissions: ["sidecar"], runtimeDependencies: { sidecars: [{ id: SIDECAR_ID, version: "0.0.1" }] } } });
+    const result = build(outDir, ["--store", store]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("RuntimeDependencyError");
+    expect(result.stderr).toContain(`${SIDECAR_ID}@0.0.1`);
+    expect(fs.existsSync(path.join(outDir, "release.json"))).toBe(false);
+  });
+
+  it("refuses a manifest dependency that names a location or digest", () => {
+    writeStoreSidecar();
+    writeFixture({ plugin: { permissions: ["sidecar"], runtimeDependencies: { sidecars: [{
+      id: SIDECAR_ID, version: "0.0.1", url: `https://github.com/${GITHUB_ORG}/${SIDECAR_ID}/releases/download/v0.0.1/release.json`, size: 1, sha256: "a".repeat(64),
+    }] } } });
+    const result = build(outDir, ["--store", store]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/plugin manifest is invalid/);
+  });
+
+  it("refuses a relative or valueless --store", () => {
+    writeFixture();
+    expect(build(outDir, ["--store", "relative/store"]).stderr).toMatch(/--store must be an absolute/);
+    expect(build(outDir, ["--store"]).stderr).toMatch(/--store must be an absolute/);
   });
 
   it("reads private build metadata from frontend/package.json", () => {
@@ -194,6 +257,13 @@ describe("release-template/build-release.mjs — canonical plugin release", () =
     const r = build();
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/plugin manifest is invalid/);
+  });
+
+  it("refuses an archive name outside the release file grammar", () => {
+    writeFixture({ pkg: { version: "0.0.1+build.1" }, plugin: { version: "0.0.1+build.1" } });
+    const r = build();
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/release file name is invalid/);
   });
 
   it("refuses a non-SHA commit", () => {

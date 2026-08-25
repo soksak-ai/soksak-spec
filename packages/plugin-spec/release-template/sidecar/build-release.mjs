@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  ID, INTERFACE, REPOSITORY, SIDECAR, TAG, VERSION,
+  ID, INTERFACE, SIDECAR, VERSION,
   assertBaseline, assertCommit, assertNativeBinaryTarget, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
   parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
 } from "./release-contract.mjs";
@@ -10,7 +10,8 @@ import {
 // --emit-summary is an additive boolean flag: the core release.build handler passes it to read the
 // manifest + per-target digests off stdout instead of re-hashing in TS. Stripped before the strict
 // --name value parser; without it stdout stays silent. The sidecar root is discovered by release-contract,
-// so no repository-root argument is carried here.
+// so no repository-root argument is present here. Every file reference in the release document is a
+// bare file name; the release directory is derived from id and version by the reader.
 const rawArgs = process.argv.slice(2);
 const emitSummary = rawArgs.includes("--emit-summary");
 const options = parseOptions(rawArgs.filter((arg) => arg !== "--emit-summary"), ["commit", "tag", "artifacts", "out"]);
@@ -47,7 +48,7 @@ const artifacts = readTargetMatrix().map(({ target }) => {
   }
   return {
     target,
-    url: `${REPOSITORY}/releases/download/${TAG}/${asset}`,
+    file: asset,
     sha256: digest,
     size: bytes.length,
     format: "tar.gz",
@@ -72,12 +73,12 @@ const evidenceFiles = [
   ["conformance-sidecar.json", report({ manifest: true })],
 ].map(([name, value]) => {
   const bytes = jsonBytes(value);
-  return { name, bytes, reference: { url: `${REPOSITORY}/releases/download/${TAG}/${name}`, size: bytes.length, sha256: sha256(bytes) } };
+  return { name, bytes, reference: { file: name, size: bytes.length, sha256: sha256(bytes) } };
 });
 const manifestBytes = jsonBytes(SIDECAR);
 const release = {
   ...releaseIdentity(options.commit),
-  manifest: { url: `${REPOSITORY}/releases/download/${TAG}/sidecar.json`, size: manifestBytes.length, sha256: sha256(manifestBytes) },
+  manifest: { file: "sidecar.json", size: manifestBytes.length, sha256: sha256(manifestBytes) },
   artifacts,
   evidence: evidenceFiles.map(({ reference }) => reference),
 };
@@ -87,7 +88,7 @@ writeRegularFile(path.join(out, "release.json"), releaseBytes);
 for (const item of evidenceFiles) writeRegularFile(path.join(out, item.name), item.bytes);
 
 // The one machine-readable line — a sentinel prefix so the caller extracts it regardless of any
-// other output. Carries exactly what the handler would otherwise re-derive from the written files.
+// other output. Contains exactly what the handler would otherwise re-derive from the written files.
 if (emitSummary) {
   process.stdout.write(`@@RELEASE_SUMMARY@@ ${JSON.stringify({ releaseJson: release, matrix: artifacts })}\n`);
 }

@@ -2,13 +2,16 @@
 // Canonical plugin release builder — byte-identical across every plugin. A plugin declares its file
 // set in release-files.json; identity, version, the boundary invariants, the archive, the release
 // manifest, and the conformance reports are derived from the plugin manifest and produced once.
-// No plugin-specific coupling lives here: implements and consumes are validated for shape only —
+// No plugin-specific coupling is here: implements and consumes are validated for shape only —
 // the manifest is the single source of truth for which contracts it relates to.
 import fs from "node:fs";
 import path from "node:path";
 
 import { createRegularFileArchive, readRegularFileArchive, sha256 } from "./archive.mjs";
+import { composeRuntimeDependencies } from "./compose-runtime-dependencies.mjs";
 import { assertNoLocalPackageDependencies } from "./package-dependencies.mjs";
+import { releaseResolver } from "./resolve-release.mjs";
+import { GITHUB_ORG, RELEASE_FILE_RE, STRICT_SEMVER_RE } from "../dist/release-primitives.js";
 import { parseManifest } from "../dist/spec.js";
 
 // The plugin repository root is resolved by a discoverable rule rather than cwd guessing.
@@ -22,9 +25,6 @@ const root = (() => {
     dir = parent;
   }
 })();
-const STRICT_SEMVER_RE =
-  /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
-
 function option(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
@@ -45,6 +45,10 @@ if (!/^[a-f0-9]{40}$/.test(commit ?? "")) {
   console.error("--commit must be an exact lowercase 40-character Git commit SHA");
   process.exit(2);
 }
+// --store <absolute local store> composes runtime dependencies against the local store; without it
+// the GitHub resolver reads each dependency's published release.json.
+const store = process.argv.includes("--store") ? option("--store") ?? "" : undefined;
+const resolver = releaseResolver(store);
 
 // The plugin's exact ordered release file set.
 const FILES = JSON.parse(fs.readFileSync(path.join(root, "release-files.json")));
@@ -63,7 +67,7 @@ const manifestBytes = fs.readFileSync(path.join(root, "plugin.json"));
 const pkg = JSON.parse(packageBytes);
 assertNoLocalPackageDependencies(packagePath);
 const rawPlugin = JSON.parse(manifestBytes);
-if (typeof pkg.version !== "string" || pkg.version.length > 256 || !STRICT_SEMVER_RE.test(pkg.version)) {
+if (typeof pkg.version !== "string" || !STRICT_SEMVER_RE.test(pkg.version)) {
   throw new Error("package version must be strict SemVer");
 }
 const VERSION = pkg.version;
@@ -87,8 +91,7 @@ if (plugin.version !== VERSION || plugin.entry !== "main.js") {
 if (fs.existsSync(path.join(root, "release", "dependencies.json"))) {
   throw new Error("release/dependencies.json is not a release input");
 }
-const REPOSITORY = `https://github.com/soksak-ai/${ID}`;
-const tag = `v${VERSION}`;
+const REPOSITORY = `https://github.com/${GITHUB_ORG}/${ID}`;
 const archiveName = `${ID}-${VERSION}-any.tgz`;
 const archive = createRegularFileArchive({ root, files: FILES });
 const archived = readRegularFileArchive(archive);
@@ -103,7 +106,7 @@ if (!archivedManifest || !archivedManifest.data.equals(manifestBytes)) {
 const artifactSha256 = sha256(archive);
 const artifact = {
   target: "any",
-  url: `${REPOSITORY}/releases/download/${tag}/${archiveName}`,
+  file: archiveName,
   sha256: artifactSha256,
   size: archive.length,
   format: "tgz",
@@ -125,21 +128,29 @@ const evidenceFiles = [
   ]),
 ].map(([name, value]) => {
   const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-  return { name, value, bytes, reference: { url: `${REPOSITORY}/releases/download/${tag}/${name}`, size: bytes.length, sha256: sha256(bytes) } };
+  return { name, value, bytes, reference: { file: name, size: bytes.length, sha256: sha256(bytes) } };
 });
+const runtimeDependencies = await composeRuntimeDependencies({ intents: plugin.runtimeDependencies, resolver });
 const release = {
   kind: "plugin", id: ID, version: VERSION,
-  manifest: { url: `${REPOSITORY}/releases/download/${tag}/plugin.json`, size: manifestBytes.length, sha256: sha256(manifestBytes) },
+  manifest: { file: "plugin.json", size: manifestBytes.length, sha256: sha256(manifestBytes) },
   source: { repository: REPOSITORY, commit },
   artifacts: [artifact],
-  ...(plugin.runtimeDependencies ? { runtimeDependencies: plugin.runtimeDependencies } : {}),
-  evidence: evidenceFiles.map(({ reference }) => reference).sort((left, right) => left.url.localeCompare(right.url)),
+  ...(runtimeDependencies ? { runtimeDependencies } : {}),
+  evidence: evidenceFiles.map(({ reference }) => reference).sort((left, right) => left.file.localeCompare(right.file)),
 };
 const releaseBytes = Buffer.from(`${JSON.stringify(release, null, 2)}\n`);
 
+// Every emitted file name satisfies the release file grammar before any byte is written.
+const outputs = [
+  [archiveName, archive],
+  ["plugin.json", manifestBytes],
+  ["release.json", releaseBytes],
+  ...evidenceFiles.map(({ name, bytes }) => [name, bytes]),
+];
+for (const [name] of outputs) {
+  if (!RELEASE_FILE_RE.test(name)) throw new Error(`release file name is invalid: ${name}`);
+}
 fs.mkdirSync(outDir, { recursive: true });
-fs.writeFileSync(path.join(outDir, archiveName), archive);
-fs.writeFileSync(path.join(outDir, "plugin.json"), manifestBytes);
-fs.writeFileSync(path.join(outDir, "release.json"), releaseBytes);
-for (const item of evidenceFiles) fs.writeFileSync(path.join(outDir, item.name), item.bytes);
+for (const [name, bytes] of outputs) fs.writeFileSync(path.join(outDir, name), bytes);
 console.log(JSON.stringify({ archive: archiveName, sha256: artifactSha256 }));

@@ -1,12 +1,32 @@
 #!/usr/bin/env node
+// Audits every published release of one sidecar repository in the org. release.json names each file
+// by bare name; the download url is derived from the org, the id, the tag version, and that name.
+// The GitHub asset with that name must report the same size and digest as release.json, and the
+// downloaded bytes must match before the archive is opened.
 import crypto from "node:crypto";
-import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { parseReleaseManifest } from "../../dist/release.js";
+import { COMPONENT_ID_RE, GITHUB_ORG, STRICT_SEMVER_RE } from "../../dist/release-primitives.js";
+import { releaseURL } from "../resolve-release.mjs";
 import { assertNativeBinaryTarget } from "./native-binary.mjs";
 import { readSidecarReleaseArchive } from "./archive.mjs";
 
-const REPOSITORY = /^https:\/\/github[.]com\/([A-Za-z0-9-]+)\/([a-z0-9][a-z0-9-]*)$/;
+const REPOSITORY_PREFIX = `https://github.com/${GITHUB_ORG}/`;
+
+// A sidecar repository is https://github.com/<GITHUB_ORG>/<id> with <id> in the component id grammar.
+function repositoryId(repository) {
+  const id = typeof repository === "string" && repository.startsWith(REPOSITORY_PREFIX) ? repository.slice(REPOSITORY_PREFIX.length) : "";
+  if (!COMPONENT_ID_RE.test(id)) throw new Error(`sidecar repository must be ${REPOSITORY_PREFIX}<id>`);
+  return id;
+}
+
+// A release tag is one leading v followed by a version in the strict SemVer grammar.
+function tagVersion(tag) {
+  const version = typeof tag === "string" && tag.startsWith("v") ? tag.slice(1) : "";
+  if (!STRICT_SEMVER_RE.test(version)) throw new Error("release tag must be v<version>");
+  return version;
+}
 
 function digest(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
@@ -38,31 +58,31 @@ function assetMap(release) {
   return result;
 }
 
-function validateReleaseIdentity(value, repository, id, tag) {
-  const version = tag.startsWith("v") ? tag.slice(1) : "";
-  if (!value || value.kind !== "sidecar" || value.id !== id || value.version !== version ||
-      value.source?.repository !== repository || !/^[0-9a-f]{40}$/.test(value.source?.commit ?? "") ||
-      !Array.isArray(value.artifacts) || value.artifacts.length === 0) {
-    throw new Error("release.json identity does not match its GitHub release");
+// The GitHub asset named by one release.json entry must state the same size and digest.
+function assertAssetMatches(assets, reference, label) {
+  const asset = assets.get(reference.file);
+  if (!asset || asset.size !== reference.size || asset.digest !== `sha256:${reference.sha256}`) {
+    throw new Error(`GitHub asset does not match ${label} in release.json: ${reference.file}`);
   }
-  return version;
 }
 
-async function auditArtifact({ request, repository, id, version, artifact, assets }) {
-  if (!artifact || typeof artifact.target !== "string" || typeof artifact.url !== "string" ||
-      !Number.isSafeInteger(artifact.size) || artifact.size < 1 || !/^[0-9a-f]{64}$/.test(artifact.sha256 ?? "") ||
-      artifact.format !== "tar.gz" || artifact.manifest !== "sidecar.json") {
-    throw new Error("release artifact metadata is invalid");
+async function readRelease({ request, assets, id, version }) {
+  const url = releaseURL(id, version, "release.json");
+  const bytes = await required(request, url);
+  assertAssetMatches(assets, { file: "release.json", size: bytes.length, sha256: digest(bytes) }, "release.json");
+  const parsed = parseReleaseManifest(JSON.parse(bytes.toString("utf8")));
+  if (!parsed.ok) throw new Error(`release.json is invalid: ${parsed.errors.join("; ")}`);
+  const release = parsed.value;
+  if (release.kind !== "sidecar" || release.id !== id || release.version !== version) {
+    throw new Error("release.json identity does not match its GitHub release");
   }
-  const expectedPrefix = `${repository}/releases/download/v${version}/`;
-  if (!artifact.url.startsWith(expectedPrefix)) throw new Error("release artifact URL is not canonical");
-  const name = path.posix.basename(new URL(artifact.url).pathname);
-  const asset = assets.get(name);
-  if (!asset || asset.browser_download_url !== artifact.url || asset.size !== artifact.size) {
-    throw new Error("GitHub asset does not match release artifact metadata");
-  }
-  if (asset.digest && asset.digest !== `sha256:${artifact.sha256}`) throw new Error("GitHub asset digest differs from release.json");
-  const bytes = await required(request, artifact.url);
+  return release;
+}
+
+async function auditArtifact({ request, id, version, artifact, assets }) {
+  if (artifact.format !== "tar.gz") throw new Error("release artifact format is not tar.gz");
+  assertAssetMatches(assets, artifact, "artifact");
+  const bytes = await required(request, releaseURL(id, version, artifact.file));
   if (bytes.length !== artifact.size || digest(bytes) !== artifact.sha256) throw new Error("downloaded artifact bytes differ from release.json");
   const archived = readSidecarReleaseArchive(bytes);
   const manifestEntry = archived.find((entry) => entry.name === "sidecar.json");
@@ -78,15 +98,11 @@ async function auditArtifact({ request, repository, id, version, artifact, asset
 }
 
 export async function auditSidecarRepository({ repository, tag, request = githubRequest }) {
-  const match = REPOSITORY.exec(repository);
-  if (!match) throw new Error("canonical GitHub sidecar repository URL required");
-  if (tag !== undefined && !/^v(?:0|[1-9][0-9]*)[.](?:0|[1-9][0-9]*)[.](?:0|[1-9][0-9]*)$/.test(tag)) {
-    throw new Error("requested release tag must be an exact stable version");
-  }
-  const [, owner, id] = match;
+  const id = repositoryId(repository);
+  if (tag !== undefined) tagVersion(tag);
   const releases = [];
   for (let page = 1; ; page += 1) {
-    const url = `https://api.github.com/repos/${owner}/${id}/releases?per_page=100&page=${page}`;
+    const url = `https://api.github.com/repos/${GITHUB_ORG}/${id}/releases?per_page=100&page=${page}`;
     const values = JSON.parse((await required(request, url)).toString("utf8"));
     if (!Array.isArray(values)) throw new Error("GitHub releases response must be an array");
     releases.push(...values.filter((release) => !release.draft));
@@ -99,29 +115,15 @@ export async function auditSidecarRepository({ repository, tag, request = github
   for (const release of selected) {
     const tag = typeof release.tag_name === "string" ? release.tag_name : "unknown";
     try {
+      const version = tagVersion(tag);
       const assets = assetMap(release);
-      const manifestAsset = assets.get("release.json");
-      if (!manifestAsset || typeof manifestAsset.browser_download_url !== "string") throw new Error("GitHub release has no release.json asset");
-      const releaseBytes = await required(request, manifestAsset.browser_download_url);
-      if (manifestAsset.size !== releaseBytes.length ||
-          (manifestAsset.digest && manifestAsset.digest !== `sha256:${digest(releaseBytes)}`)) {
-        throw new Error("release.json asset bytes differ from GitHub metadata");
-      }
-      const value = JSON.parse(releaseBytes.toString("utf8"));
-      const version = validateReleaseIdentity(value, repository, id, tag);
-      const seen = new Set();
+      const value = await readRelease({ request, assets, id, version });
       for (const artifact of value.artifacts) {
         report.artifacts += 1;
-        const target = typeof artifact?.target === "string" ? artifact.target : "unknown";
-        if (seen.has(target)) {
-          report.failures.push({ tag, target, error: "duplicate release artifact target" });
-          continue;
-        }
-        seen.add(target);
         try {
-          await auditArtifact({ request, repository, id, version, artifact, assets });
+          await auditArtifact({ request, id, version, artifact, assets });
         } catch (error) {
-          report.failures.push({ tag, target, error: error instanceof Error ? error.message : String(error) });
+          report.failures.push({ tag, target: artifact.target, error: error instanceof Error ? error.message : String(error) });
         }
       }
     } catch (error) {

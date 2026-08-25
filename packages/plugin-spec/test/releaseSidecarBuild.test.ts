@@ -3,7 +3,7 @@
 // and runs in its publish job to emit the owner manifest + conformance reports the signed registry
 // requires. These run the real artifacts from a fixture sidecar repository with sidecar.json,
 // release/targets.json, the validator pin, and a five-target archive set — and fix the contract:
-// identity derives from sidecar.json and the emitted release carries per-target archives.
+// identity derives from sidecar.json and the emitted release records per-target archives.
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createRegularFileArchive } from "../release-template/archive.mjs";
+import { COMPONENT_ID_RE, GITHUB_ORG, RELEASE_FILE_RE, STRICT_SEMVER_RE } from "../src/release-primitives.js";
 
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template/sidecar");
 const COMMIT = "b".repeat(40);
@@ -85,7 +86,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
     );
   } else {
     if (!GO_VERSION) throw new Error("workspace Go version is missing");
-    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/soksak-ai/${sidecar.id}\n\ngo ${GO_VERSION}\n`);
+    fs.writeFileSync(path.join(root, "go.mod"), `module github.com/${GITHUB_ORG}/${sidecar.id}\n\ngo ${GO_VERSION}\n`);
   }
   for (const target of targets) {
     const asset = `${sidecar.id}-${sidecar.version}-${target}.tar.gz`;
@@ -115,7 +116,7 @@ function build(tag = "v0.0.1", emitSummary = false, deVendored = false): { statu
 const SUMMARY_MARK = "@@RELEASE_SUMMARY@@ ";
 
 beforeEach(() => {
-  // The canon refuses any symlink on the path walk — macOS tmpdir sits behind the /var symlink,
+  // The canon refuses any symlink on the path walk — macOS tmpdir is behind the /var symlink,
   // so anchor fixtures at the resolved real path (exactly what a CI checkout gives the scripts).
   const tmp = fs.realpathSync(os.tmpdir());
   root = fs.mkdtempSync(path.join(tmp, "sidecar-rel-root-"));
@@ -143,17 +144,27 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
 
-    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
+    const releaseBytes = fs.readFileSync(path.join(outDir, "release.json"));
+    const release = JSON.parse(releaseBytes.toString("utf8"));
     expect(release).toMatchObject({
       kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1",
-      source: { repository: "https://github.com/soksak-ai/soksak-sidecar-example", commit: COMMIT },
+      source: { repository: `https://github.com/${GITHUB_ORG}/soksak-sidecar-example`, commit: COMMIT },
     });
     expect(release.artifacts).toHaveLength(5);
     expect(release.artifacts.map((a: { target: string }) => a.target)).toEqual(TARGETS);
     for (const artifact of release.artifacts) {
       expect(artifact.format).toBe("tar.gz");
       expect(artifact.manifest).toBe("sidecar.json");
+      expect(artifact.file).toBe(`soksak-sidecar-example-0.0.1-${artifact.target}.tar.gz`);
+      expect(fs.readFileSync(path.join(artifactsDir, artifact.file))).toHaveLength(artifact.size);
     }
+    const manifestBytes = fs.readFileSync(path.join(outDir, "sidecar.json"));
+    expect(release.manifest).toEqual({ file: "sidecar.json", size: manifestBytes.length, sha256: sha256(manifestBytes) });
+    expect(release.evidence.map((item: { file: string }) => item.file))
+      .toEqual(["conformance-interface.json", "conformance-release.json", "conformance-sidecar.json"]);
+    expect(Object.keys(release.manifest).sort()).toEqual(["file", "sha256", "size"]);
+    for (const artifact of release.artifacts) expect(Object.keys(artifact).sort()).toEqual(["file", "format", "manifest", "sha256", "size", "target"]);
+    for (const item of release.evidence) expect(Object.keys(item).sort()).toEqual(["file", "sha256", "size"]);
     const claims: Record<string, unknown> = {
       "conformance-release.json": { release: true },
       "conformance-sidecar.json": { manifest: true },
@@ -223,6 +234,35 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     const r = build();
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
+  });
+
+  // The vendored builder set is exactly the five scripts copied by writeFixture; the sidecar
+  // release document imports nothing outside that set.
+  it("runs from the vendored five-file set with no import outside it", () => {
+    const source = fs.readFileSync(path.join(TEMPLATE, "build-release.mjs"), "utf8");
+    const imports = [...source.matchAll(/from "([^"]+)"/g)].map((match) => match[1]);
+    expect(imports).toEqual(["node:fs", "node:path", "./release-contract.mjs"]);
+  });
+
+  // release-contract.mjs has no access to dist/ and restates three grammars; each restated regex
+  // source must equal the dist source, including the SemVer length bound.
+  it("restates the component id, strict SemVer, and release file grammars with the exact dist source", () => {
+    const contract = fs.readFileSync(path.join(TEMPLATE, "release-contract.mjs"), "utf8");
+    const literal = (name: string): string => {
+      const match = contract.match(new RegExp(`^const ${name} = /(.*)/;$`, "m"));
+      if (!match) throw new Error(`${name} literal missing`);
+      return match[1];
+    };
+    expect(literal("COMPONENT_ID_RE")).toBe(COMPONENT_ID_RE.source);
+    expect(literal("SEMVER")).toBe(STRICT_SEMVER_RE.source);
+    expect(literal("RELEASE_FILE_RE")).toBe(RELEASE_FILE_RE.source);
+  });
+
+  it("refuses an asset name outside the release file grammar", () => {
+    writeFixture({ sidecar: { version: "0.0.1+build.1" }, cargoVersion: "0.0.1+build.1" });
+    const r = build("v0.0.1+build.1");
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/release file name is invalid/);
   });
 
   it("discovers sidecar.json when run from the canonical source", () => {

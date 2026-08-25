@@ -5,12 +5,14 @@
 // publication. These pin the contract: publication verification polls the seal to a coherent terminal
 // state and only then returns published; a release that never seals fails closed.
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
 import { publishImmutableRelease } from "../release-template/publish-release.mjs";
+import { GITHUB_ORG } from "../src/release-primitives.js";
 
-const REPOSITORY = "soksak-ai/soksak-plugin-example";
+const REPOSITORY = `${GITHUB_ORG}/soksak-plugin-example`;
 const COMMIT = "a".repeat(40);
 const TAG = "v0.0.1";
 
@@ -108,5 +110,17 @@ describe("publishImmutableRelease — owner-immutable publication settles the as
 
   it("fails closed when the release never seals (not a benign race)", async () => {
     await expect(run(new FakeGitHub(Number.POSITIVE_INFINITY))).rejects.toThrow();
+  });
+
+  it("names release assets by the one file grammar of release-primitives", async () => {
+    const source = readFileSync(new URL("../release-template/publish-release.mjs", import.meta.url), "utf8");
+    expect(source).toMatch(/import \{[^}]*\bRELEASE_FILE_RE\b[^}]*\} from "\.\.\/dist\/release-primitives\.js"/);
+    expect(source).not.toMatch(/ASSET_RE|ASSET_NAME_RE|\[A-Za-z0-9\]\[A-Za-z0-9\._-\]/);
+    for (const name of ["..", ".", "sub/release.json", "release json"]) {
+      await expect(publishImmutableRelease({
+        repository: REPOSITORY, commit: COMMIT, tag: TAG, prerelease: false,
+        assets: [makeAsset(name, "{}", "application/json")], api: new FakeGitHub(0), settleAttempts: 1, sleep: noSleep,
+      })).rejects.toThrow(`unsafe release asset name: ${name}`);
+    }
   });
 });
