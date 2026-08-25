@@ -14,7 +14,10 @@ import { publishLocalRelease } from "./local-release-store.mjs";
 import { packSidecarTarget } from "./sidecar/pack-target.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-function run(command, args, cwd) { const result = spawnSync(command, args, { cwd, encoding: "utf8", env: process.env }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}${result.stderr}`); return result.stdout.trim(); }
+// The owner's make receives only the variables named on its command line: GNU make would otherwise
+// read the calling make's command-line variables from MAKEFLAGS and treat them as its own.
+const { MAKEFLAGS: _makeflags, MFLAGS: _mflags, GNUMAKEFLAGS: _gnumakeflags, ...ownerEnvironment } = process.env;
+function run(command, args, cwd) { const result = spawnSync(command, args, { cwd, encoding: "utf8", env: ownerEnvironment }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}${result.stderr}`); return result.stdout.trim(); }
 function read(pathname) { const info = fs.lstatSync(pathname); if (info.isSymbolicLink() || !info.isFile()) throw new Error(`regular file required: ${pathname}`); return fs.readFileSync(pathname); }
 // Every file name the release document records or the build writes satisfies the release file grammar.
 function releaseFile(name) { if (!RELEASE_FILE_RE.test(name)) throw new Error(`release file name is invalid: ${name}`); return name; }
