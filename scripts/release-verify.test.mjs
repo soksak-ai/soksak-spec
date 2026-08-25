@@ -44,13 +44,13 @@ test("spec release projects the derived owner identity", () => {
   const { workspace, pluginSpec } = metadata();
   const release = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.32.tgz",
+    archiveName: "soksak-ai-plugin-spec-0.0.33.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
     manifestBytes: Buffer.from('{}\n'),
   });
-  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.32" });
+  assert.deepEqual({ kind: release.kind, id: release.id, version: release.version }, { kind: "spec", id: "soksak-spec", version: "0.0.33" });
   assert.equal(release.source.repository, "https://github.com/soksak-ai/soksak-spec");
   assert.equal(release.source.commit, commit);
   assert.equal(release.artifacts[0].sha256, digest);
@@ -63,13 +63,13 @@ test("spec release names every file by bare name; the location is derived by the
   const { workspace, pluginSpec } = metadata();
   const { evidenceFiles, ...release } = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.32.tgz",
+    archiveName: "soksak-ai-plugin-spec-0.0.33.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
     manifestBytes: Buffer.from('{}\n'),
   });
-  assert.equal(release.artifacts[0].file, "soksak-ai-plugin-spec-0.0.32.tgz");
+  assert.equal(release.artifacts[0].file, "soksak-ai-plugin-spec-0.0.33.tgz");
   assert.equal(release.manifest.file, "spec.json");
   assert.deepEqual(release.evidence.map(({ file }) => file), ["conformance-manifest.json", "conformance-release.json"]);
   assert.deepEqual(evidenceFiles.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json"]);
