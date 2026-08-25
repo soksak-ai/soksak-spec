@@ -78,6 +78,7 @@ test("repository owns a complete reproducible release boundary", () => {
     "build-release.mjs",
     "cargo-dependencies.mjs",
     "compose-runtime-dependencies.mjs",
+    "entry.mjs",
     "local-release-build.mjs",
     "local-release-store.mjs",
     "local-release.mjs",
