@@ -7,4 +7,10 @@ describe("plugin owner release gate", () => {
     for (const required of ["make", "verify", "build-release.mjs", "release generation is not idempotent", "conformance"]) expect(source).toContain(required);
     for (const duplicate of ["--frozen-lockfile", "typecheck", '["test"]', '["build"]']) expect(source).not.toContain(duplicate);
   });
+  it("passes --registry to the owner Makefile as a command-line REGISTRY", () => {
+    const source = readFileSync(join(import.meta.dirname, "../release-template/verify-plugin-release.mjs"), "utf8");
+    expect(source).toContain('option("--registry")');
+    expect(source).toContain('`REGISTRY=${registry}`');
+    expect(source).not.toContain('run("make", ["verify"])');
+  });
 });
