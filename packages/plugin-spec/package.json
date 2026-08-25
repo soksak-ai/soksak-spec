@@ -1,6 +1,6 @@
 {
   "name": "@soksak-ai/plugin-spec",
-  "version": "0.0.33",
+  "version": "0.0.34",
   "publishConfig": { "access": "public" },
   "description": "Public Soksak plugin, component release, conformance, and authenticated registry contracts.",
   "license": "MIT",
