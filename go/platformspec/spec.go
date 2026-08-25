@@ -23,8 +23,9 @@ type SidecarManifest struct {
 }
 
 const (
-	RegistrySource = "registry"
-	LocalSource    = "local"
+	RegistrySource    = "registry"
+	LocalSource       = "local"
+	DevelopmentSource = "development"
 )
 
 type Component struct {
@@ -100,17 +101,27 @@ func ValidateEnvironment(value Environment) error {
 	return nil
 }
 func validComponent(value Component, sidecar bool) error {
-	if !strictSemver(value.Version) || !filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path || !digestPattern.MatchString(value.ArtifactSHA256) {
-		return fmt.Errorf("component requires exact version, absolute path, and artifact SHA-256")
+	if !strictSemver(value.Version) || !filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path {
+		return fmt.Errorf("component requires exact version and absolute path")
 	}
 	switch value.Source {
 	case RegistrySource:
+		if !digestPattern.MatchString(value.ArtifactSHA256) {
+			return fmt.Errorf("registry source requires artifact SHA-256")
+		}
 		if !registryPattern.MatchString(value.Registry) {
 			return fmt.Errorf("registry source requires registry id")
 		}
 	case LocalSource:
+		if !digestPattern.MatchString(value.ArtifactSHA256) {
+			return fmt.Errorf("local source requires artifact SHA-256")
+		}
 		if value.Registry != "" {
 			return fmt.Errorf("local source cannot declare registry")
+		}
+	case DevelopmentSource:
+		if value.ArtifactSHA256 != "" || value.Registry != "" {
+			return fmt.Errorf("development source cannot declare artifact SHA-256 or registry")
 		}
 	default:
 		return fmt.Errorf("invalid component source")
@@ -119,7 +130,7 @@ func validComponent(value Component, sidecar bool) error {
 		return fmt.Errorf("sidecar target required")
 	}
 	if !sidecar && value.Target != "" {
-		return fmt.Errorf("target belongs only to sidecars")
+		return fmt.Errorf("target is sidecar-only")
 	}
 	return nil
 }

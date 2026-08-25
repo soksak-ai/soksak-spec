@@ -230,8 +230,10 @@ package manifest states author intent; the lock or checksum records exact select
 
 <!-- rule:development-source -->
 
-A development component changes where Soksak reads one plugin, sidecar, kit, contract, or spec and
-excludes only that item from managed updates. It does not disable validation.
+A development record changes where Soksak reads one plugin or sidecar and excludes only that
+record from managed updates. It applies to plugin and sidecar records only; `environment.json`
+models those two kinds. It does not disable validation. The record keeps the `artifactSha256`
+key with an empty string value and declares no `registry`.
 
 <!-- example:development-path-valid:settings-fragment -->
 ```json
@@ -240,6 +242,7 @@ excludes only that item from managed updates. It does not disable validation.
     "terminal-provider": {
       "version": "0.0.1",
       "path": "/absolute/development/terminal-provider",
+      "artifactSha256": "",
       "source": "development",
       "target": "aarch64-apple-darwin"
     }

@@ -84,9 +84,12 @@ Kit, Contract, Spec identity는 release reference와 candidate build receipt에 
 runtime process로 기록하지 않습니다.
 
 `environment.json`은 Plugin과 Sidecar runtime 선택만 기록합니다. 각 record에는 exact version,
-materialized path, source(`local` 또는 `registry`), artifact SHA-256이 있습니다. Sidecar는 target을,
-Plugin은 enabled 상태를 추가로 기록합니다. Release와 build receipt는 repository, source commit,
-dependency URL, size, digest를 보존합니다.
+materialized path, source(`local`, `registry` 또는 `development`), artifact SHA-256이 있습니다.
+`development` record의 path는 source directory이고, 그 manifest에서 version을 읽으며, 빈 artifact
+SHA-256과 registry 없음을 기록합니다. Sidecar는 target을, Plugin은 enabled 상태를 추가로
+기록합니다. Release와 build receipt는 repository, source commit, dependency URL, size, digest를
+보존합니다. `environment.json`은 Go module이 소유하고 검증합니다. TypeScript package는 이 문서에
+대해 아무것도 내보내지 않습니다.
 
 ## Local release store
 

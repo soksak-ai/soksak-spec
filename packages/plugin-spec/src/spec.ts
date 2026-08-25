@@ -72,7 +72,6 @@ export * from "./buildDependencies.js";
 export * from "./distribution.js";
 import { parseRuntimeDependencies, type RuntimeDependencies } from "./distribution.js";
 export * from "./release.js";
-export * from "./installation.js";
 export * from "./sidecar.js";
 export * from "./conformanceWire.js";
 export * from "./pluginRuntime.js";

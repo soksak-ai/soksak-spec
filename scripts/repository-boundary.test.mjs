@@ -56,7 +56,6 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.match(read("Cargo.toml"), /^edition\s*=\s*"2024"$/m, "workspace Rust edition");
   for (const file of [
     "go/platformspec/spec.go",
-    "packages/plugin-spec/src/installation.ts",
     "packages/plugin-spec/docs/VERSIONING.md",
     "packages/plugin-spec/docs/VERSIONING.ko.md",
   ]) {

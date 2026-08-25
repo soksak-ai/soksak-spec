@@ -228,8 +228,10 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 
 <!-- rule:development-source -->
 
-개발 경로는 하나의 플러그인, 사이드카, 킷, 계약 또는 스펙을 읽는 위치를 변경하고 해당
-항목만 관리형 업데이트에서 제외한다. 검증을 비활성화하지 않는다.
+개발 레코드는 하나의 플러그인 또는 사이드카를 읽는 위치를 변경하고 해당 레코드만 관리형
+업데이트에서 제외한다. 플러그인과 사이드카 레코드에만 적용되며, `environment.json`은 이 두
+종류만 모델링한다. 검증을 비활성화하지 않는다. 레코드는 `artifactSha256` 키를 빈 문자열 값으로
+유지하고 `registry`를 선언하지 않는다.
 
 <!-- example:development-path-valid:settings-fragment -->
 ```json
@@ -238,6 +240,7 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
     "terminal-provider": {
       "version": "0.0.1",
       "path": "/absolute/development/terminal-provider",
+      "artifactSha256": "",
       "source": "development",
       "target": "aarch64-apple-darwin"
     }

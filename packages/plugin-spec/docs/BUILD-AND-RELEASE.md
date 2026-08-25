@@ -81,9 +81,12 @@ platform schemas and validators. Kit, Contract, and Spec identities remain visib
 references and candidate build receipts; Core does not record them as runtime processes.
 
 `environment.json` records only Plugin and Sidecar runtime selections. Each record contains the
-exact version, materialized path, source (`local` or `registry`), and artifact SHA-256. A Sidecar
-also records its target; a Plugin also records its enabled state. Release and build receipts retain
-repository, source commit, dependency URL, size, and digest.
+exact version, materialized path, source (`local`, `registry`, or `development`), and artifact
+SHA-256. A `development` record references a source directory, reads its version from the manifest
+there, and records an empty artifact SHA-256 and no registry. A Sidecar also records its target; a
+Plugin also records its enabled state. Release and build receipts retain
+repository, source commit, dependency URL, size, and digest. `environment.json` is owned and
+validated by the Go module; the TypeScript package exports nothing for it.
 
 ## Local release store
 

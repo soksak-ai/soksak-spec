@@ -19,7 +19,7 @@ func TestPluginComponentErrorsNameTheFieldRatherThanTheID(t *testing.T) {
 	environment := EmptyEnvironment()
 	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "any"}}
 	err := ValidateEnvironment(environment)
-	if err == nil || err.Error() != "plugin soksak-plugin-browser-wails3: target belongs only to sidecars" {
+	if err == nil || err.Error() != "plugin soksak-plugin-browser-wails3: target is sidecar-only" {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -43,7 +43,7 @@ func TestEnvironmentRejectsInvalidMaterialization(t *testing.T) {
 		"relative path":     {Version: "0.0.1", Path: "relative", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"},
 		"registry missing":  {Version: "0.0.1", Path: "/installed/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Target: "aarch64-apple-darwin"},
 		"registry on local": {Version: "0.0.1", Path: "/work/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: LocalSource, Registry: "official", Target: "aarch64-apple-darwin"},
-		"unknown source":    {Version: "0.0.1", Path: "/work/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: "development", Target: "aarch64-apple-darwin"},
+		"unknown source":    {Version: "0.0.1", Path: "/work/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: "unknown", Target: "aarch64-apple-darwin"},
 	} {
 		environment := EmptyEnvironment()
 		environment.Sidecars["demo"] = component
@@ -84,5 +84,51 @@ func TestSidecarManifestIsExact(t *testing.T) {
 	wrong := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/other.exe\"}")
 	if _, err := ParseSidecarManifest(wrong); err == nil {
 		t.Fatal("mismatched Windows process was accepted")
+	}
+}
+
+func TestDevelopmentRecordHasNoArtifactAndNoRegistry(t *testing.T) {
+	environment := EmptyEnvironment()
+	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource}, Enabled: true}
+	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/work/terminal-provider", Source: DevelopmentSource, Target: "aarch64-apple-darwin"}
+	if err := ValidateEnvironment(environment); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte(`{"revision":1,"plugins":{"demo":{"version":"0.0.1","path":"/work/demo","artifactSha256":"","source":"development","enabled":true}},"sidecars":{}}`)
+	if _, err := ParseEnvironment(body); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDevelopmentRecordRejectsArtifactRegistryAndMissingTarget(t *testing.T) {
+	for name, component := range map[string]Component{
+		"artifact on development": {Version: "0.0.1", Path: "/work/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: DevelopmentSource},
+		"registry on development": {Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource, Registry: "official"},
+		"relative path":           {Version: "0.0.1", Path: "relative", Source: DevelopmentSource},
+		"loose version":           {Version: "v0.0.1", Path: "/work/demo", Source: DevelopmentSource},
+	} {
+		environment := EmptyEnvironment()
+		environment.Plugins["demo"] = Plugin{Component: component}
+		if err := ValidateEnvironment(environment); err == nil {
+			t.Errorf("accepted %s", name)
+		}
+	}
+	environment := EmptyEnvironment()
+	environment.Sidecars["demo"] = Component{Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource}
+	if err := ValidateEnvironment(environment); err == nil {
+		t.Error("accepted development sidecar without target")
+	}
+}
+
+func TestRegistryAndLocalStillRequireArtifactDigest(t *testing.T) {
+	for name, component := range map[string]Component{
+		"registry without digest": {Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"},
+		"local without digest":    {Version: "0.0.1", Path: "/installed/demo", Source: LocalSource, Target: "aarch64-apple-darwin"},
+	} {
+		environment := EmptyEnvironment()
+		environment.Sidecars["demo"] = component
+		if err := ValidateEnvironment(environment); err == nil {
+			t.Errorf("accepted %s", name)
+		}
 	}
 }
