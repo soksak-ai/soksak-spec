@@ -83,7 +83,10 @@ function assembleSidecar(root, commit, targets, work) {
   return output;
 }
 
-export function buildLocalRelease({ store, source, targets = [], template = path.dirname(fileURLToPath(import.meta.url)) }) {
+// registry: the package registry the owner's make verify installs @soksak packages from, handed
+// over as the command-line variable REGISTRY; an owner without such packages ignores it.
+export function buildLocalRelease({ store, source, targets = [], registry, template = path.dirname(fileURLToPath(import.meta.url)) }) {
+  const verify = ["verify", ...(registry === undefined ? [] : [`REGISTRY=${registry}`])];
   if (!path.isAbsolute(store) || !path.isAbsolute(source)) throw new Error("store and source must be absolute");
   const sourceRoot = fs.realpathSync(source);
   if (run("git", ["status", "--porcelain"], sourceRoot) !== "") throw new Error("owner source must be clean");
@@ -95,9 +98,9 @@ export function buildLocalRelease({ store, source, targets = [], template = path
     if (run("git", ["rev-parse", "HEAD"], checkout) !== commit) throw new Error("local build clone commit mismatch");
     const kind = kindOf(checkout); let release;
     // A local Plugin build composes its runtime dependencies against the store it publishes into.
-    if (kind === "plugin") { release = path.join(work, "release"); run("make", ["verify"], checkout); run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", release, "--store", store], checkout); }
-    else if (kind === "kit" || kind === "contract") { release = path.join(work, "release"); run("make", ["verify"], checkout); fs.mkdirSync(release); run(process.execPath, [path.join(template, "build-portable-release.mjs"), "--commit", commit, "--out", release], checkout); }
-    else if (kind === "spec") { run("make", ["verify"], checkout); release = path.join(checkout, "artifacts"); }
+    if (kind === "plugin") { release = path.join(work, "release"); run("make", verify, checkout); run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", release, "--store", store], checkout); }
+    else if (kind === "kit" || kind === "contract") { release = path.join(work, "release"); run("make", verify, checkout); fs.mkdirSync(release); run(process.execPath, [path.join(template, "build-portable-release.mjs"), "--commit", commit, "--out", release], checkout); }
+    else if (kind === "spec") { run("make", verify, checkout); release = path.join(checkout, "artifacts"); }
     else release = assembleSidecar(checkout, commit, targets, work);
     return publishLocalRelease({ store, release });
   } finally { fs.rmSync(work, { recursive: true, force: true }); }

@@ -132,8 +132,8 @@ describe("local release owner build", () => {
     expect(() => buildLocalRelease({ store, source, targets: [TARGET] })).toThrow(/binary target/);
   });
 
-  it("accepts only --store, --source, and --targets for a build", () => {
-    expect(() => runLocalRelease(["build", "--store", store, "--source", source, "--unknown", "value"])).toThrow("build accepts --store, --source, and --targets");
+  it("accepts only --store, --source, --targets, and --registry for a build", () => {
+    expect(() => runLocalRelease(["build", "--store", store, "--source", source, "--unknown", "value"])).toThrow("build accepts --store, --source, --targets, and --registry");
   });
 });
 
@@ -147,4 +147,11 @@ describe("local release command entry", () => {
     expect(JSON.parse(result.stdout)).toEqual({ releases: 0, entries: [] });
   });
 
+  it("passes --registry to the owner's make verify as a command-line REGISTRY", () => {
+    write("Makefile", "verify:\n\t@test '$(origin REGISTRY)' = 'command line' || { echo 'REGISTRY required' >&2; exit 64; }\n\t@test -f plugin.json\n");
+    commit();
+    expect(() => buildLocalRelease({ store, source })).toThrow(/REGISTRY required/);
+    expect(buildLocalRelease({ store, source, registry: "http://127.0.0.1:4873" })).toMatchObject({ state: "published", kind: "plugin" });
+    expect(() => runLocalRelease(["build", "--store", store, "--source", source, "--registry", "localhost:4873"])).toThrow(/--registry must be an absolute http\(s\) URL/);
+  });
 });

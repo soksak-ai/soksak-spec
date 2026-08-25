@@ -194,11 +194,15 @@ credentials and GitHub release mutation stay in Actions.
 ```sh
 soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
 soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
+soksak-local-release build --store <absolute-store> --source <absolute-clean-plugin-repository> --registry http://host:port/
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
 soksak-local-release inspect --store <absolute-store> --kind plugin --id <id> --version <version>
 soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --version <version>
 ```
+
+`--registry` is handed to the owner's `make verify` as the command-line variable `REGISTRY`; an owner
+that installs `@soksak` packages refuses to build without it.
 
 `build` clones the exact clean owner commit into a disposable directory, runs the owner Make gate,
 uses the canonical packager, publishes the verified release atomically, and removes the clone. A
