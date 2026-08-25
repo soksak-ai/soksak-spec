@@ -68,6 +68,10 @@ toolchain installer and does not serialize a developer workstation into source.
   main commit with the same owner commands, assembles one complete release, and publishes the tested
   bytes without rebuilding in the publish job. Local GREEN is development evidence; the required
   Actions matrix is publication evidence.
+- **BR16 — Local verification spends first.** Development iterations run owner gates, maintained
+  Docker cross-builds, local release-store verification, and installed-product tests locally. An
+  Actions run begins only for native evidence unavailable locally or for the final publication
+  candidate. A failed run is not rerun without a source or declared-environment change.
 
 ## Component and state ownership
 

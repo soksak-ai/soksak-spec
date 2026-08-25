@@ -71,6 +71,10 @@ workstation 상태를 source에 직렬화하지 않습니다.
 - **BR15 — GitHub Actions가 공개를 승인합니다.** Actions는 exact main commit에서 같은 owner command로
   full matrix를 build하고 complete release 하나를 조립하며, publish job에서 rebuild하지 않고 검증된
   byte를 공개합니다. Local GREEN은 개발 증거이며 필수 Actions matrix가 공개 증거입니다.
+- **BR16 — Local 검증을 먼저 사용합니다.** 개발 반복은 owner gate, 관리되는 Docker cross-build, local
+  release-store 검증, installed-product test를 로컬에서 실행합니다. Local에서 만들 수 없는 native evidence
+  또는 최종 공개 candidate에만 Actions run을 시작합니다. Source나 선언된 환경이 바뀌지 않았다면 실패한
+  run을 다시 실행하지 않습니다.
 
 ## Component와 상태 소유권
 
@@ -128,8 +132,8 @@ id, version 하나를 받습니다. 설치된 component를 제거하거나 proce
 
 다음 gate가 모두 계속 GREEN이어야 완료입니다. Local-store transaction safety, release 5종, local/registry
 transport parity, digest-conflict 거부, Sidecar in-use 거부, event-driven install progress, cross-build/native
-evidence 구분, publish-job no-rebuild, 영어/한국어 command·error code 정확한 일치. 이후 실패는 완료
-주장을 무효로 만듭니다.
+  evidence 구분, publish-job no-rebuild, 영어/한국어 command·error code 정확한 일치. 이후 실패는 완료
+  주장을 무효로 만듭니다.
 
 ## Command 경계
 
