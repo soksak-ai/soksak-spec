@@ -6,6 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { publishLocalRelease } from "./local-release-store.mjs";
+import { stageNodeCandidate } from "./candidate-stage.mjs";
+import { buildNodeCandidate } from "./candidate-build.mjs";
 import { packSidecarTarget } from "./sidecar/pack-target.mjs";
 import { stageSidecarCandidatePackage } from "./sidecar/candidate.mjs";
 
@@ -16,6 +18,10 @@ function writeJSON(directory, name, value) { fs.writeFileSync(path.join(director
 
 function kindOf(root) {
   const values = [["plugin", "plugin.json"], ["sidecar", "sidecar.json"], ["kit", "kit.json"], ["contract", "contract.json"], ["spec", "spec.json"]].filter(([, name]) => fs.existsSync(path.join(root, name)));
+  if (values.length === 0 && fs.existsSync(path.join(root, "package.json"))) {
+    const owner = JSON.parse(read(path.join(root, "package.json"))).soksakRelease;
+    if (owner?.spec?.id === "soksak-spec" && owner.manifest === "release.json") values.push(["spec", "package.json"]);
+  }
   if (values.length !== 1) throw new Error("owner repository must contain exactly one component manifest");
   return values[0][0];
 }
@@ -43,7 +49,7 @@ function assembleSidecar(root, commit, targets, work, template) {
   return output;
 }
 
-export function buildLocalRelease({ store, source, targets = [], template = path.dirname(fileURLToPath(import.meta.url)) }) {
+export function buildLocalRelease({ store, source, targets = [], plan, generated = [], template = path.dirname(fileURLToPath(import.meta.url)) }) {
   if (!path.isAbsolute(store) || !path.isAbsolute(source)) throw new Error("store and source must be absolute");
   const sourceRoot = fs.realpathSync(source);
   if (run("git", ["status", "--porcelain"], sourceRoot) !== "") throw new Error("owner source must be clean");
@@ -53,11 +59,20 @@ export function buildLocalRelease({ store, source, targets = [], template = path
   try {
     run("git", ["clone", "--quiet", "--no-local", sourceRoot, checkout], work);
     if (run("git", ["rev-parse", "HEAD"], checkout) !== commit) throw new Error("local build clone commit mismatch");
-    const kind = kindOf(checkout); let release;
-    if (kind === "plugin") { release = path.join(work, "release"); run("make", ["verify"], checkout); run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", release], checkout); }
+    const kind = kindOf(checkout); let release; let buildReceipt;
+    if (plan !== undefined) {
+      if (kind === "sidecar" || kind === "spec") throw new Error("candidate dependency plans belong only to Plugin, Kit, or Contract builds");
+      if (!path.isAbsolute(plan)) throw new Error("candidate plan path must be absolute");
+      const declaration = JSON.parse(read(plan));
+      const stage = path.join(work, "candidate-stage"); release = path.join(work, "release"); fs.mkdirSync(stage); fs.mkdirSync(release);
+      stageNodeCandidate({ source: checkout, output: stage, packagePath: declaration.packagePath, dependencies: declaration.dependencies });
+      buildReceipt = buildNodeCandidate({ stage, output: release, kind: kind === "plugin" ? "plugin" : "portable", generated });
+      fs.rmSync(path.join(release, "candidate-build.json"));
+    }
+    else if (kind === "plugin") { release = path.join(work, "release"); run("make", ["verify"], checkout); run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", release], checkout); }
     else if (kind === "kit" || kind === "contract") { release = path.join(work, "release"); run("make", ["verify"], checkout); fs.mkdirSync(release); run(process.execPath, [path.join(template, "build-portable-release.mjs"), "--commit", commit, "--out", release], checkout); }
     else if (kind === "spec") { run("make", ["verify"], checkout); release = path.join(checkout, "artifacts"); }
     else release = assembleSidecar(checkout, commit, targets, work, template);
-    return publishLocalRelease({ store, release });
+    return { ...publishLocalRelease({ store, release }), ...(buildReceipt ? { buildReceipt } : {}) };
   } finally { fs.rmSync(work, { recursive: true, force: true }); }
 }

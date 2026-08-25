@@ -165,6 +165,7 @@ named explicitly. Neither command uploads or publishes anything.
 
 ```sh
 soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
+soksak-local-release build --store <absolute-store> --source <absolute-clean-node-owner-repository> --plan <absolute-candidate-plan> --generated <path-one>,<path-two>
 soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
@@ -177,3 +178,6 @@ uses the canonical packager, publishes the verified release atomically, and remo
 requested Sidecar target is eligible only when the selected native or maintained Docker environment
 passes that owner's preflight. The command never weakens an owner preflight or substitutes a raw
 compiler command.
+When a Node owner consumes unpublished build dependencies, `--plan` names the canonical candidate
+plan and `--generated` names the outputs that the owner build is allowed to create. Overrides exist
+only inside the disposable staging checkout; source manifests and lockfiles remain unchanged.

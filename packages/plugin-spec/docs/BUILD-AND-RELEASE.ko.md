@@ -168,6 +168,7 @@ Node candidate의 `candidate-build.json`은 자동으로 발견합니다. 그 �
 
 ```sh
 soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
+soksak-local-release build --store <absolute-store> --source <absolute-clean-node-owner-repository> --plan <absolute-candidate-plan> --generated <path-one>,<path-two>
 soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
@@ -179,3 +180,6 @@ soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --v
 packager를 실행하며 검증된 release를 atomically 저장한 뒤 clone을 제거합니다. Sidecar target은 선택한
 native 또는 관리되는 Docker 환경이 해당 owner preflight를 통과할 때만 build할 수 있습니다. Command는
 owner preflight를 약화하거나 raw compiler command로 바꾸지 않습니다.
+Node owner가 미공개 build dependency를 사용하면 `--plan`이 canonical candidate plan을 지정하고
+`--generated`가 owner build가 만들 수 있는 output을 지정합니다. Override는 disposable staging
+checkout에만 존재하며 source manifest와 lockfile은 바뀌지 않습니다.
