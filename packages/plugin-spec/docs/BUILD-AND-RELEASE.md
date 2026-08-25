@@ -46,6 +46,87 @@ toolchain installer and does not serialize a developer workstation into source.
   byte size and SHA-256. Actions may upload that directory without creating a tag or release. A
   product workflow downloads and verifies those bytes; it never builds sibling source. Extra,
   missing or changed files invalidate the entire artifact.
+- **BR11 — Local releases use the public release shape.** A local release contains the same
+  `release.json`, source commit, manifests, evidence, target artifacts, sizes, and SHA-256 values as
+  a GitHub Release. Local paths never appear in those documents. The local store maps public asset
+  URLs to regular files without changing the release document.
+- **BR12 — One local version directory is one release transaction.** While
+  `local/releases/<kind-plural>/<id>/<version>` exists, its bytes are immutable. Republishing equal
+  bytes is idempotent. Different bytes fail with `LOCAL_RELEASE_VERSION_CONFLICT`. Reusing an
+  unpublished version requires deleting the complete version directory and rebuilding every local
+  dependent that named the old size or digest. Partial replacement is always invalid.
+- **BR13 — Installation is shared; transport is not identity.** Local and registry installs share
+  one closure resolver, target selector, validator, extractor, consent summary, progress stream,
+  and atomic environment commit. HTTPS and local-store reads are transports for exact release
+  references. A local file is eligible only under the explicitly addressed store and only when its
+  name, size, and SHA-256 equal `release.json`. Raw source paths and `file:` URLs are forbidden.
+- **BR14 — Build evidence is not execution evidence.** An owner toolchain or maintained Docker
+  cross-builder may build every target it supports. Cross-build success proves the target archive
+  and native header, not execution on that operating system. Native, emulated, VM, and cross-build
+  evidence name their environment and never substitute for one another.
+- **BR15 — GitHub Actions authorizes publication.** Actions builds the full matrix from the exact
+  main commit with the same owner commands, assembles one complete release, and publishes the tested
+  bytes without rebuilding in the publish job. Local GREEN is development evidence; the required
+  Actions matrix is publication evidence.
+
+## Component and state ownership
+
+Plugin and Sidecar releases become runtime installations. Kit releases carry reusable build
+implementation, Contract releases carry shared type or protocol inputs, and Spec releases carry
+platform schemas and validators. Kit, Contract, and Spec identities remain visible in release
+references and candidate build receipts; Core does not record them as runtime processes.
+
+`environment.json` records only Plugin and Sidecar runtime selections. Each record contains the
+exact version, materialized path, source (`local` or `registry`), and artifact SHA-256. A Sidecar
+also records its target; a Plugin also records its enabled state. Release and build receipts retain
+repository, source commit, dependency URL, size, and digest.
+
+## Local release store
+
+The workspace development repository owns `local/releases`. Component repositories never discover
+that directory, and Core never derives it from a sibling checkout. A caller supplies its absolute
+path when inspecting or installing a local release.
+
+```text
+local/releases/
+├── plugins/<id>/<version>/
+├── sidecars/<id>/<version>/
+├── kits/<id>/<version>/
+├── contracts/<id>/<version>/
+└── specs/<id>/<version>/
+```
+
+Each version directory is the flat GitHub Release asset set. Sidecar targets remain artifact fields
+and filename segments, not additional store directories. The publisher verifies the source output,
+copies it to a private sibling directory, verifies the copy, and atomically renames that directory.
+A failed publication exposes no final directory.
+
+`publish`, `list`, `inspect`, `verify`, and `delete` are the complete store operations. `delete`
+addresses one exact kind, id, and version. It removes no installed component and stops no process.
+
+## Build, install, and publish
+
+1. The owner repository verifies its exact commit. Unpublished build dependencies enter only the
+   canonical isolated candidate materializer; owner manifests and lockfiles remain unchanged.
+2. The canonical builder creates one flat release output. Portable components produce `any`; a
+   Sidecar produces every requested target supported by the selected native or Docker toolchain.
+3. The local publisher validates and atomically stores the output. Equal bytes return `unchanged`;
+   different bytes at the same version are rejected.
+4. The local resolver reads an explicit Plugin or Sidecar root. A locally present dependency must
+   exactly match the parent URL, size, and SHA-256 or installation fails. An absent local dependency
+   may use its exact HTTPS reference.
+5. The shared installer selects the host target, verifies and extracts the closure, then commits the
+   directories and `environment.json` atomically. Equal version and digest are idempotent. Equal
+   version and target with a different digest fail with `VERSION_ARTIFACT_CONFLICT`.
+6. Actions repeats the owner build on main for the required matrix. The publish job downloads,
+   verifies, assembles, and publishes those outputs. It contains no build command.
+
+## Acceptance gates
+
+Completion requires all of these gates to remain GREEN: local-store transaction safety; all five
+release kinds; local and registry transport parity; digest-conflict refusal; Sidecar in-use refusal;
+event-driven install progress; cross-build versus native evidence; publish-job no-rebuild; and exact
+English/Korean command and error-code parity. A later failure invalidates completion.
 
 ## Command boundary
 
@@ -77,3 +158,10 @@ node <plugin-spec>/release-template/verify-candidate-artifact.mjs \
 
 `candidate-build.json` is discovered automatically for Node candidates. Other build evidence is
 named explicitly. Neither command uploads or publishes anything.
+
+```sh
+soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
+soksak-local-release verify --store <absolute-store>
+soksak-local-release inspect --store <absolute-store> --kind plugin --id <id> --version <version>
+soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --version <version>
+```

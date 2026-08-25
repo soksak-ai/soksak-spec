@@ -2,13 +2,14 @@ package platformspec
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
 func TestEnvironmentOwnsLocalMaterializationAndUserChoices(t *testing.T) {
 	environment := EmptyEnvironment()
-	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", Source: RegistrySource, Registry: "official"}, Enabled: true}
-	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
+	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official"}, Enabled: true}
+	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", ArtifactSHA256: strings.Repeat("b", 64), Source: LocalSource, Target: "aarch64-apple-darwin"}
 	if err := ValidateEnvironment(environment); err != nil {
 		t.Fatal(err)
 	}
@@ -16,7 +17,7 @@ func TestEnvironmentOwnsLocalMaterializationAndUserChoices(t *testing.T) {
 
 func TestPluginComponentErrorsNameTheFieldRatherThanTheID(t *testing.T) {
 	environment := EmptyEnvironment()
-	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", Source: RegistrySource, Registry: "official", Target: "any"}}
+	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "any"}}
 	err := ValidateEnvironment(environment)
 	if err == nil || err.Error() != "plugin soksak-plugin-browser-wails3: target belongs only to sidecars" {
 		t.Fatalf("error = %v", err)
@@ -24,7 +25,7 @@ func TestPluginComponentErrorsNameTheFieldRatherThanTheID(t *testing.T) {
 }
 
 func TestEnvironmentRejectsPluginSidecarBindings(t *testing.T) {
-	body := []byte(`{"revision":1,"plugins":{"demo":{"version":"0.0.1","path":"/installed/demo","source":"registry","registry":"official","enabled":true,"sidecars":{"pty":"soksak-sidecar-pty"}}},"sidecars":{},"kits":{},"contracts":{},"specs":{}}`)
+	body := []byte(`{"revision":1,"plugins":{"demo":{"version":"0.0.1","path":"/installed/demo","artifactSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source":"registry","registry":"official","enabled":true,"sidecars":{"pty":"soksak-sidecar-pty"}}},"sidecars":{}}`)
 	if _, err := ParseEnvironment(body); err == nil {
 		t.Fatal("plugin sidecar binding was accepted")
 	}
@@ -33,19 +34,19 @@ func TestEnvironmentRejectsPluginSidecarBindings(t *testing.T) {
 func TestEnvironmentRejectsInvalidMaterialization(t *testing.T) {
 	for _, version := range []string{"0.0", "v0.0.2", "latest", "01.0.0"} {
 		environment := EmptyEnvironment()
-		environment.Kits["demo"] = Component{Version: version, Path: "/installed/demo", Source: RegistrySource, Registry: "official"}
+		environment.Sidecars["demo"] = Component{Version: version, Path: "/installed/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
 		if err := ValidateEnvironment(environment); err == nil {
 			t.Errorf("accepted version %q", version)
 		}
 	}
 	for name, component := range map[string]Component{
-		"relative path":           {Version: "0.0.1", Path: "relative", Source: RegistrySource, Registry: "official"},
-		"registry missing":        {Version: "0.0.1", Path: "/installed/demo", Source: RegistrySource},
-		"registry on development": {Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource, Registry: "official"},
-		"unknown source":          {Version: "0.0.1", Path: "/work/demo", Source: "local"},
+		"relative path":     {Version: "0.0.1", Path: "relative", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"},
+		"registry missing":  {Version: "0.0.1", Path: "/installed/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Target: "aarch64-apple-darwin"},
+		"registry on local": {Version: "0.0.1", Path: "/work/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: LocalSource, Registry: "official", Target: "aarch64-apple-darwin"},
+		"unknown source":    {Version: "0.0.1", Path: "/work/demo", ArtifactSHA256: strings.Repeat("a", 64), Source: "development", Target: "aarch64-apple-darwin"},
 	} {
 		environment := EmptyEnvironment()
-		environment.Kits["demo"] = component
+		environment.Sidecars["demo"] = component
 		if err := ValidateEnvironment(environment); err == nil {
 			t.Errorf("accepted %s", name)
 		}
@@ -57,7 +58,7 @@ func TestEnvironmentIsTheOnlyLocalComponentDiscoveryDocument(t *testing.T) {
 		t.Fatalf("environment file=%q", EnvironmentFile)
 	}
 	environment := EmptyEnvironment()
-	environment.Sidecars["pty"] = Component{Version: "0.0.1", Path: "/local/pty", Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
+	environment.Sidecars["pty"] = Component{Version: "0.0.1", Path: "/local/pty", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
 	body, err := json.Marshal(environment)
 	if err != nil {
 		t.Fatal(err)

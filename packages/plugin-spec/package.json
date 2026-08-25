@@ -22,7 +22,8 @@
     }
   },
   "bin": {
-    "soksak-validate": "bin/validate.mjs"
+    "soksak-validate": "bin/validate.mjs",
+    "soksak-local-release": "release-template/local-release.mjs"
   },
   "files": [
     "dist",

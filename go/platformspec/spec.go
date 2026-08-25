@@ -23,28 +23,26 @@ type SidecarManifest struct {
 }
 
 const (
-	RegistrySource    = "registry"
-	DevelopmentSource = "development"
+	RegistrySource = "registry"
+	LocalSource    = "local"
 )
 
 type Component struct {
-	Version  string `json:"version"`
-	Path     string `json:"path"`
-	Source   string `json:"source"`
-	Registry string `json:"registry,omitempty"`
-	Target   string `json:"target,omitempty"`
+	Version        string `json:"version"`
+	Path           string `json:"path"`
+	ArtifactSHA256 string `json:"artifactSha256"`
+	Source         string `json:"source"`
+	Registry       string `json:"registry,omitempty"`
+	Target         string `json:"target,omitempty"`
 }
 type Plugin struct {
 	Component
 	Enabled bool `json:"enabled"`
 }
 type Environment struct {
-	Revision  uint64               `json:"revision"`
-	Plugins   map[string]Plugin    `json:"plugins"`
-	Sidecars  map[string]Component `json:"sidecars"`
-	Kits      map[string]Component `json:"kits"`
-	Contracts map[string]Component `json:"contracts"`
-	Specs     map[string]Component `json:"specs"`
+	Revision uint64               `json:"revision"`
+	Plugins  map[string]Plugin    `json:"plugins"`
+	Sidecars map[string]Component `json:"sidecars"`
 }
 
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,127}$`)
@@ -80,8 +78,8 @@ func ParseEnvironment(body []byte) (Environment, error) {
 	return value, ValidateEnvironment(value)
 }
 func ValidateEnvironment(value Environment) error {
-	if value.Revision < 1 || value.Plugins == nil || value.Sidecars == nil || value.Kits == nil || value.Contracts == nil || value.Specs == nil {
-		return fmt.Errorf("environment requires revision and all component maps")
+	if value.Revision < 1 || value.Plugins == nil || value.Sidecars == nil {
+		return fmt.Errorf("environment requires revision, plugins, and sidecars")
 	}
 	for id, plugin := range value.Plugins {
 		if !idPattern.MatchString(id) {
@@ -91,30 +89,28 @@ func ValidateEnvironment(value Environment) error {
 			return fmt.Errorf("plugin %s: %w", id, err)
 		}
 	}
-	for index, values := range []map[string]Component{value.Sidecars, value.Kits, value.Contracts, value.Specs} {
-		for id, item := range values {
-			if !idPattern.MatchString(id) {
-				return fmt.Errorf("invalid component id")
-			}
-			if err := validComponent(item, index == 0); err != nil {
-				return err
-			}
+	for id, item := range value.Sidecars {
+		if !idPattern.MatchString(id) {
+			return fmt.Errorf("invalid component id")
+		}
+		if err := validComponent(item, true); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 func validComponent(value Component, sidecar bool) error {
-	if !strictSemver(value.Version) || !filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path {
-		return fmt.Errorf("component requires exact version and absolute path")
+	if !strictSemver(value.Version) || !filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path || !digestPattern.MatchString(value.ArtifactSHA256) {
+		return fmt.Errorf("component requires exact version, absolute path, and artifact SHA-256")
 	}
 	switch value.Source {
 	case RegistrySource:
 		if !registryPattern.MatchString(value.Registry) {
 			return fmt.Errorf("registry source requires registry id")
 		}
-	case DevelopmentSource:
+	case LocalSource:
 		if value.Registry != "" {
-			return fmt.Errorf("development source cannot declare registry")
+			return fmt.Errorf("local source cannot declare registry")
 		}
 	default:
 		return fmt.Errorf("invalid component source")
@@ -128,5 +124,5 @@ func validComponent(value Component, sidecar bool) error {
 	return nil
 }
 func EmptyEnvironment() Environment {
-	return Environment{Revision: 1, Plugins: map[string]Plugin{}, Sidecars: map[string]Component{}, Kits: map[string]Component{}, Contracts: map[string]Component{}, Specs: map[string]Component{}}
+	return Environment{Revision: 1, Plugins: map[string]Plugin{}, Sidecars: map[string]Component{}}
 }

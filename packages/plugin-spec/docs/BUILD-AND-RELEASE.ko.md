@@ -50,6 +50,86 @@ workstation 상태를 source에 직렬화하지 않습니다.
   byte size와 SHA-256을 결합합니다. Actions는 tag나 release를 만들지 않고 해당 directory를 upload할
   수 있습니다. 제품 workflow는 그 byte를 download하고 검증하며 형제 source를 build하지 않습니다.
   파일 추가, 누락, 변경은 artifact 전체를 무효로 만듭니다.
+- **BR11 — Local release는 공개 release 형식을 사용합니다.** Local release에는 GitHub Release와
+  동일한 `release.json`, source commit, manifest, evidence, target artifact, size, SHA-256이 있습니다.
+  이 문서에는 local path를 기록하지 않습니다. Local store는 release document를 바꾸지 않고 공개
+  asset URL을 regular file에 대응시킵니다.
+- **BR12 — Local version directory 하나가 release transaction 하나입니다.**
+  `local/releases/<kind 복수형>/<id>/<version>`이 존재하는 동안 그 byte는 immutable입니다. 같은 byte의
+  재발행은 멱등이고 다른 byte는 `LOCAL_RELEASE_VERSION_CONFLICT`로 실패합니다. 공개하지 않은
+  version을 다시 사용하려면 version directory 전체를 삭제하고 이전 size 또는 digest를 선언했던 모든
+  local dependent를 다시 build해야 합니다. 일부 file만 교체한 상태는 언제나 잘못입니다.
+- **BR13 — Installer는 하나이며 transport는 identity가 아닙니다.** Local install과 registry install은
+  같은 closure resolver, target selector, validator, extractor, consent summary, progress stream, atomic
+  environment commit을 사용합니다. HTTPS와 local-store read는 exact release reference의 transport입니다.
+  Local file은 명시한 store 아래에 있고 name, size, SHA-256이 `release.json`과 같을 때만 사용할 수
+  있습니다. Raw source path와 `file:` URL은 금지합니다.
+- **BR14 — Build evidence는 execution evidence가 아닙니다.** Owner toolchain 또는 관리되는 Docker
+  cross-builder가 지원하는 모든 target을 build할 수 있습니다. Cross-build 성공은 target archive와
+  native header를 증명하지만 해당 OS의 실행을 증명하지 않습니다. Native, emulated, VM, cross-build
+  evidence는 환경을 이름으로 기록하며 서로를 대신하지 않습니다.
+- **BR15 — GitHub Actions가 공개를 승인합니다.** Actions는 exact main commit에서 같은 owner command로
+  full matrix를 build하고 complete release 하나를 조립하며, publish job에서 rebuild하지 않고 검증된
+  byte를 공개합니다. Local GREEN은 개발 증거이며 필수 Actions matrix가 공개 증거입니다.
+
+## Component와 상태 소유권
+
+Plugin과 Sidecar release는 runtime installation이 됩니다. Kit release는 재사용 build 구현을, Contract
+release는 공유 type 또는 protocol input을, Spec release는 platform schema와 validator를 제공합니다.
+Kit, Contract, Spec identity는 release reference와 candidate build receipt에 남습니다. Core는 이들을
+runtime process로 기록하지 않습니다.
+
+`environment.json`은 Plugin과 Sidecar runtime 선택만 기록합니다. 각 record에는 exact version,
+materialized path, source(`local` 또는 `registry`), artifact SHA-256이 있습니다. Sidecar는 target을,
+Plugin은 enabled 상태를 추가로 기록합니다. Release와 build receipt는 repository, source commit,
+dependency URL, size, digest를 보존합니다.
+
+## Local release store
+
+Workspace 개발 repository가 `local/releases`를 소유합니다. Component repository는 이 directory를
+찾지 않으며 Core도 sibling checkout에서 유추하지 않습니다. Caller는 local release 조회·설치 때 store
+절대 경로를 제공합니다.
+
+```text
+local/releases/
+├── plugins/<id>/<version>/
+├── sidecars/<id>/<version>/
+├── kits/<id>/<version>/
+├── contracts/<id>/<version>/
+└── specs/<id>/<version>/
+```
+
+각 version directory는 flat GitHub Release asset set입니다. Sidecar target은 artifact field와 filename
+segment이며 추가 store directory가 아닙니다. Publisher는 source output을 검증하고 private sibling
+directory에 복사하며 복사본을 다시 검증한 뒤 atomic rename합니다. 실패하면 final directory가
+노출되지 않습니다.
+
+Store operation은 `publish`, `list`, `inspect`, `verify`, `delete`가 전부입니다. `delete`는 exact kind,
+id, version 하나를 받습니다. 설치된 component를 제거하거나 process를 종료하지 않습니다.
+
+## Build, install, 공개
+
+1. Owner repository가 exact commit을 검증합니다. 공개하지 않은 build dependency는 canonical isolated
+   candidate materializer에만 들어가며 owner manifest와 lockfile은 바뀌지 않습니다.
+2. Canonical builder가 flat release output 하나를 만듭니다. Portable component는 `any`를 만들고,
+   Sidecar는 선택한 native 또는 Docker toolchain이 지원하는 요청 target을 모두 만듭니다.
+3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 byte는 `unchanged`를 반환하고 같은
+   version의 다른 byte는 거부합니다.
+4. Local resolver가 명시한 Plugin 또는 Sidecar root를 읽습니다. Local에 존재하는 dependency는 parent의
+   URL, size, SHA-256과 정확히 같아야 하며 다르면 설치가 실패합니다. Local에 없으면 exact HTTPS
+   reference를 사용할 수 있습니다.
+5. Shared installer가 host target을 선택하고 closure를 검증·추출한 뒤 directory와 `environment.json`을
+   atomically commit합니다. 같은 version과 digest는 멱등입니다. 같은 version과 target의 digest가
+   다르면 `VERSION_ARTIFACT_CONFLICT`로 실패합니다.
+6. Actions가 main에서 필수 matrix의 owner build를 반복합니다. Publish job은 output을 내려받아 검증하고
+   조립하고 공개합니다. Publish job에는 build command가 없습니다.
+
+## 인수 gate
+
+다음 gate가 모두 계속 GREEN이어야 완료입니다. Local-store transaction safety, release 5종, local/registry
+transport parity, digest-conflict 거부, Sidecar in-use 거부, event-driven install progress, cross-build/native
+evidence 구분, publish-job no-rebuild, 영어/한국어 command·error code 정확한 일치. 이후 실패는 완료
+주장을 무효로 만듭니다.
 
 ## Command 경계
 
@@ -81,3 +161,10 @@ node <plugin-spec>/release-template/verify-candidate-artifact.mjs \
 
 Node candidate의 `candidate-build.json`은 자동으로 발견합니다. 그 밖의 build evidence는 명시적으로
 이름을 전달합니다. 두 command 모두 upload나 publish를 수행하지 않습니다.
+
+```sh
+soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
+soksak-local-release verify --store <absolute-store>
+soksak-local-release inspect --store <absolute-store> --kind plugin --id <id> --version <version>
+soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --version <version>
+```
