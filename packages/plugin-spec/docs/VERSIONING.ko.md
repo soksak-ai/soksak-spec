@@ -120,7 +120,7 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
   "id": "soksak-spec",
   "version": "0.0.9",
   "manifest": {
-    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/spec.json",
+    "file": "spec.json",
     "size": 256,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
@@ -133,13 +133,13 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
       "target": "any",
       "format": "tgz",
       "manifest": "spec.json",
-      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/soksak-ai-plugin-spec-0.0.9.tgz",
+      "file": "soksak-ai-plugin-spec-0.0.9.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
   "evidence": [{
-    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/conformance-release.json",
+    "file": "conformance-release.json",
     "size": 512,
     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   }]
@@ -153,7 +153,8 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
 
 <!-- rule:plugin-sidecar-interface -->
 
-플러그인은 설치할 정확한 불변 Sidecar release를 고정한다. 제공 interface는 Sidecar manifest와
+플러그인은 설치할 정확한 Sidecar release를 `{ id, version }`으로 지정한다. Builder는 그 참조를
+`release.json`의 `{ id, version, size, sha256 }`으로 해석한다. 제공 interface는 Sidecar manifest와
 conformance evidence가 소유하며 설치 시 provider 선택이나 fallback은 없다.
 
 <!-- example:terminal-plugin-valid:valid-plugin -->
@@ -170,13 +171,7 @@ conformance evidence가 소유하며 설치 시 provider 선택이나 fallback�
   ],
   "runtimeDependencies": {
     "sidecars": [
-    {
-      "id": "terminal-provider",
-      "version": "0.0.1",
-      "url": "https://github.com/example/terminal-provider/releases/download/v0.0.1/release.json",
-      "size": 12345,
-      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    }
+      { "id": "terminal-provider", "version": "0.0.1" }
     ]
   }
 }
@@ -221,8 +216,7 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 - Go 릴리스는 `go.mod`와 `go.sum`을 사용한다.
 - 릴리스 빌드는 npm `file:`, `link:`, `workspace:`, `portal:`, `catalog:`, 절대 경로와 상위 상대
   경로, Cargo `path`, Go `replace`, sibling source path 및 설치로 변경된 lockfile을 거부한다.
-  이는 이식 가능한 릴리스 입력이 아니라 로컬 구조를 나타낸다. Development override는 test가
-  소유한 staging metadata에만 존재하며 source 또는 release input에 복사하지 않는다.
+  이는 이식 가능한 릴리스 입력이 아니라 로컬 구조를 나타낸다.
 
 ## 6. 개발 경로
 
@@ -251,29 +245,18 @@ Package manifest는 작성자의 의도를, lock 또는 checksum은 실제 선�
 개발 manifest도 정체성, 버전, 해당되는 경우 앱 조건, 인터페이스, 권한 및 경로 검사를
 통과해야 한다. Source는 하나의 닫힌 값이며 별도 개발 flag나 설치 문서가 이를 복제하지 않는다.
 
-공개되지 않은 Node package dependency는 `release-template/stage-node-candidate.mjs`로 검증한다.
-이 command는 clean 상태의 정확한 Git commit 하나를 복사하고 모든 dependency archive SHA-256을
-검증한 뒤 별도 output checkout에만 `pnpm.overrides`를 기록한다. Source checkout은 변경하지 않는다.
-Staged checkout은 development input이며 `release-template/build-node-candidate.mjs` exit command가
-source check와 build를 실행하고 source commit의 정확한 package manifest, lockfile, workspace
-setting을 복원하기 전까지 release builder가 이를 거부한다. Exit command는 선언한 generated output
-밖의 변경을 거부하며 모든 staging locator를 제거한다. 이후
-canonical builder와 validator를 실행하고 dependency digest는 candidate archive 내부가 아니라 옆의
-report에 기록한다.
-
-Owner는 완성된 output에 `release-template/seal-candidate-artifact.mjs`가
-`candidate-artifact.json`을 기록한 뒤에만 제품 인증 workflow로 전달할 수 있습니다. Envelope는
-canonical release manifest, 모든 local release asset, 명시적 build evidence를 size와 SHA-256으로
-결합합니다. Download 뒤 `verify-candidate-artifact.mjs`는 추가, 누락, 변경된 파일을 모두
-거부합니다. 이 transport는 release identity를 만들지 않습니다. Source manifest는 immutable release
-URL을 유지하고 Actions artifact는 candidate-only이며 실패하면 폐기합니다.
-
 ## 7. 릴리스와 설치 내용
 
 <!-- rule:release-install-separation -->
 
-릴리스는 게시된 바이트와 정확한 runtime dependency를 투영한다. 빌드 dependency는 언어 package
-manifest와 lockfile만 소유한다.
+릴리스는 게시된 바이트를 기록하고 정확한 runtime dependency를 `{ id, version, size, sha256 }`
+참조로 투영한다. `size`와 `sha256`은 해당 dependency의 `release.json`의 값이다. 릴리스의 모든 파일은
+release directory 안의 bare `file` 이름이며 [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3의 단일 release
+file grammar를 따른다. Directory는 `kind`, `id`, `version`에서 유도하며 어떤
+문서에도 없다. 공개 릴리스는 `https://github.com/soksak-ai/<id>/releases/download/v<version>/`, local
+릴리스는 `<store>/<kind 복수형>/<id>/<version>/`이다. `source.repository`는 organization에 묶인다.
+값은 `https://github.com/soksak-ai/<id>`와 같다. 빌드 dependency는 언어 package manifest와
+lockfile만 소유한다.
 
 <!-- example:plugin-release-valid:release -->
 ```json
@@ -282,7 +265,7 @@ manifest와 lockfile만 소유한다.
   "id": "example-plugin",
   "version": "0.0.1",
   "manifest": {
-    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/plugin.json",
+    "file": "plugin.json",
     "size": 256,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
@@ -295,20 +278,21 @@ manifest와 lockfile만 소유한다.
       "target": "any",
       "format": "tgz",
       "manifest": "plugin.json",
-      "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/example-plugin-0.0.1.tgz",
+      "file": "example-plugin-0.0.1.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
   "evidence": [{
-    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/conformance-release.json",
+    "file": "conformance-release.json",
     "size": 512,
     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   }]
 }
 ```
 
-레지스트리는 정확한 릴리스, dependency, source commit, artifact URL, 크기와 digest를 게시한다.
+레지스트리 index는 plugin당 `{ id, version, size, sha256 }` 참조 하나를 게시한다. 각
+`release.json`은 source commit, artifact file 이름, 크기, digest, runtime dependency 참조를 기록한다.
 `environment.json`은 exact 선택 버전, registry ID, 절대 local path, source kind, 해당되는 target,
 plugin 활성화와 설치된 정확한 component identity를 기록하는 유일한 local state다. repository, commit, digest를
 레지스트리에서 복제하지 않는다.
@@ -321,7 +305,7 @@ write lock은 transaction 동안만 존재하며 영구 lock 문서는 없다. �
 `environment.json`만 local runtime discovery를 소유한다. 저장소는 `../`, 주입된 저장소 root,
 workspace checkout path, PATH 또는 symbolic link로 다른 저장소를 찾지 않는다. build-time 관계는
 package dependency를 사용하고 runtime 관계는 environment에서 component ID로 해석하며 remote byte는
-registry release로 접근한다. 테스트도 같은 공개 interface를 사용하고 sibling source topology를 만들지 않는다.
+release 참조로 읽는다. 테스트도 같은 공개 interface를 사용하고 sibling source topology를 만들지 않는다.
 
 ## 8. 충돌과 업데이트
 
@@ -355,7 +339,8 @@ Major 버전은 의도적으로 호환되지 않는 공개 변경을 표시한�
 | 게시된 바이트 | Release descriptor 및 attestation |
 | 발견 가능한 릴리스 | Registry |
 | 선택 버전, local path, source kind, 활성화 | `environment.json` |
-| 다운로드 URL, source commit, artifact digest, dependency | Registry release |
+| Source commit, artifact file 이름, digest, dependency 참조 | `release.json` |
+| 릴리스 location | `kind`, `id`, `version`에서 유도 |
 
 Registry는 release history가 아니라 현재 plugin catalogue다. plugins array에는 plugin ID별 현재
 release가 하나만 존재한다. Sidecar는 plugin의 exact runtime dependency로만 나타난다. 과거 version은

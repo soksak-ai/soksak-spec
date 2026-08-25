@@ -122,7 +122,7 @@ does not silently change the component and runtime-interface versions validated 
   "id": "soksak-spec",
   "version": "0.0.9",
   "manifest": {
-    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/spec.json",
+    "file": "spec.json",
     "size": 256,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
@@ -135,13 +135,13 @@ does not silently change the component and runtime-interface versions validated 
       "target": "any",
       "format": "tgz",
       "manifest": "spec.json",
-      "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/soksak-ai-plugin-spec-0.0.9.tgz",
+      "file": "soksak-ai-plugin-spec-0.0.9.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
   "evidence": [{
-    "url": "https://github.com/soksak-ai/soksak-spec/releases/download/v0.0.9/conformance-release.json",
+    "file": "conformance-release.json",
     "size": 512,
     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   }]
@@ -155,7 +155,8 @@ interfaces at `0.0.1`. A package correction is not evidence that those contracts
 
 <!-- rule:plugin-sidecar-interface -->
 
-A plugin pins the exact immutable sidecar release it installs. The sidecar manifest and conformance
+A plugin names the exact sidecar release it installs by `{ id, version }`. The builder resolves that
+reference to `{ id, version, size, sha256 }` in `release.json`. The sidecar manifest and conformance
 evidence own the provided interface; there is no provider selection or fallback at install time.
 
 <!-- example:terminal-plugin-valid:valid-plugin -->
@@ -172,13 +173,7 @@ evidence own the provided interface; there is no provider selection or fallback 
   ],
   "runtimeDependencies": {
     "sidecars": [
-    {
-      "id": "terminal-provider",
-      "version": "0.0.1",
-      "url": "https://github.com/example/terminal-provider/releases/download/v0.0.1/release.json",
-      "size": 12345,
-      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    }
+      { "id": "terminal-provider", "version": "0.0.1" }
     ]
   }
 }
@@ -223,8 +218,7 @@ package manifest states author intent; the lock or checksum records exact select
 - Go releases use `go.mod` and `go.sum`.
 - Release builds reject npm `file:`, `link:`, `workspace:`, `portal:`, `catalog:`, absolute and
   parent-relative paths, Cargo `path`, Go `replace`, sibling source paths, and lockfiles changed by
-  installation. These describe local topology, not portable release inputs. A development override
-  exists only in test-owned staging metadata and is never copied into source or release inputs.
+  installation. These describe local topology, not portable release inputs.
 
 ## 6. Development paths
 
@@ -254,29 +248,19 @@ The development manifest still passes identity, version, application requirement
 applicable, interface, permission, and path checks. Source is one closed value; no second
 development flag or installed document duplicates it.
 
-An unpublished Node package dependency is verified with
-`release-template/stage-node-candidate.mjs`. The command copies one clean exact Git commit,
-verifies every dependency archive SHA-256, and writes `pnpm.overrides` only in the separate output
-checkout. The source checkout remains unchanged. The staged checkout is development input and the
-release builders reject it until `release-template/build-node-candidate.mjs` completes the source
-checks and build, restores the exact package manifest, lockfile and workspace settings from the
-source commit, and removes all staging locators. The exit command rejects any change outside its
-declared generated outputs, runs the canonical builder and validator, and records dependency
-digests beside the candidate archive rather than inside it.
-
-An owner may transfer that completed output to a product certification workflow only after
-`release-template/seal-candidate-artifact.mjs` writes `candidate-artifact.json`. The envelope binds
-the canonical release manifest, every local release asset and explicit build evidence to their
-sizes and SHA-256 values. `verify-candidate-artifact.mjs` rejects any extra, missing or changed file
-after download. This transport creates no release identity: source manifests keep immutable release
-URLs, while the Actions artifact remains candidate-only and is discarded on failure.
-
 ## 7. Releases and installed content
 
 <!-- rule:release-install-separation -->
 
-A release records published bytes and projects exact runtime dependencies. Build dependencies
-remain solely in the language package manifest and lockfile.
+A release records published bytes and projects exact runtime dependencies as
+`{ id, version, size, sha256 }` references, where `size` and `sha256` are of the dependency's
+`release.json`. Every file of the release is a bare `file` name in the release directory under
+the one release file grammar in [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3. The
+directory is derived from `kind`, `id`, and `version` and appears in no document: a published
+release is `https://github.com/soksak-ai/<id>/releases/download/v<version>/`, a local release is
+`<store>/<kind-plural>/<id>/<version>/`. `source.repository` is bound to the organization: it equals
+`https://github.com/soksak-ai/<id>`. Build dependencies remain solely in the language package
+manifest and lockfile.
 
 <!-- example:plugin-release-valid:release -->
 ```json
@@ -285,7 +269,7 @@ remain solely in the language package manifest and lockfile.
   "id": "example-plugin",
   "version": "0.0.1",
   "manifest": {
-    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/plugin.json",
+    "file": "plugin.json",
     "size": 256,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
@@ -298,23 +282,25 @@ remain solely in the language package manifest and lockfile.
       "target": "any",
       "format": "tgz",
       "manifest": "plugin.json",
-      "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/example-plugin-0.0.1.tgz",
+      "file": "example-plugin-0.0.1.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
   ],
   "evidence": [{
-    "url": "https://github.com/soksak-ai/example-plugin/releases/download/v0.0.1/conformance-release.json",
+    "file": "conformance-release.json",
     "size": 512,
     "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   }]
 }
 ```
 
-The registry publishes exact releases, dependencies, source commits, artifact URLs, sizes, and
-digests. `environment.json` is the single local state: exact selected version, registry ID,
-absolute materialized path, source kind, target where applicable, plugin activation, and exact
-installed component identities. It does not copy repository, commit, or digest facts out of the registry.
+The registry index publishes one `{ id, version, size, sha256 }` reference per plugin. Each
+`release.json` records the source commit, artifact file names, sizes, digests, and runtime
+dependency references. `environment.json` is the single local state: exact selected version,
+registry ID, absolute materialized path, source kind, target where applicable, plugin activation,
+and exact installed component identities. It does not copy repository, commit, or digest facts out
+of the registry.
 
 The installer downloads into a transaction directory, checks size and SHA-256 before extraction,
 validates every manifest and requirement, moves all content into place, and atomically replaces
@@ -324,7 +310,7 @@ document. Any error leaves the existing environment unchanged.
 `environment.json` is the only local runtime discovery surface. A repository never discovers
 another repository through `../`, an injected repository root, a workspace checkout path, PATH,
 or a symbolic link. Build-time relationships use package dependencies. Runtime relationships use
-component IDs resolved through the environment. Remote bytes are reached through registry releases.
+component IDs resolved through the environment. Remote bytes are read through release references.
 Tests use the same public interfaces and do not invent a sibling-source topology.
 
 ## 8. Conflicts and updates
@@ -359,7 +345,8 @@ after compatibility tests, never to make a failing implementation pass.
 | Published bytes | Release descriptor and attestation |
 | Discoverable releases | Registry |
 | Selected version, local path, source kind, activation | `environment.json` |
-| Download URL, source commit, artifact digest, dependencies | Registry release |
+| Source commit, artifact file names, digests, dependency references | `release.json` |
+| Release location | Derived from `kind`, `id`, and `version` |
 
 The registry is the current plugin catalogue, not release history. Its plugins array holds one
 current release per plugin id. Sidecars appear only as exact runtime dependencies of a plugin. Git

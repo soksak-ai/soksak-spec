@@ -26,18 +26,21 @@ plugins[]
 signature
 ```
 
-Each plugin entry is one exact release reference plus the direct runtime dependencies projected from
-that release. Details remain in hash-pinned owner releases. See [PLUGIN-DISTRIBUTION.md](PLUGIN-DISTRIBUTION.md).
+Each plugin entry is one exact release reference `{ id, version, size, sha256 }`. Runtime
+dependencies are read from that release's `release.json`; the index does not copy them. See
+[PLUGIN-DISTRIBUTION.md](PLUGIN-DISTRIBUTION.md).
 
 ## 2. Identity and immutable transport
 
 - A release has one flat `kind`, `id`, and `version`.
 - Each identity `id` is flat, at most 128 ASCII characters, and matches
-  `^[a-z0-9][a-z0-9-]{0,127}$`. A third party is not forced into a
-  soksak-branded namespace.
+  `^[a-z0-9][a-z0-9-]{0,127}$`.
 - Every 0.0.1 identity reference has exact version `0.0.1`.
-- Source is a canonical `https://github.com/<owner>/<repository>` URL plus one lowercase
-  40-character commit SHA.
+- The organization binding is the rule. The organization is the one exported constant
+  `GITHUB_ORG` = `soksak-ai`; every builder derives `source.repository` from it, so
+  `source.repository` equals `https://github.com/soksak-ai/<id>` and the release directory is
+  derived from that value. A release under another organization is invalid.
+  `source.commit` is one lowercase 40-character commit SHA.
 - Distribution uses immutable GitHub Release assets plus lowercase SHA-256. A branch,
   `latest`, git checkout, npm/crates registry lookup, or guessed filesystem path is not an
   installation source.
@@ -58,21 +61,35 @@ for soksak installation.
 - exact plugin and sidecar runtime release references;
 - the complete artifact matrix;
 - SHA-256, archive format, and kind-specific manifest name for every artifact;
-- generated conformance evidence URL, size, and SHA-256 references.
+- generated conformance evidence file name, size, and SHA-256.
+
+Every `file` value in a release (`release.json`, the manifest, each artifact, and each evidence
+file) is one bare name under the one release file grammar, exported by the package as
+`RELEASE_FILE_RE` = `^(?!\.\.?$)[A-Za-z0-9._-]+$`. `.` and `..` are excluded by the grammar; a
+path separator, a leading `/`, and a non-ASCII byte are excluded by the character class. Builders
+and publishers import this pattern; no second file-name pattern exists.
 
 Plugin, kit, contract, and spec releases contain exactly one portable `any` artifact with
 `plugin.json`, `kit.json`, `contract.json`, or `spec.json`. A sidecar uses canonical native target triples and every archive declares
 `sidecar.json`. The manifest inside the verified archive owns process/library paths and the exact
 sidecar interface. Installers open only that kind-specific manifest and reject links.
 
-`plugin.json.runtimeDependencies` owns exact immutable plugin and sidecar release references. Kit,
-contract, spec, and language dependencies remain in standard build manifests and lockfiles. The
-release builder projects runtime dependencies without a second authoring surface.
+`plugin.json.runtimeDependencies` is intent: exact `{ id, version }` plugin and sidecar references.
+`release.json.runtimeDependencies` is fact: `{ id, version, size, sha256 }` composed by the release
+builder through the release resolver, never copied from the manifest. Kit, contract, spec, and
+language dependencies remain in standard build manifests and lockfiles.
 
-Dependencies are resolved only through the exact URL, size, and digest declared by the parent
-release. No match is a hard failure. It must not retry another registry, a package registry, or a
-git branch. A release consumer detects dependency
+Dependencies are resolved only through the exact identity, size, and digest declared by the parent
+release; the location is derived from kind, id, and version. No match is a hard failure. It must not
+retry another registry, a package registry, or a git branch. A release consumer detects dependency
 cycles and fails with the cycle path; it never drops an edge to make the graph installable.
+
+A resolver receives the full reference `{ kind, id, version, size, sha256 }`. The GitHub resolver
+bounds a read with a reference by `size`: a declared content length above `size` is refused before
+the body is read, and a body that grows past `size` is cancelled. A root read without a reference
+is bounded by `MAX_RELEASE_DOCUMENT_BYTES` (1 MiB). The local-store resolver reads the whole file.
+One verifier compares the bytes with `size` and `sha256` after every read; a mismatch is a hard
+failure.
 
 ## 4. Schemas, runtime contracts, and evidence
 
@@ -152,7 +169,7 @@ The schemas are:
 
 The corpus is under `test/fixtures/platform-wire/`. Consumers in another language should
 first reproduce the canonical registry bytes/digest/signature, then accept every valid
-plugin/sidecar/kit/contract/spec fixture and reject mutations of identity, URL, digest, target, manifest,
+plugin/sidecar/kit/contract/spec fixture and reject mutations of identity, file name, digest, target, manifest,
 unknown fields, continuity, and evidence coverage.
 
 The installed GitHub Release package provides:

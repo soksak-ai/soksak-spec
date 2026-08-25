@@ -44,26 +44,37 @@ workstation 상태를 source에 직렬화하지 않습니다.
 - **BR9 — Repository 소유권.** Repository Makefile은 자기 구현과 경계만 검증합니다. Contract
   fixture는 contract owner가 정의하고 각 구현이 실행합니다. 여러 실제 component의 조합은 제품
   composition repository가 검증합니다.
-- **BR10 — Candidate artifact는 seal하며 공개하지 않습니다.** Release 전에 각 component owner가
-  자기 candidate output을 `candidate-artifact.json`으로 seal합니다. Envelope는 canonical
-  `release.json` 하나, 모든 local release asset, build evidence, source commit, component identity,
-  byte size와 SHA-256을 결합합니다. Actions는 tag나 release를 만들지 않고 해당 directory를 upload할
-  수 있습니다. 제품 workflow는 그 byte를 download하고 검증하며 형제 source를 build하지 않습니다.
-  파일 추가, 누락, 변경은 artifact 전체를 무효로 만듭니다.
+- **BR10 — 미공개 dependency는 주소 지정된 local store에서 옵니다.** Local build는 `--store`를
+  받아 모든 runtime dependency를 `<store>/<kind 복수형>/<id>/<version>/`에서 해석합니다. Build
+  input은 package manager의 commit된 manifest와 lockfile에서 옵니다. 제품 workflow는 공개된
+  byte를 검증하며 형제 source를 build하지 않습니다.
 - **BR11 — Local release는 공개 release 형식을 사용합니다.** Local release에는 GitHub Release와
   동일한 `release.json`, source commit, manifest, evidence, target artifact, size, SHA-256이 있습니다.
-  이 문서에는 local path를 기록하지 않습니다. Local store는 release document를 바꾸지 않고 공개
-  asset URL을 regular file에 대응시킵니다.
-- **BR12 — Local version directory 하나가 release transaction 하나입니다.**
-  `local/releases/<kind 복수형>/<id>/<version>`이 존재하는 동안 그 byte는 immutable입니다. 같은 byte의
-  재발행은 멱등이고 다른 byte는 `LOCAL_RELEASE_VERSION_CONFLICT`로 실패합니다. 공개하지 않은
-  version을 다시 사용하려면 version directory 전체를 삭제하고 이전 size 또는 digest를 선언했던 모든
-  local dependent를 다시 build해야 합니다. 일부 file만 교체한 상태는 언제나 잘못입니다.
+  이 형식에는 location이 없습니다. Store는 release directory를 file에 대응시킵니다. `release.json`의
+  모든 bare `file` 이름은 `<store>/<kind 복수형>/<id>/<version>/` 안의 regular file입니다. 모든 bare
+  `file` 이름은 [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3의 단일 release file grammar와 일치합니다.
+- **BR12 — 공개 release는 immutable이며 local store는 commit 기준으로 교체합니다.** 공개된 GitHub
+  Release는 바뀌지 않습니다. Local store에서는 `<store>/<kind 복수형>/<id>/<version>/`이 release
+  transaction 하나입니다. 이미 있는 version directory에 발행하면 `source.commit`과 byte를
+  비교합니다. 같은 commit에 같은 byte는 `unchanged`이고, 같은 commit에 다른 byte는
+  `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로 실패하며, 다른 commit은 version directory 전체를
+  교체합니다. 저장된 release 중 하나라도 `runtimeDependencies`에 기존 `release.json`의 size와
+  digest를 고정하고 있으면 교체는 `LOCAL_RELEASE_IN_USE`로 거부되며, 오류는 그런 release를 각각
+  이름으로 나열합니다. 그 dependent는 교체 전에 store에서 삭제하고 교체 후 새 release 기준으로
+  다시 build합니다. 일부 file만 교체한 상태는 언제나 잘못입니다.
 - **BR13 — Installer는 하나이며 transport는 identity가 아닙니다.** Local install과 registry install은
   같은 closure resolver, target selector, validator, extractor, consent summary, progress stream, atomic
-  environment commit을 사용합니다. HTTPS와 local-store read는 exact release reference의 transport입니다.
-  Local file은 명시한 store 아래에 있고 name, size, SHA-256이 `release.json`과 같을 때만 사용할 수
-  있습니다. Raw source path와 `file:` URL은 금지합니다.
+  environment commit을 사용합니다. Release reference는 `{ id, version, size, sha256 }`이며 location이
+  없습니다. GitHub resolver는
+  `https://github.com/soksak-ai/<id>/releases/download/v<version>/release.json`을 fetch하고,
+  local-store resolver는 `<store>/<kind 복수형>/<id>/<version>/release.json`을 읽으며, verifier는 그
+  byte의 size와 SHA-256을 reference와 비교합니다. Resolver는 reference 전체를 받습니다. GitHub
+  resolver는 reference가 있는 읽기를 reference `size`로, reference가 없는 root 읽기를
+  `MAX_RELEASE_DOCUMENT_BYTES`(1 MiB)로 제한하며, local-store resolver는 file 전체를 읽습니다.
+  모든 읽기 뒤에 하나의 verifier가 실행됩니다. Local file은 명시한 store 아래에 있고 name, size,
+  SHA-256이 `release.json`과 같을 때만 사용할 수 있습니다. `file:`, `link:`, `workspace:` locator는
+  commit된 source manifest와 lockfile에서 금지합니다. 생성된 release document에는 location이 전혀
+  없습니다.
 - **BR14 — Build evidence는 execution evidence가 아닙니다.** Owner toolchain 또는 관리되는 Docker
   cross-builder가 지원하는 모든 target을 build할 수 있습니다. Cross-build 성공은 target archive와
   native header를 증명하지만 해당 OS의 실행을 증명하지 않습니다. Native, emulated, VM, cross-build
@@ -73,21 +84,21 @@ workstation 상태를 source에 직렬화하지 않습니다.
   byte를 공개합니다. Local GREEN은 개발 증거이며 필수 Actions matrix가 공개 증거입니다.
 - **BR16 — Local 검증을 먼저 사용합니다.** 개발 반복은 owner gate, 관리되는 Docker cross-build, local
   release-store 검증, installed-product test를 로컬에서 실행합니다. Local에서 만들 수 없는 native evidence
-  또는 최종 공개 candidate에만 Actions run을 시작합니다. Source나 선언된 환경이 바뀌지 않았다면 실패한
+  또는 최종 공개에만 Actions run을 시작합니다. Source나 선언된 환경이 바뀌지 않았다면 실패한
   run을 다시 실행하지 않습니다.
 
 ## Component와 상태 소유권
 
 Plugin과 Sidecar release는 runtime installation이 됩니다. Kit release는 재사용 build 구현을, Contract
 release는 공유 type 또는 protocol input을, Spec release는 platform schema와 validator를 제공합니다.
-Kit, Contract, Spec identity는 release reference와 candidate build receipt에 남습니다. Core는 이들을
+Kit, Contract, Spec identity는 release reference에 남습니다. Core는 이들을
 runtime process로 기록하지 않습니다.
 
 `environment.json`은 Plugin과 Sidecar runtime 선택만 기록합니다. 각 record에는 exact version,
 materialized path, source(`local`, `registry` 또는 `development`), artifact SHA-256이 있습니다.
 `development` record의 path는 source directory이고, 그 manifest에서 version을 읽으며, 빈 artifact
 SHA-256과 registry 없음을 기록합니다. Sidecar는 target을, Plugin은 enabled 상태를 추가로
-기록합니다. Release와 build receipt는 repository, source commit, dependency URL, size, digest를
+기록합니다. `release.json`은 repository, source commit, dependency identity, size, digest를
 보존합니다. `environment.json`은 Go module이 소유하고 검증합니다. TypeScript package는 이 문서에
 대해 아무것도 내보내지 않습니다.
 
@@ -107,24 +118,51 @@ local/releases/
 ```
 
 각 version directory는 flat GitHub Release asset set입니다. Sidecar target은 artifact field와 filename
-segment이며 추가 store directory가 아닙니다. Publisher는 source output을 검증하고 private sibling
-directory에 복사하며 복사본을 다시 검증한 뒤 atomic rename합니다. 실패하면 final directory가
-노출되지 않습니다.
+segment이며 추가 store directory가 아닙니다. Store 순회는 directory만 대상으로 합니다. `<kind 복수형>/`
+또는 `<kind 복수형>/<id>/` 아래의 `.DS_Store` 같은 regular file은 store entry가 아니며 무시합니다. 그 자리의
+symbolic link·FIFO·socket·device는 `LOCAL_RELEASE_INVALID`로 거부합니다. Store당 publisher는 한 번에 하나입니다.
+Publisher는 실행 동안 `<store>/.publish-lock` directory를 점유하며 두 번째 publisher는 `LOCAL_RELEASE_BUSY`로
+거부됩니다.
+Publisher는 source output을 검증하고 sibling directory `<version>~next.<pid>`에 복사하며 복사본을
+다시 검증한 뒤 그 directory를 제자리로 rename합니다. 교체는 다음 순서의 rename 두 번입니다.
+`<version>`을 `<version>~previous.<pid>`로, 그다음 `<version>~next.<pid>`를 `<version>`으로
+rename하고 `<version>~previous.<pid>`는 마지막에 제거합니다. `~`는 SemVer 문법 밖이므로 staging
+directory는 저장된 version과 충돌하지 않습니다. 실패하면 final directory가 노출되지 않습니다. 남아
+있는 `<version>~previous.<pid>` 또는 `<version>~next.<pid>` directory는 중단된 교체입니다.
+`publish`, `verify`, `list`, `inspect`, `delete`는 진입 시 store 전체를 순회하고 그 경로를 이름으로
+지정해 `LOCAL_RELEASE_REPLACEMENT_INTERRUPTED`로 거부하며 어떤 store operation도 이를 복구하지
+않습니다. 남은 directory는 operator가 제거합니다.
+
+Location은 규약으로 유도하며 어떤 document에도 없습니다. 공개 release directory는
+`https://github.com/soksak-ai/<id>/releases/download/v<version>/`이고 local release directory는
+`<store>/<kind 복수형>/<id>/<version>/`입니다. 둘 다 `release.json`, manifest file, artifact,
+evidence를 `release.json`이 기록한 bare file 이름으로 보관합니다.
 
 Store operation은 `publish`, `list`, `inspect`, `verify`, `delete`가 전부입니다. `delete`는 exact kind,
 id, version 하나를 받습니다. 설치된 component를 제거하거나 process를 종료하지 않습니다.
 
+`verify`는 저장된 모든 release와 store 안의 모든 `runtimeDependencies` reference를 검사합니다. 각
+reference는 `release.json`이 참조된 size와 SHA-256을 가진 저장 release로 해석되어야 합니다. 다른
+byte로 해석되거나 저장 release가 없는 reference는 dependent release와 참조된 identity를 이름으로
+지정해 `LOCAL_RELEASE_DEPENDENCY_MISMATCH`로 실패합니다.
+
 ## Build, install, 공개
 
-1. Owner repository가 exact commit을 검증합니다. 공개하지 않은 build dependency는 canonical isolated
-   candidate materializer에만 들어가며 owner manifest와 lockfile은 바뀌지 않습니다.
+1. Owner repository가 exact commit을 검증합니다. Build input은 commit된 package manifest와
+   lockfile에서 옵니다. Owner manifest와 lockfile은 바뀌지 않습니다.
 2. Canonical builder가 flat release output 하나를 만듭니다. Portable component는 `any`를 만들고,
    Sidecar는 선택한 native 또는 Docker toolchain이 지원하는 요청 target을 모두 만듭니다.
-3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 byte는 `unchanged`를 반환하고 같은
-   version의 다른 byte는 거부합니다.
-4. Local resolver가 명시한 Plugin 또는 Sidecar root를 읽습니다. Local에 존재하는 dependency는 parent의
-   URL, size, SHA-256과 정확히 같아야 하며 다르면 설치가 실패합니다. Local에 없으면 exact HTTPS
-   reference를 사용할 수 있습니다.
+3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 `source.commit`에 같은 byte는
+   `unchanged`를 반환하고, 같은 commit에 다른 byte는 `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로
+   실패하며, 다른 commit은 BR12에 따라 version directory를 교체합니다.
+4. Local build는 runtime dependency를 주소 지정된 store에서만 해석합니다. 각 `{ id, version }`
+   intent를 `<store>/<kind 복수형>/<id>/<version>/release.json`에서 읽어
+   `{ id, version, size, sha256 }`으로 기록합니다. 공개 build는 GitHub에서만 해석합니다. Intent에는
+   `size`가 없으므로 builder의 읽기는 reference가 없는 root 읽기이며, GitHub에서는
+   `MAX_RELEASE_DOCUMENT_BYTES`(1 MiB)로 제한하고 local store에서는 제한하지 않습니다. 선택한
+   location에 없는 dependency는 build를 실패시킵니다. Installer는 각 dependency의 `release.json`
+   byte를 그것을 참조하는 reference의 size, SHA-256과 비교합니다. 읽기는 reference `size`로
+   제한하며(BR13) 다르면 설치가 실패합니다.
 5. Shared installer가 host target을 선택하고 closure를 검증·추출한 뒤 directory와 `environment.json`을
    atomically commit합니다. 같은 version과 digest는 멱등입니다. 같은 version과 target의 digest가
    다르면 `VERSION_ARTIFACT_CONFLICT`로 실패합니다.
@@ -155,23 +193,8 @@ GitHub Actions는 선언적 owner에서 tool을 clean job에 주입한 뒤 같�
 target은 명시적 target triple과 staging directory를 받을 수 있지만 publication credential과
 GitHub release 변경은 Actions에만 둡니다.
 
-Repository 소유 build와 canonical release packager가 평면 output directory 하나를 만든 뒤 다음
-공개 release-template command로 seal 및 검증합니다.
-
-```sh
-node <plugin-spec>/release-template/seal-candidate-artifact.mjs \
-  --directory <absolute-output-directory> \
-  --evidence <optional-build-evidence.json>
-node <plugin-spec>/release-template/verify-candidate-artifact.mjs \
-  --directory <absolute-output-directory>
-```
-
-Node candidate의 `candidate-build.json`은 자동으로 발견합니다. 그 밖의 build evidence는 명시적으로
-이름을 전달합니다. 두 command 모두 upload나 publish를 수행하지 않습니다.
-
 ```sh
 soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
-soksak-local-release build --store <absolute-store> --source <absolute-clean-node-owner-repository> --plan <absolute-candidate-plan> --generated <path-one>,<path-two>
 soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
@@ -182,7 +205,5 @@ soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --v
 `build`는 exact clean owner commit을 disposable directory에 clone하고 owner Make gate와 canonical
 packager를 실행하며 검증된 release를 atomically 저장한 뒤 clone을 제거합니다. Sidecar target은 선택한
 native 또는 관리되는 Docker 환경이 해당 owner preflight를 통과할 때만 build할 수 있습니다. Command는
-owner preflight를 약화하거나 raw compiler command로 바꾸지 않습니다.
-Node owner가 미공개 build dependency를 사용하면 `--plan`이 canonical candidate plan을 지정하고
-`--generated`가 owner build가 만들 수 있는 output을 지정합니다. Override는 disposable staging
-checkout에만 존재하며 source manifest와 lockfile은 바뀌지 않습니다.
+owner preflight를 약화하거나 raw compiler command로 바꾸지 않습니다. Runtime dependency는 주소
+지정된 `--store`에서만 해석합니다.

@@ -40,26 +40,38 @@ toolchain installer and does not serialize a developer workstation into source.
 - **BR9 — Repository ownership.** A repository's Makefile verifies only its implementation and
   boundary. Contract fixtures are defined by the contract owner and run by each implementation.
   The product composition repository verifies multiple real components together.
-- **BR10 — Candidate artifacts are sealed, not published.** Before release, each component owner
-  seals its own candidate output with `candidate-artifact.json`. The envelope binds one canonical
-  `release.json`, every local release asset, build evidence, source commit, component identity,
-  byte size and SHA-256. Actions may upload that directory without creating a tag or release. A
-  product workflow downloads and verifies those bytes; it never builds sibling source. Extra,
-  missing or changed files invalidate the entire artifact.
+- **BR10 — Unpublished dependencies come from the addressed local store.** A local build takes
+  `--store` and resolves every runtime dependency from `<store>/<kind-plural>/<id>/<version>/`;
+  its build inputs come from the package manager's committed manifest and lockfile. A product
+  workflow verifies released bytes; it never builds sibling source.
 - **BR11 — Local releases use the public release shape.** A local release contains the same
   `release.json`, source commit, manifests, evidence, target artifacts, sizes, and SHA-256 values as
-  a GitHub Release. Local paths never appear in those documents. The local store maps public asset
-  URLs to regular files without changing the release document.
-- **BR12 — One local version directory is one release transaction.** While
-  `local/releases/<kind-plural>/<id>/<version>` exists, its bytes are immutable. Republishing equal
-  bytes is idempotent. Different bytes fail with `LOCAL_RELEASE_VERSION_CONFLICT`. Reusing an
-  unpublished version requires deleting the complete version directory and rebuilding every local
-  dependent that named the old size or digest. Partial replacement is always invalid.
+  a GitHub Release. The shape contains no location. The store maps a release directory to files:
+  every bare `file` name in `release.json` is a regular file inside
+  `<store>/<kind-plural>/<id>/<version>/`. Every bare `file` name matches the one release file
+  grammar in [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3.
+- **BR12 — Published releases are immutable; the local store replaces by commit.** A published
+  GitHub Release never changes. In the local store, `<store>/<kind-plural>/<id>/<version>/` is one
+  release transaction. Publishing into an existing version directory compares `source.commit` and
+  bytes: same commit and same bytes is `unchanged`; same commit and different bytes fails with
+  `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit replaces the complete version
+  directory. The replacement is refused with `LOCAL_RELEASE_IN_USE` while any stored release pins
+  the old `release.json` size and digest in its `runtimeDependencies`; the error names each such
+  release. Those dependents are deleted from the store before the replacement and rebuilt against
+  the new release after it. Partial replacement is always invalid.
 - **BR13 — Installation is shared; transport is not identity.** Local and registry installs share
   one closure resolver, target selector, validator, extractor, consent summary, progress stream,
-  and atomic environment commit. HTTPS and local-store reads are transports for exact release
-  references. A local file is eligible only under the explicitly addressed store and only when its
-  name, size, and SHA-256 equal `release.json`. Raw source paths and `file:` URLs are forbidden.
+  and atomic environment commit. A release reference is `{ id, version, size, sha256 }` and has no
+  location. The GitHub resolver fetches
+  `https://github.com/soksak-ai/<id>/releases/download/v<version>/release.json`, the local-store
+  resolver reads `<store>/<kind-plural>/<id>/<version>/release.json`, and a verifier compares the
+  size and SHA-256 of the bytes with the reference. A resolver receives the full reference. The
+  GitHub resolver bounds a read with a reference by the reference `size` and a root read without a
+  reference by `MAX_RELEASE_DOCUMENT_BYTES` (1 MiB); the local-store resolver reads the whole file.
+  The one verifier runs after every read. A local file is eligible only under the explicitly
+  addressed store and only when its name, size, and SHA-256 equal `release.json`. `file:`, `link:`,
+  and `workspace:` locators are forbidden in committed source manifests and lockfiles. Generated
+  release documents contain no location at all.
 - **BR14 — Build evidence is not execution evidence.** An owner toolchain or maintained Docker
   cross-builder may build every target it supports. Cross-build success proves the target archive
   and native header, not execution on that operating system. Native, emulated, VM, and cross-build
@@ -70,22 +82,22 @@ toolchain installer and does not serialize a developer workstation into source.
   Actions matrix is publication evidence.
 - **BR16 — Local verification spends first.** Development iterations run owner gates, maintained
   Docker cross-builds, local release-store verification, and installed-product tests locally. An
-  Actions run begins only for native evidence unavailable locally or for the final publication
-  candidate. A failed run is not rerun without a source or declared-environment change.
+  Actions run begins only for native evidence unavailable locally or for the final publication.
+  A failed run is not rerun without a source or declared-environment change.
 
 ## Component and state ownership
 
 Plugin and Sidecar releases become runtime installations. Kit releases carry reusable build
 implementation, Contract releases carry shared type or protocol inputs, and Spec releases carry
 platform schemas and validators. Kit, Contract, and Spec identities remain visible in release
-references and candidate build receipts; Core does not record them as runtime processes.
+references; Core does not record them as runtime processes.
 
 `environment.json` records only Plugin and Sidecar runtime selections. Each record contains the
 exact version, materialized path, source (`local`, `registry`, or `development`), and artifact
 SHA-256. A `development` record references a source directory, reads its version from the manifest
 there, and records an empty artifact SHA-256 and no registry. A Sidecar also records its target; a
-Plugin also records its enabled state. Release and build receipts retain
-repository, source commit, dependency URL, size, and digest. `environment.json` is owned and
+Plugin also records its enabled state. `release.json` retains
+repository, source commit, dependency identity, size, and digest. `environment.json` is owned and
 validated by the Go module; the TypeScript package exports nothing for it.
 
 ## Local release store
@@ -104,24 +116,51 @@ local/releases/
 ```
 
 Each version directory is the flat GitHub Release asset set. Sidecar targets remain artifact fields
-and filename segments, not additional store directories. The publisher verifies the source output,
-copies it to a private sibling directory, verifies the copy, and atomically renames that directory.
-A failed publication exposes no final directory.
+and filename segments, not additional store directories. The store walk considers only directories:
+a regular file such as `.DS_Store` under `<kind-plural>/` or `<kind-plural>/<id>/` is not a store
+entry and is ignored; a symbolic link, FIFO, socket, or device there is refused as
+`LOCAL_RELEASE_INVALID`. One publisher runs per store at a time: the publisher holds the directory
+`<store>/.publish-lock` for its duration and a second publisher is refused as `LOCAL_RELEASE_BUSY`. The publisher verifies the source output, copies it to the sibling directory
+`<version>~next.<pid>`, verifies the copy, and renames that directory into place. A replacement is
+two renames in this order: `<version>` to `<version>~previous.<pid>`, then `<version>~next.<pid>`
+to `<version>`; `<version>~previous.<pid>` is removed last. `~` is outside the SemVer grammar, so a
+staging directory never collides with a stored version. A failed publication exposes no final
+directory. A leftover `<version>~previous.<pid>` or `<version>~next.<pid>` directory is an
+interrupted replacement: `publish`, `verify`, `list`, `inspect`, and `delete` walk the whole store
+at entry and refuse with `LOCAL_RELEASE_REPLACEMENT_INTERRUPTED` naming that path, and no store
+operation repairs it. The operator removes the leftover directory.
+
+Location is derived by convention and appears in no document. A published release directory is
+`https://github.com/soksak-ai/<id>/releases/download/v<version>/`; a local release directory is
+`<store>/<kind-plural>/<id>/<version>/`. Both hold `release.json`, the manifest file, the
+artifacts, and the evidence under the bare file names that `release.json` records.
 
 `publish`, `list`, `inspect`, `verify`, and `delete` are the complete store operations. `delete`
 addresses one exact kind, id, and version. It removes no installed component and stops no process.
 
+`verify` checks every stored release and every `runtimeDependencies` reference in the store: each
+reference resolves to a stored release whose `release.json` has the referenced size and SHA-256. A
+reference that resolves to different bytes or to no stored release fails with
+`LOCAL_RELEASE_DEPENDENCY_MISMATCH` naming the dependent release and the referenced identity.
+
 ## Build, install, and publish
 
-1. The owner repository verifies its exact commit. Unpublished build dependencies enter only the
-   canonical isolated candidate materializer; owner manifests and lockfiles remain unchanged.
+1. The owner repository verifies its exact commit. Build inputs come from the committed package
+   manifest and lockfile; owner manifests and lockfiles remain unchanged.
 2. The canonical builder creates one flat release output. Portable components produce `any`; a
    Sidecar produces every requested target supported by the selected native or Docker toolchain.
-3. The local publisher validates and atomically stores the output. Equal bytes return `unchanged`;
-   different bytes at the same version are rejected.
-4. The local resolver reads an explicit Plugin or Sidecar root. A locally present dependency must
-   exactly match the parent URL, size, and SHA-256 or installation fails. An absent local dependency
-   may use its exact HTTPS reference.
+3. The local publisher validates and atomically stores the output. Same `source.commit` and same
+   bytes return `unchanged`; same commit and different bytes fail with
+   `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit replaces the version directory
+   under BR12.
+4. A local build resolves its runtime dependencies from the addressed store only: each
+   `{ id, version }` intent is read from `<store>/<kind-plural>/<id>/<version>/release.json` and
+   recorded as `{ id, version, size, sha256 }`. A published build resolves from GitHub only. An
+   intent has no `size`: the builder's read is a root read without a reference, bounded by
+   `MAX_RELEASE_DOCUMENT_BYTES` (1 MiB) from GitHub and unbounded from the local store. A
+   dependency absent from the selected location fails the build. The installer compares the bytes
+   of each dependency's `release.json` with the size and SHA-256 of the reference that names it;
+   the read is bounded by the reference `size` (BR13), and a mismatch fails installation.
 5. The shared installer selects the host target, verifies and extracts the closure, then commits the
    directories and `environment.json` atomically. Equal version and digest are idempotent. Equal
    version and target with a different digest fail with `VERSION_ARTIFACT_CONFLICT`.
@@ -152,23 +191,8 @@ GitHub Actions inject tools from the declarative owners and invoke the same targ
 Release-only targets may accept an explicit target triple and staging directory, but publication
 credentials and GitHub release mutation stay in Actions.
 
-After the repository-owned build and canonical release packager have produced one flat output
-directory, seal and verify it with the public release-template commands:
-
-```sh
-node <plugin-spec>/release-template/seal-candidate-artifact.mjs \
-  --directory <absolute-output-directory> \
-  --evidence <optional-build-evidence.json>
-node <plugin-spec>/release-template/verify-candidate-artifact.mjs \
-  --directory <absolute-output-directory>
-```
-
-`candidate-build.json` is discovered automatically for Node candidates. Other build evidence is
-named explicitly. Neither command uploads or publishes anything.
-
 ```sh
 soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
-soksak-local-release build --store <absolute-store> --source <absolute-clean-node-owner-repository> --plan <absolute-candidate-plan> --generated <path-one>,<path-two>
 soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
@@ -180,7 +204,4 @@ soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --v
 uses the canonical packager, publishes the verified release atomically, and removes the clone. A
 requested Sidecar target is eligible only when the selected native or maintained Docker environment
 passes that owner's preflight. The command never weakens an owner preflight or substitutes a raw
-compiler command.
-When a Node owner consumes unpublished build dependencies, `--plan` names the canonical candidate
-plan and `--generated` names the outputs that the owner build is allowed to create. Overrides exist
-only inside the disposable staging checkout; source manifests and lockfiles remain unchanged.
+compiler command. Runtime dependencies are resolved from the addressed `--store` only.

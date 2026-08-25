@@ -7,21 +7,16 @@ build inputs and are never separate install products.
 ## Owner inputs
 
 The owner writes `plugin.json` and standard build manifests with lockfiles. Build dependencies stay
-in `package.json`, `Cargo.toml`, or `go.mod`. A separately installed component uses one flat
-reference in `plugin.json.runtimeDependencies`:
+in `package.json`, `Cargo.toml`, or `go.mod`. A separately installed component is one
+`{ id, version }` reference in `plugin.json.runtimeDependencies`. The manifest is intent: it has
+no `url`, `size`, or `sha256`, and the manifest validator rejects those keys as unknown.
 
 ```json
 {
   "id": "soksak-plugin-terminal-xterm",
   "version": "0.0.18",
   "runtimeDependencies": {
-    "sidecars": [{
-      "id": "soksak-sidecar-pty",
-      "version": "0.0.6",
-      "url": "https://github.com/soksak-ai/soksak-sidecar-pty/releases/download/v0.0.6/release.json",
-      "size": 1234,
-      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    }]
+    "sidecars": [{ "id": "soksak-sidecar-pty", "version": "0.0.6" }]
   }
 }
 ```
@@ -31,16 +26,26 @@ The array location states the kind. There is no role, provider alias, interface 
 arrays. Changing a reference requires a new plugin version.
 
 A service declaration contains its service interface and optional subscriptions only. A v1 service
-plugin has exactly one `runtimeDependencies.sidecars` reference; that common release reference is
-the service executable. `service.sidecar` and partial `{id, version}` component references do not
-exist.
+plugin has exactly one `runtimeDependencies.sidecars` reference; that reference is the service
+executable. `service.sidecar` does not exist.
 
 ## Automated owner release
 
-The canonical builder verifies locked build inputs, produces self-contained artifacts, validates
-the complete runtime dependency chain, and writes `release.json`. Plugin and sidecar releases use
-the same flat shape. `manifest`, `artifacts`, their sizes and digests, and `evidence` are generated
-outputs. `evidence` records conformance; it is not installed.
+The canonical builder verifies locked build inputs, produces self-contained artifacts, resolves
+every runtime dependency through the release resolver, and writes `release.json`. Plugin and
+sidecar releases use the same flat shape. `manifest`, `artifacts`, their sizes and digests,
+`runtimeDependencies`, and `evidence` are generated outputs. `evidence` records conformance; it is
+not installed.
+
+`release.json` contains no location. Every file in the same release directory is a bare `file`
+name under the one release file grammar in [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3; the builder
+and both publishers import that pattern and define no second one. Every reference to another release is `{ id, version, size, sha256 }` where `size` and
+`sha256` are of that release's `release.json`; the builder composes it from the resolver and never
+copies it from the manifest. `source.repository` is bound to the organization: it equals
+`https://github.com/soksak-ai/<id>`. The release directory is derived from the identity: a published
+release is `https://github.com/soksak-ai/<id>/releases/download/v<version>/`, a local release is
+`<store>/<kind-plural>/<id>/<version>/`. A local build with `--store` reads the local one; a
+published build reads GitHub.
 
 ```json
 {
@@ -48,7 +53,7 @@ outputs. `evidence` records conformance; it is not installed.
   "id": "soksak-plugin-terminal-xterm",
   "version": "0.0.18",
   "manifest": {
-    "url": "https://github.com/soksak-ai/soksak-plugin-terminal-xterm/releases/download/v0.0.18/plugin.json",
+    "file": "plugin.json",
     "size": 4096,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
@@ -58,7 +63,7 @@ outputs. `evidence` records conformance; it is not installed.
   },
   "artifacts": [{
     "target": "any",
-    "url": "https://github.com/soksak-ai/soksak-plugin-terminal-xterm/releases/download/v0.0.18/soksak-plugin-terminal-xterm-0.0.18-any.tgz",
+    "file": "soksak-plugin-terminal-xterm-0.0.18-any.tgz",
     "size": 94578,
     "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "format": "tgz",
@@ -68,13 +73,12 @@ outputs. `evidence` records conformance; it is not installed.
     "sidecars": [{
       "id": "soksak-sidecar-pty",
       "version": "0.0.6",
-      "url": "https://github.com/soksak-ai/soksak-sidecar-pty/releases/download/v0.0.6/release.json",
       "size": 1234,
       "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     }]
   },
   "evidence": [{
-    "url": "https://github.com/soksak-ai/soksak-plugin-terminal-xterm/releases/download/v0.0.18/conformance-release.json",
+    "file": "conformance-release.json",
     "size": 512,
     "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   }]
@@ -83,23 +87,25 @@ outputs. `evidence` records conformance; it is not installed.
 
 ## Registry contribution and release
 
-One pull request adds or replaces one `plugins/<id>.json` file. It contains only the plugin release
-reference:
+One pull request adds or replaces one `plugins/<id>.json` file. It contains only `{ id, version }`:
 
 ```json
-{
-  "id": "soksak-plugin-terminal-xterm",
-  "version": "0.0.18",
-  "url": "https://github.com/soksak-ai/soksak-plugin-terminal-xterm/releases/download/v0.0.18/release.json",
-  "size": 2048,
-  "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-}
+{ "id": "soksak-plugin-terminal-xterm", "version": "0.0.18" }
 ```
 
-The registry workflow validates every immutable release and publishes an authenticated
-`registry.json`. It projects only each plugin's direct runtime dependencies; transitive
-dependencies remain in their own hash-pinned releases. There are no `installs`, `packages`,
-independent sidecar arrays, or build-dependency catalogues.
+`registry-build` resolves `size` and `sha256` by fetching the derived
+`https://github.com/soksak-ai/<id>/releases/download/v<version>/release.json`. A root entry
+without a reference is read under the fixed 1 MiB bound; every dependency in the closure is read
+with its full reference `{ kind, id, version, size, sha256 }`, at most `size` bytes, and the one
+verifier compares the bytes with `size` and `sha256` after the read. The registry
+workflow validates every immutable release and publishes an authenticated `registry.json`. Each
+index entry is the release reference `{ id, version, size, sha256 }`. The index does not copy
+`runtimeDependencies`; consumers walk the closure through each `release.json`. There are no
+`installs`, `packages`, independent sidecar arrays, or build-dependency catalogues.
+
+Publication gate: `registry-verify` rejects the pull request when any release in the closure is not
+resolvable at its derived https url (404) or when the fetched bytes differ from the size and SHA-256
+of the reference that names it.
 The packaged CLI provides `registry-verify`, `registry-build`, and `registry-authenticate`; the
 registry repository contains no separate parser or signer implementation.
 
@@ -112,18 +118,8 @@ registry repository contains no separate parser or signer implementation.
   "plugins": [{
     "id": "soksak-plugin-terminal-xterm",
     "version": "0.0.18",
-    "url": "https://github.com/soksak-ai/soksak-plugin-terminal-xterm/releases/download/v0.0.18/release.json",
     "size": 2048,
-    "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "runtimeDependencies": {
-      "sidecars": [{
-        "id": "soksak-sidecar-pty",
-        "version": "0.0.6",
-        "url": "https://github.com/soksak-ai/soksak-sidecar-pty/releases/download/v0.0.6/release.json",
-        "size": 1234,
-        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-      }]
-    }
+    "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
   }],
   "signature": { "algorithm": "ed25519", "keyId": "official-2026", "value": "..." }
 }
