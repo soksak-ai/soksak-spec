@@ -3,7 +3,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { isEntryModule } from "../packages/plugin-spec/release-template/entry.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const COMMIT_RE = /^[a-f0-9]{40}$/;
@@ -44,7 +45,7 @@ export function verifyReleaseContext(environment = process.env) {
   return result;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isEntryModule(import.meta.url)) {
   try {
     process.stdout.write(`${JSON.stringify(verifyReleaseContext())}\n`);
   } catch (error) {

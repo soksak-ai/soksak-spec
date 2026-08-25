@@ -2,11 +2,11 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { RELEASE_FILE_RE } from "../dist/release-primitives.js";
 import { parseReleaseManifest, releaseIdentity } from "../dist/release.js";
 import { GitHubApi, publishImmutableRelease } from "./publish-release.mjs";
+import { isEntryModule } from "./entry.mjs";
 
 const COMMIT_RE = /^[a-f0-9]{40}$/;
 const REPOSITORY_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -83,7 +83,7 @@ function options(argv) {
   return values;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isEntryModule(import.meta.url)) {
   try {
     const input = options(process.argv.slice(2));
     const release = collectCanonicalReleaseAssets(input);

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { COMPONENT_ID_RE, STRICT_SEMVER_RE } from "../../dist/release-primitives.js";
 import { createRegularFileArchive, sha256 } from "../archive.mjs";
 import { readSidecarReleaseArchive } from "./archive.mjs";
 import { assertNativeBinaryTarget } from "./native-binary.mjs";
+import { isEntryModule } from "../entry.mjs";
 
 const TARGET = /^(?:aarch64|x86_64)-(?:apple-darwin|pc-windows-msvc|unknown-linux-(?:gnu|musl))$/;
 
@@ -95,7 +95,7 @@ function options(argv) {
   return { source: result["--source"], target: result["--target"], out: result["--out"] };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryModule(import.meta.url)) {
   try {
     const result = packSidecarTarget(options(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(result)}\n`);

@@ -4,11 +4,12 @@
 // identity to this repository and version.
 import { lstatSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { parseReleaseManifest, releaseIdentity } from "../packages/plugin-spec/dist/spec.js";
 import { collectCanonicalReleaseAssets } from "../packages/plugin-spec/release-template/publish-canonical-release.mjs";
 import { GitHubApi, publishImmutableRelease } from "../packages/plugin-spec/release-template/publish-release.mjs";
+import { isEntryModule } from "../packages/plugin-spec/release-template/entry.mjs";
 
 export { GitHubApi, publishImmutableRelease };
 
@@ -65,7 +66,7 @@ function parseOptions(argv) {
   return values;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (isEntryModule(import.meta.url)) {
   try {
     const options = parseOptions(process.argv.slice(2));
     const release = collectReleaseAssets(options);

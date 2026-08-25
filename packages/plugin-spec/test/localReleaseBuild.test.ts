@@ -136,3 +136,15 @@ describe("local release owner build", () => {
     expect(() => runLocalRelease(["build", "--store", store, "--source", source, "--unknown", "value"])).toThrow("build accepts --store, --source, and --targets");
   });
 });
+
+describe("local release command entry", () => {
+  it("runs when invoked through a symbolic link, as a package manager's bin shim does", () => {
+    const script = path.resolve(import.meta.dirname, "../release-template/local-release.mjs");
+    const link = path.join(root, "soksak-local-release");
+    fs.symlinkSync(script, link);
+    const result = spawnSync(process.execPath, [link, "list", "--store", store], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ releases: 0, entries: [] });
+  });
+
+});

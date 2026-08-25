@@ -4,13 +4,13 @@
 // The GitHub asset with that name must report the same size and digest as release.json, and the
 // downloaded bytes must match before the archive is opened.
 import crypto from "node:crypto";
-import { pathToFileURL } from "node:url";
 
 import { parseReleaseManifest } from "../../dist/release.js";
 import { COMPONENT_ID_RE, GITHUB_ORG, STRICT_SEMVER_RE } from "../../dist/release-primitives.js";
 import { releaseURL } from "../resolve-release.mjs";
 import { assertNativeBinaryTarget } from "./native-binary.mjs";
 import { readSidecarReleaseArchive } from "./archive.mjs";
+import { isEntryModule } from "../entry.mjs";
 
 const REPOSITORY_PREFIX = `https://github.com/${GITHUB_ORG}/`;
 
@@ -148,7 +148,7 @@ function auditOptions(argv) {
   return { repository: values["--repository"], tag: values["--tag"] };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntryModule(import.meta.url)) {
   try {
     const report = await auditSidecarRepository(auditOptions(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

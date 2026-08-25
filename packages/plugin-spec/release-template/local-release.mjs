@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { deleteLocalRelease, inspectLocalRelease, publishLocalRelease, verifyLocalReleaseStore } from "./local-release-store.mjs";
 import { buildLocalRelease } from "./local-release-build.mjs";
+import { isEntryModule } from "./entry.mjs";
 
 function parse(argv) {
   const [command, ...rest] = argv;
@@ -41,7 +41,7 @@ export function runLocalRelease(argv) {
   throw new Error("command must be build, publish, list, inspect, verify, or delete");
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (isEntryModule(import.meta.url)) {
   try { process.stdout.write(`${JSON.stringify(runLocalRelease(process.argv.slice(2)))}\n`); }
   catch (error) { process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 1; }
 }
