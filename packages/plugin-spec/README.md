@@ -86,6 +86,9 @@ JSON Schemas ship in `schema/`. Cross-language canonical/signature fixtures and 
 plugin/sidecar/kit/contract/spec closures ship in `test/fixtures/platform-wire/`. The normative ownership,
 dependency, evidence, and certification rules are in
 [`docs/PLATFORM-WIRE.md`](docs/PLATFORM-WIRE.md).
+The local/GitHub build and publication pipeline is in
+[`docs/BUILD-AND-RELEASE.md`](docs/BUILD-AND-RELEASE.md). Exact version, correction, and dependency
+rules are in [`docs/VERSIONING.md`](docs/VERSIONING.md).
 
 ## License
 
