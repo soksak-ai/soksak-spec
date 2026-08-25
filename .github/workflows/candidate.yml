@@ -110,7 +110,7 @@ jobs:
           cp source/artifacts/conformance-manifest.json candidate-output/conformance-manifest.json
           cp source/artifacts/conformance-release.json candidate-output/conformance-release.json
           cp source/artifacts/soksak-ai-plugin-spec-*.tgz candidate-output/
-          cp source/artifacts/soksak-spec-release.json candidate-output/release.json
+          cp source/artifacts/release.json candidate-output/release.json
           node source/packages/plugin-spec/release-template/seal-candidate-artifact.mjs \
             --directory "$GITHUB_WORKSPACE/candidate-output"
           node source/packages/plugin-spec/release-template/verify-candidate-artifact.mjs \

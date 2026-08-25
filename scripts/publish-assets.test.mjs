@@ -20,7 +20,7 @@ function fixture() {
   const archiveName = `soksak-ai-plugin-spec-${version}.tgz`;
   const archive = Buffer.from(`spec-${version}`);
   const tag = `v${version}`;
-  const manifestName = "soksak-spec-release.json";
+  const manifestName = "release.json";
   const specManifest = Buffer.from('{}\n');
   writeFileSync(join(directory, "spec.json"), specManifest);
   const evidence = ["conformance-manifest.json", "conformance-release.json"].map((name) => {
@@ -50,7 +50,7 @@ test("release assets and tag are derived from the verified owner manifest", (con
     manifest: join(value.directory, value.manifestName),
   });
   assert.equal(result.tag, value.tag);
-  assert.deepEqual(result.assets.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json", value.archiveName, value.manifestName, "spec.json"]);
+  assert.deepEqual(result.assets.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json", value.manifestName, value.archiveName, "spec.json"]);
 });
 
 test("asset collection fails closed on undeclared or changed files", (context) => {

@@ -34,7 +34,7 @@ function readOwnerConfiguration() {
     owner === null || typeof owner !== "object" || Array.isArray(owner) ||
     !owner.spec || typeof owner.spec !== "object" || owner.spec.id !== "soksak-spec" || owner.spec.version !== workspace.version ||
     typeof owner.repository !== "string" ||
-    typeof owner.manifest !== "string" || owner.manifest !== `${owner.spec.id}-release.json`
+    owner.manifest !== "release.json"
   ) {
     throw new Error("workspace release owner metadata is invalid");
   }

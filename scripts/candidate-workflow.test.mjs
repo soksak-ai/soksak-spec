@@ -17,6 +17,7 @@ test("spec owner emits a sealed candidate artifact without publication authority
     "git -C source rev-parse HEAD",
     "working-directory: source",
     "make verify",
+    "source/artifacts/release.json",
     "candidate-output/release.json",
     "seal-candidate-artifact.mjs",
     "verify-candidate-artifact.mjs",

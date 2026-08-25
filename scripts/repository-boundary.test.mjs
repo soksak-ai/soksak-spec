@@ -115,7 +115,7 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.deepEqual(workspace.soksakRelease, {
     spec: { id: "soksak-spec", version: releaseVersion },
     repository: "https://github.com/soksak-ai/soksak-spec",
-    manifest: "soksak-spec-release.json",
+    manifest: "release.json",
   });
 
   const pluginSpec = json("packages/plugin-spec/package.json");

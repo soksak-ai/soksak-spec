@@ -69,7 +69,7 @@ export function specReleaseIdentity(workspace, pluginSpec) {
     release === null || typeof release !== "object" || Array.isArray(release) ||
     !release.spec || typeof release.spec !== "object" || release.spec.id !== "soksak-spec" || release.spec.version !== workspace.version ||
     typeof release.repository !== "string" ||
-    typeof release.manifest !== "string" || release.manifest !== `${release.spec.id}-release.json`
+    release.manifest !== "release.json"
   ) {
     throw new Error("workspace soksakRelease metadata is invalid");
   }

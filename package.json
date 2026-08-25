@@ -7,7 +7,7 @@
   "soksakRelease": {
     "spec": { "id": "soksak-spec", "version": "0.0.30" },
     "repository": "https://github.com/soksak-ai/soksak-spec",
-    "manifest": "soksak-spec-release.json"
+    "manifest": "release.json"
   },
   "scripts": {
     "build": "pnpm --filter @soksak-ai/plugin-spec build",

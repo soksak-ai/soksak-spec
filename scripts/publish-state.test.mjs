@@ -21,7 +21,7 @@ function localAsset(name, value, contentType) {
 
 const assets = [
   localAsset("soksak-ai-plugin-spec-0.9.7.tgz", "archive", "application/gzip"),
-  localAsset("soksak-spec-release.json", "{}\n", "application/json"),
+  localAsset("release.json", "{}\n", "application/json"),
 ];
 
 class MemoryApi {

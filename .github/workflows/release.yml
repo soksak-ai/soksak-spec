@@ -65,4 +65,4 @@ jobs:
           --repository "$GITHUB_REPOSITORY"
           --commit "$GITHUB_SHA"
           --artifacts "$GITHUB_WORKSPACE/artifacts"
-          --manifest "$GITHUB_WORKSPACE/artifacts/soksak-spec-release.json"
+          --manifest "$GITHUB_WORKSPACE/artifacts/release.json"
