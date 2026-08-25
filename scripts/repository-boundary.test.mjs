@@ -68,11 +68,28 @@ test("repository owns a complete reproducible release boundary", () => {
   for (const rule of ["environment.json is the only local runtime discovery surface", "injected repository root", "workspace checkout path", "sibling-source topology"]) {
     assert.ok(versioning.includes(rule), "versioning policy omits " + rule);
   }
+  // The release template and the workflow set are exactly these files: a local build takes its
+  // runtime dependencies from --store and its build inputs from the package manager.
+  const files = (directory, suffix) => readdirSync(join(root, directory)).filter((name) => name.endsWith(suffix)).sort();
+  assert.deepEqual(files("packages/plugin-spec/release-template", ".mjs"), [
+    "archive.mjs",
+    "archive.test.mjs",
+    "build-portable-release.mjs",
+    "build-release.mjs",
+    "cargo-dependencies.mjs",
+    "compose-runtime-dependencies.mjs",
+    "local-release-build.mjs",
+    "local-release-store.mjs",
+    "local-release.mjs",
+    "package-dependencies.mjs",
+    "publish-canonical-release.mjs",
+    "publish-release.mjs",
+    "resolve-release.mjs",
+    "verify-plugin-release.mjs",
+  ]);
+  assert.deepEqual(files(".github/workflows", ".yml"), ["release.yml", "verify.yml"]);
   for (const path of [
     ".node-version",
-    ".github/workflows/candidate.yml",
-    ".github/workflows/node-candidate.yml",
-    ".github/workflows/sidecar-candidate.yml",
     ".github/workflows/release.yml",
     ".github/workflows/verify.yml",
     ".gitignore",
@@ -171,7 +188,7 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.doesNotMatch(verifier, /(?:node|golang|rust):\d/);
   assert.match(verifier, /--no-update-notifier --no-fund/);
 
-  for (const workflow of [".github/workflows/candidate.yml", ".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
+  for (const workflow of [".github/workflows/release.yml", ".github/workflows/verify.yml"]) {
     const source = read(workflow);
     assert.match(source, /actions\/setup-go@[a-f0-9]{40}/);
     assert.match(source, /go-version-file:\s*(?:source\/)?go\/platformspec\/go\.mod/);
