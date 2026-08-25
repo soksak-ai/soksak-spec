@@ -24,7 +24,7 @@ function base(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     description: "테스트용",
     entry: null,
     permissions: ["commands", "sidecar", "service"],
-    runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1", url: "https://github.com/example/demo-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "a".repeat(64) }] },
+    runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1" }] },
     service: { interface: SERVICE_CONTRACT_REQUIREMENT },
     contributes: {
       commands: [
@@ -212,8 +212,8 @@ describe("service — 거부(PS3·PS5·PS6)", () => {
 
   it("service는 runtimeDependencies.sidecars release를 정확히 하나 요구한다", () => {
     expect(errorsOf(base({ runtimeDependencies: undefined })).some((e) => e.includes("exactly one"))).toBe(true);
-    const second = { id: "other-svc", version: "0.0.1", url: "https://github.com/example/other-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "b".repeat(64) };
-    expect(errorsOf(base({ runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1", url: "https://github.com/example/demo-svc/releases/download/v0.0.1/release.json", size: 1, sha256: "a".repeat(64) }, second] } })).some((e) => e.includes("exactly one"))).toBe(true);
+    const second = { id: "other-svc", version: "0.0.1" };
+    expect(errorsOf(base({ runtimeDependencies: { sidecars: [{ id: "demo-svc", version: "0.0.1" }, second] } })).some((e) => e.includes("exactly one"))).toBe(true);
   });
 
   it('service 선언에 "service" 권한 부재 → 거부(caution 동의 고지)', () => {

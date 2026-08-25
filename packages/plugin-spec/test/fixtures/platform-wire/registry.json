@@ -5,9 +5,8 @@
     {
       "id": "weather-plugin",
       "version": "0.0.1",
-      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/release.json",
-      "size": 12345,
-      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "size": 965,
+      "sha256": "c3a19097723d41ac1babafd912e0a47df5f5830480ecf32fc80d840c33fe9dac"
     }
   ],
   "issuedAt": "2026-07-14T00:00:00Z",
@@ -15,6 +14,6 @@
   "signature": {
     "algorithm": "ed25519",
     "keyId": "fixture-2026",
-    "value": "PLlab8JPrrl2ubKA//pmkrOb/uxRDuFHdDdM+U01r8NBFpzCaCwkg/HLz+mhf8CVmjWWC+gc/ve4dS3FpjkUAg=="
+    "value": "2VGoKq1YnZjA31PC85hdQAwZYzDHd5cPSEdJa2jBJP4t1hYMAqpWdO26nzfB3uMPH5rXIKIUs/AD4FnIdrzqDQ=="
   }
 }

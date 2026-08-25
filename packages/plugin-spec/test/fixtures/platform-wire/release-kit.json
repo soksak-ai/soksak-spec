@@ -3,18 +3,18 @@
   "id": "terminal-common",
   "version": "0.0.1",
   "manifest": {
-    "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit.json",
+    "file": "kit.json",
     "size": 21,
     "sha256": "0cf721a91feef4213226b7c663b065674fc967ad7b09e98b7da32ed9f1def764"
   },
   "source": {
-    "repository": "https://github.com/example/terminal-common",
+    "repository": "https://github.com/soksak-ai/terminal-common",
     "commit": "cccccccccccccccccccccccccccccccccccccccc"
   },
   "artifacts": [
     {
       "target": "any",
-      "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/terminal-common-0.0.1.tgz",
+      "file": "terminal-common-0.0.1.tgz",
       "size": 12345,
       "sha256": "7777777777777777777777777777777777777777777777777777777777777777",
       "format": "tgz",
@@ -23,7 +23,7 @@
   ],
   "evidence": [
     {
-      "url": "https://github.com/example/terminal-common/releases/download/v0.0.1/kit-release.conformance.json",
+      "file": "kit-release.conformance.json",
       "size": 12345,
       "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
     }

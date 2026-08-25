@@ -33,6 +33,26 @@ describe("schema metadata and payload identity", () => {
     }
   });
 
+  it("keeps location out of every payload: files are bare names, releases are id, version, size, sha256", () => {
+    const keys = (value: unknown, out: string[] = []): string[] => {
+      if (Array.isArray(value)) value.forEach((item) => keys(item, out));
+      else if (value && typeof value === "object") for (const [key, item] of Object.entries(value)) { out.push(key); keys(item, out); }
+      return out;
+    };
+    const directory = join(root, "test/fixtures/platform-wire");
+    for (const name of readdirSync(directory).filter((file) => file.endsWith(".json"))) {
+      const value = JSON.parse(read(`test/fixtures/platform-wire/${name}`));
+      expect(keys(value), name).not.toContain("url");
+    }
+    const registry = JSON.parse(read("test/fixtures/platform-wire/registry.json"));
+    for (const plugin of registry.plugins) expect(Object.keys(plugin).sort()).toEqual(["id", "sha256", "size", "version"]);
+    for (const kind of ["plugin", "sidecar", "kit", "contract", "spec"]) {
+      const release = JSON.parse(read(`test/fixtures/platform-wire/release-${kind}.json`));
+      expect(release.manifest.file).toBe(`${kind}.json`);
+      for (const entry of [release.manifest, ...release.artifacts, ...release.evidence]) expect(entry.file, `${kind} ${entry.file}`).toMatch(/^[A-Za-z0-9._-]+$/);
+    }
+  });
+
   it("keeps the registry focused on authenticated plugins", () => {
     const registry = JSON.parse(read("test/fixtures/platform-wire/registry.json"));
     expect(Object.keys(registry).sort()).toEqual(["expiresAt", "id", "issuedAt", "plugins", "sequence", "signature"]);

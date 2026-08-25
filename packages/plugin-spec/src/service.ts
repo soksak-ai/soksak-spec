@@ -12,7 +12,7 @@ import {
   isNonEmptyString,
   isRecord,
 } from "./util.js";
-import type { ReleaseReference } from "./distribution.js";
+import type { ExactReference } from "./release.js";
 
 // 코어가 말하는 plugin service 와이어 계약(PS5·PS6). Rust 측 단일진실은
 // soksak-spec-service 크레이트 — 이 상수는 TS 표면 미러이며 교차언어 골든 테스트가
@@ -62,7 +62,7 @@ export const SERVICE_COMMAND_KEYS = [
 ] as const;
 
 // 서비스 선언(PS1·PS5·PS9·PS15) — interface와 구독만 선언한다. 실행 Sidecar는
-// runtimeDependencies.sidecars의 유일한 공통 release reference다.
+// runtimeDependencies.sidecars의 유일한 dependency intent { id, version } 다.
 export interface ServiceDecl {
   interface: ContractRequirement;
   subscribe: string[];
@@ -343,7 +343,7 @@ export function validateServiceRules(
     commands: ServiceCommandView[];
     schedules: ContributedSchedule[];
     codeBoundCounts: Record<string, number>; // views/overlays/nodes/fileViewers/iconSets → 개수
-    sidecars: ReleaseReference[];
+    sidecars: ExactReference[];
     permissions: readonly string[];
     entryIsNull: boolean;
   },

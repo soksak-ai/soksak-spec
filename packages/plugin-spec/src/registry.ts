@@ -1,9 +1,9 @@
-import { parseReleaseReference, parseRuntimeDependencies, type ReleaseReference, type RuntimeDependencies } from "./distribution.js";
+import { parseReleaseReference, type ReleaseReference } from "./distribution.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
-export interface RegistryPlugin extends ReleaseReference { runtimeDependencies?: RuntimeDependencies }
+// An index entry is one release reference; consumers walk the dependency closure through release.json.
 export interface Registry {
-  id: string; sequence: number; issuedAt: string; expiresAt: string; plugins: RegistryPlugin[];
+  id: string; sequence: number; issuedAt: string; expiresAt: string; plugins: ReleaseReference[];
   signature: { algorithm: "ed25519"; keyId: string; value: string };
 }
 export interface RegistryPublicKey { algorithm: "ed25519"; keyId: string; value: string }
@@ -38,16 +38,11 @@ export function parseRegistry(raw: unknown): { ok: true; value: Registry } | { o
   if (!Number.isSafeInteger(raw.sequence) || (raw.sequence as number) < 1) errors.push("registry.sequence: positive integer required");
   if (!validTime(raw.issuedAt)) errors.push("registry.issuedAt: canonical timestamp required");
   if (!validTime(raw.expiresAt) || (validTime(raw.issuedAt) && Date.parse(raw.expiresAt as string) <= Date.parse(raw.issuedAt))) errors.push("registry.expiresAt: later canonical timestamp required");
-  const plugins: RegistryPlugin[] = [];
+  const plugins: ReleaseReference[] = [];
   if (!Array.isArray(raw.plugins)) errors.push("registry.plugins: array required");
   else raw.plugins.forEach((item, index) => {
-    if (!isRecord(item)) { errors.push(`registry.plugins[${index}]: object required`); return; }
-    checkKnownKeys(item, ["id", "runtimeDependencies", "sha256", "size", "url", "version"], `registry.plugins[${index}]`, errors);
-    const reference = parseReleaseReference({ id: item.id, version: item.version, url: item.url, size: item.size, sha256: item.sha256 }, `registry.plugins[${index}]`);
-    if (!reference.ok) { errors.push(...reference.errors); return; }
-    let runtimeDependencies: RuntimeDependencies | undefined;
-    if (item.runtimeDependencies !== undefined) { const parsed = parseRuntimeDependencies(item.runtimeDependencies, `registry.plugins[${index}].runtimeDependencies`); if (parsed.ok) runtimeDependencies = parsed.value; else errors.push(...parsed.errors); }
-    plugins.push({ ...reference.value, ...(runtimeDependencies ? { runtimeDependencies } : {}) });
+    const reference = parseReleaseReference(item, `registry.plugins[${index}]`);
+    if (reference.ok) plugins.push(reference.value); else errors.push(...reference.errors);
   });
   const keys = plugins.map((plugin) => plugin.id);
   if (new Set(keys).size !== keys.length) errors.push("registry.plugins: one current release per plugin id required");

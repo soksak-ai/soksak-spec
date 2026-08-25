@@ -37,6 +37,11 @@ describe("portable platform wire artifacts", () => {
 
     expect(release.required).toContain("evidence");
     expect(release.$defs.reference.properties.version.$ref).toContain("version");
+    expect(release.$defs.reference.required).toEqual(["id", "version", "size", "sha256"]);
+    expect(release.$defs.integrity.required).toEqual(["file", "size", "sha256"]);
+    expect(release.$defs.artifact.required).toEqual(["file", "size", "sha256", "target", "format", "manifest"]);
+    for (const name of ["reference", "integrity", "artifact"]) expect(release.$defs[name].properties, name).not.toHaveProperty("url");
+    expect(release.$defs.integrity.properties.file.pattern).toBe(release.$defs.artifact.properties.file.pattern);
     expect(registry.properties.plugins.items.$ref).toContain("reference");
     expect(registry.properties).not.toHaveProperty("sidecars");
     expect(registry.properties).not.toHaveProperty(["un", "its"].join(""));
@@ -109,5 +114,13 @@ describe("portable platform wire artifacts", () => {
     const wrongManifest = json(join(FIXTURES, "release-plugin.json"));
     wrongManifest.artifacts[0].manifest = "sidecar.json";
     expect(validate(wrongManifest)).toBe(false);
+    for (const file of ["", ".", "..", "sub/plugin.json", "../plugin.json", "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz"]) {
+      const located = json(join(FIXTURES, "release-plugin.json"));
+      located.artifacts[0].file = file;
+      expect(validate(located), file).toBe(false);
+    }
+    const withUrl = json(join(FIXTURES, "release-plugin.json"));
+    withUrl.evidence[0].url = "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-kind.conformance.json";
+    expect(validate(withUrl)).toBe(false);
   });
 });

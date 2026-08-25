@@ -1,1 +1,1 @@
-{"expiresAt":"2026-07-15T00:00:00Z","id":"fixture","issuedAt":"2026-07-14T00:00:00Z","plugins":[{"id":"weather-plugin","sha256":"1111111111111111111111111111111111111111111111111111111111111111","size":12345,"url":"https://github.com/example/weather-plugin/releases/download/v0.0.1/release.json","version":"0.0.1"}],"sequence":42}
+{"expiresAt":"2026-07-15T00:00:00Z","id":"fixture","issuedAt":"2026-07-14T00:00:00Z","plugins":[{"id":"weather-plugin","sha256":"c3a19097723d41ac1babafd912e0a47df5f5830480ecf32fc80d840c33fe9dac","size":965,"version":"0.0.1"}],"sequence":42}

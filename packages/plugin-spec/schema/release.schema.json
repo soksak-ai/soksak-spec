@@ -10,7 +10,7 @@
     "id": { "$ref": "#/$defs/id" },
     "version": { "$ref": "#/$defs/version" },
     "manifest": { "$ref": "#/$defs/integrity" },
-    "source": { "type": "object", "additionalProperties": false, "required": ["repository", "commit"], "properties": { "repository": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" }, "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" } } },
+    "source": { "type": "object", "additionalProperties": false, "required": ["repository", "commit"], "properties": { "repository": { "type": "string", "pattern": "^https://github\\.com/soksak-ai/[a-z0-9][a-z0-9-]{0,127}$" }, "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" } } },
     "artifacts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/artifact" } },
     "runtimeDependencies": { "$ref": "#/$defs/runtimeDependencies" },
     "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/integrity" } }
@@ -26,9 +26,10 @@
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
     "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "integrity": { "type": "object", "additionalProperties": false, "required": ["url", "size", "sha256"], "properties": { "url": { "type": "string", "format": "uri" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
-    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version", "url", "size", "sha256"], "properties": { "id": { "$ref": "#/$defs/id" }, "version": { "$ref": "#/$defs/version" }, "url": { "type": "string", "format": "uri" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "file": { "type": "string", "pattern": "^(?!\\.\\.?$)[A-Za-z0-9._-]+$" },
+    "integrity": { "type": "object", "additionalProperties": false, "required": ["file", "size", "sha256"], "properties": { "file": { "$ref": "#/$defs/file" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "reference": { "type": "object", "additionalProperties": false, "required": ["id", "version", "size", "sha256"], "properties": { "id": { "$ref": "#/$defs/id" }, "version": { "$ref": "#/$defs/version" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
     "runtimeDependencies": { "type": "object", "additionalProperties": false, "minProperties": 1, "properties": { "plugins": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } }, "sidecars": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/reference" } } } },
-    "artifact": { "type": "object", "additionalProperties": false, "required": ["url", "size", "sha256", "target", "format", "manifest"], "properties": { "url": { "type": "string", "format": "uri" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "target": { "type": "string" }, "format": { "enum": ["tar.gz", "tgz"] }, "manifest": { "enum": ["plugin.json", "sidecar.json", "kit.json", "contract.json", "spec.json"] } } }
+    "artifact": { "type": "object", "additionalProperties": false, "required": ["file", "size", "sha256", "target", "format", "manifest"], "properties": { "file": { "$ref": "#/$defs/file" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" }, "target": { "type": "string" }, "format": { "enum": ["tar.gz", "tgz"] }, "manifest": { "enum": ["plugin.json", "sidecar.json", "kit.json", "contract.json", "spec.json"] } } }
   }
 }

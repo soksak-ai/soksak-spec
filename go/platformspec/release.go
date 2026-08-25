@@ -2,14 +2,18 @@ package platformspec
 
 import (
 	"fmt"
-	"net/url"
 	"regexp"
 	"sort"
-	"strings"
 )
 
+// GitHubOrg is the organization every release is published under:
+// source.repository is https://github.com/<GitHubOrg>/<id>.
+const GitHubOrg = "soksak-ai"
+
+// IntegrityReference names a file inside the same release directory.
+// File is a bare filename; the location is derived by the resolver.
 type IntegrityReference struct {
-	URL    string `json:"url"`
+	File   string `json:"file"`
 	Size   int64  `json:"size"`
 	SHA256 string `json:"sha256"`
 }
@@ -20,10 +24,14 @@ type ReleaseArtifact struct {
 	Manifest string `json:"manifest"`
 }
 type ReleaseSource struct{ Repository, Commit string }
+
+// ReleaseReference points at another release; Size and SHA256 are of that
+// release's release.json.
 type ReleaseReference struct {
 	ID      string `json:"id"`
 	Version string `json:"version"`
-	IntegrityReference
+	Size    int64  `json:"size"`
+	SHA256  string `json:"sha256"`
 }
 type RuntimeDependencies struct {
 	Plugins  []ReleaseReference `json:"plugins,omitempty"`
@@ -40,7 +48,9 @@ type ReleaseDocument struct {
 	Evidence            []IntegrityReference `json:"evidence"`
 }
 
-var githubRepositoryPattern = regexp.MustCompile(`^https://github[.]com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
+// releaseFilePattern is the file grammar of release.schema.json $defs.file; "." and ".."
+// are excluded in validateIntegrity.
+var releaseFilePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var nativeTargets = map[string]bool{
@@ -67,11 +77,11 @@ func ValidateReleaseManifest(value ReleaseDocument) error {
 	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) {
 		return fmt.Errorf("release requires component id and exact version")
 	}
-	if !githubRepositoryPattern.MatchString(value.Source.Repository) || !commitPattern.MatchString(value.Source.Commit) {
-		return fmt.Errorf("release requires canonical source")
+	if value.Source.Repository != "https://github.com/"+GitHubOrg+"/"+value.ID || !commitPattern.MatchString(value.Source.Commit) {
+		return fmt.Errorf("release requires the source https://github.com/%s/%s at an exact commit", GitHubOrg, value.ID)
 	}
 	manifest := value.Kind + ".json"
-	if err := validateIntegrity(value.Manifest, value.Source.Repository, value.Version); err != nil || !strings.HasSuffix(value.Manifest.URL, "/"+manifest) {
+	if err := validateIntegrity(value.Manifest); err != nil || value.Manifest.File != manifest {
 		return fmt.Errorf("invalid release manifest reference")
 	}
 	if len(value.Artifacts) == 0 || len(value.Evidence) == 0 {
@@ -79,7 +89,7 @@ func ValidateReleaseManifest(value ReleaseDocument) error {
 	}
 	targets := make([]string, 0, len(value.Artifacts))
 	for _, artifact := range value.Artifacts {
-		if err := validateIntegrity(artifact.IntegrityReference, value.Source.Repository, value.Version); err != nil || (artifact.Format != "tgz" && artifact.Format != "tar.gz") || artifact.Manifest != manifest {
+		if err := validateIntegrity(artifact.IntegrityReference); err != nil || (artifact.Format != "tgz" && artifact.Format != "tar.gz") || artifact.Manifest != manifest {
 			return fmt.Errorf("invalid release artifact")
 		}
 		if value.Kind == "sidecar" {
@@ -95,13 +105,13 @@ func ValidateReleaseManifest(value ReleaseDocument) error {
 		return fmt.Errorf("release artifact targets must be unique and sorted")
 	}
 	for _, evidence := range value.Evidence {
-		if err := validateIntegrity(evidence, value.Source.Repository, value.Version); err != nil {
+		if err := validateIntegrity(evidence); err != nil {
 			return fmt.Errorf("invalid release evidence")
 		}
 	}
 	if value.RuntimeDependencies != nil {
 		if value.Kind != "plugin" && value.Kind != "sidecar" {
-			return fmt.Errorf("runtime dependencies belong only to plugins and sidecars")
+			return fmt.Errorf("runtime dependencies are allowed only on plugins and sidecars")
 		}
 		if len(value.RuntimeDependencies.Plugins)+len(value.RuntimeDependencies.Sidecars) == 0 {
 			return fmt.Errorf("runtime dependencies cannot be empty")
@@ -116,18 +126,19 @@ func ValidateReleaseManifest(value ReleaseDocument) error {
 	return nil
 }
 
-func validateIntegrity(value IntegrityReference, repository, version string) error {
-	prefix := repository + "/releases/download/v" + version + "/"
-	parsed, err := url.Parse(value.URL)
-	if err != nil || !strings.HasPrefix(value.URL, prefix) || len(value.URL) <= len(prefix) || parsed.RawQuery != "" || parsed.Fragment != "" || value.Size <= 0 || !digestPattern.MatchString(value.SHA256) {
+func validateIntegrity(value IntegrityReference) error {
+	if !releaseFilePattern.MatchString(value.File) || value.File == "." || value.File == ".." || !validDigest(value.Size, value.SHA256) {
 		return fmt.Errorf("invalid integrity reference")
 	}
 	return nil
 }
+func validDigest(size int64, sha256 string) bool {
+	return size > 0 && digestPattern.MatchString(sha256)
+}
 func validateReferences(values []ReleaseReference, kind string) error {
 	keys := make([]string, 0, len(values))
 	for _, value := range values {
-		if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !strings.HasSuffix(value.URL, "/releases/download/v"+value.Version+"/release.json") || value.Size <= 0 || !digestPattern.MatchString(value.SHA256) {
+		if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !validDigest(value.Size, value.SHA256) {
 			return fmt.Errorf("invalid %s release reference", kind)
 		}
 		keys = append(keys, value.ID+"@"+value.Version)

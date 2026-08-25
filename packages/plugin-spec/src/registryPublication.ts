@@ -1,45 +1,49 @@
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
-import { canonicalRegistryPayload, parseRegistry, type RegistryPlugin } from "./registry.js";
-import { parseReleaseManifest, type ReleaseDocument } from "./release.js";
+import { canonicalRegistryPayload, parseRegistry } from "./registry.js";
+import { parseReleaseManifest, verifyReference, type ReleaseDocument, type ReleaseIdentity } from "./release.js";
 import type { ReleaseReference } from "./distribution.js";
 
-export interface ReadReleaseResult { bytes: Uint8Array; value: unknown }
-export type ReadRelease = (reference: ReleaseReference) => Promise<ReadReleaseResult>;
-interface UnsignedRegistry { id: string; sequence: number; issuedAt: string; expiresAt: string; plugins: RegistryPlugin[] }
+// Resolver interface: the bytes of release.json for one release reference { kind, id, version,
+// size, sha256 }. The reader derives the release directory and bounds the read by size; this
+// module verifies the bytes against the reference after the read.
+export type ReadRelease = (reference: ReleaseIdentity & ReleaseReference) => Promise<Uint8Array>;
+interface UnsignedRegistry { id: string; sequence: number; issuedAt: string; expiresAt: string; plugins: ReleaseReference[] }
 
-function digest(bytes: Uint8Array): string { return createHash("sha256").update(bytes).digest("hex"); }
 function referenceKey(reference: ReleaseReference): string { return `${reference.id}@${reference.version}`; }
-function assertReferenceBytes(reference: ReleaseReference, bytes: Uint8Array, verifyBytes: boolean): void {
-  if (!verifyBytes) return;
-  if (bytes.byteLength !== reference.size) throw new Error(`release size mismatch: ${referenceKey(reference)}`);
-  if (digest(bytes) !== reference.sha256) throw new Error(`release digest mismatch: ${referenceKey(reference)}`);
+function decode(bytes: Uint8Array, key: string): unknown {
+  try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { throw new Error(`invalid release ${key}: JSON required`); }
 }
-async function visit(reference: ReleaseReference, expectedKind: "plugin" | "sidecar", read: ReadRelease, verifyBytes: boolean, active: Set<string>, done: Map<string, ReleaseDocument>): Promise<ReleaseDocument> {
+// A visited release keeps its bytes: every later reference to it is verified against those bytes
+// (size and sha256) and its kind before reuse; a reference with a different digest refuses by name.
+interface Visited { document: ReleaseDocument; bytes: Uint8Array }
+async function visit(reference: ReleaseReference, kind: "plugin" | "sidecar", read: ReadRelease, active: Set<string>, done: Map<string, Visited>): Promise<ReleaseDocument> {
   const key = referenceKey(reference);
   if (active.has(key)) throw new Error(`runtime dependency cycle: ${[...active, key].join(" -> ")}`);
-  const existing = done.get(key); if (existing) return existing;
+  const existing = done.get(key);
+  if (existing) {
+    verifyReference(existing.bytes, reference);
+    if (existing.document.kind !== kind) throw new Error(`release kind mismatch: ${key} is ${existing.document.kind}, expected ${kind}`);
+    return existing.document;
+  }
   active.add(key);
-  const result = await read(reference); assertReferenceBytes(reference, result.bytes, verifyBytes);
-  const parsed = parseReleaseManifest(result.value); if (!parsed.ok) throw new Error(`invalid release ${key}: ${parsed.errors.join("; ")}`);
-  if (parsed.value.kind !== expectedKind) throw new Error(`release kind mismatch: ${key} is ${parsed.value.kind}, expected ${expectedKind}`);
+  const bytes = await read({ kind, id: reference.id, version: reference.version, size: reference.size, sha256: reference.sha256 });
+  verifyReference(bytes, reference);
+  const parsed = parseReleaseManifest(decode(bytes, key)); if (!parsed.ok) throw new Error(`invalid release ${key}: ${parsed.errors.join("; ")}`);
+  if (parsed.value.kind !== kind) throw new Error(`release kind mismatch: ${key} is ${parsed.value.kind}, expected ${kind}`);
   if (parsed.value.id !== reference.id || parsed.value.version !== reference.version) throw new Error(`release identity mismatch: ${key}`);
-  for (const dependency of parsed.value.runtimeDependencies?.plugins ?? []) await visit(dependency, "plugin", read, verifyBytes, active, done);
-  for (const dependency of parsed.value.runtimeDependencies?.sidecars ?? []) await visit(dependency, "sidecar", read, verifyBytes, active, done);
-  active.delete(key); done.set(key, parsed.value); return parsed.value;
+  for (const dependency of parsed.value.runtimeDependencies?.plugins ?? []) await visit(dependency, "plugin", read, active, done);
+  for (const dependency of parsed.value.runtimeDependencies?.sidecars ?? []) await visit(dependency, "sidecar", read, active, done);
+  active.delete(key); done.set(key, { document: parsed.value, bytes }); return parsed.value;
 }
-export async function verifyReleaseClosure(plugins: ReleaseReference[], read: ReadRelease, verifyBytes = true): Promise<void> {
-  const done = new Map<string, ReleaseDocument>();
-  for (const plugin of plugins) await visit(plugin, "plugin", read, verifyBytes, new Set(), done);
+export async function verifyReleaseClosure(plugins: ReleaseReference[], read: ReadRelease): Promise<void> {
+  const done = new Map<string, Visited>();
+  for (const plugin of plugins) await visit(plugin, "plugin", read, new Set(), done);
 }
-export async function buildRegistry(input: { id: string; sequence: number; issuedAt: string; expiresAt: string; plugins: ReleaseReference[]; read: ReadRelease; verifyBytes?: boolean }): Promise<UnsignedRegistry> {
+export async function buildRegistry(input: { id: string; sequence: number; issuedAt: string; expiresAt: string; plugins: ReleaseReference[]; read: ReadRelease }): Promise<UnsignedRegistry> {
   const plugins = [...input.plugins].sort((left, right) => left.id.localeCompare(right.id));
   if (new Set(plugins.map((plugin) => plugin.id)).size !== plugins.length) throw new Error("one current release per plugin id required");
-  const projected: RegistryPlugin[] = []; const done = new Map<string, ReleaseDocument>();
-  for (const plugin of plugins) {
-    const release = await visit(plugin, "plugin", input.read, input.verifyBytes ?? true, new Set(), done);
-    projected.push({ ...plugin, ...(release.runtimeDependencies ? { runtimeDependencies: release.runtimeDependencies } : {}) });
-  }
-  return { id: input.id, sequence: input.sequence, issuedAt: input.issuedAt, expiresAt: input.expiresAt, plugins: projected };
+  await verifyReleaseClosure(plugins, input.read);
+  return { id: input.id, sequence: input.sequence, issuedAt: input.issuedAt, expiresAt: input.expiresAt, plugins: plugins.map((plugin) => ({ id: plugin.id, version: plugin.version, size: plugin.size, sha256: plugin.sha256 })) };
 }
 export function authenticateRegistry(registry: UnsignedRegistry, seedBase64: string) {
   const seed = Buffer.from(seedBase64, "base64"); if (seed.length !== 32) throw new Error("registry signing seed must contain 32 bytes");

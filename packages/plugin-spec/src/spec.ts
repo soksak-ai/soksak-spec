@@ -70,7 +70,7 @@ import { COMPONENT_ID_RE } from "./release-primitives.js";
 export * from "./release-primitives.js";
 export * from "./buildDependencies.js";
 export * from "./distribution.js";
-import { parseRuntimeDependencies, type RuntimeDependencies } from "./distribution.js";
+import { parseRuntimeDependencyIntents, type RuntimeDependencyIntents } from "./distribution.js";
 export * from "./release.js";
 export * from "./sidecar.js";
 export * from "./conformanceWire.js";
@@ -331,7 +331,7 @@ export interface PluginManifest {
   requiresNativeChildWebview?: boolean;
   requiresEngineModules?: boolean;
   template?: boolean; // true = 개발 템플릿(읽기 전용). 활성화 대상이 아니다 — 목록·상세만 노출하고 토글을 주지 않는다.
-  runtimeDependencies?: RuntimeDependencies;
+  runtimeDependencies?: RuntimeDependencyIntents;
   // 외부 CLI/라이브러리 종속성 — 동의 후 미설치면 강제 설치. dependencies(플러그인↔플러그인)와 별개 축.
   libraries?: LibraryDep[];
   // plugin service 선언(제3 실행 형태 — 규범 docs/PLUGIN-SERVICE.md). sidecar 는 runtimeDependencies.sidecars
@@ -636,9 +636,9 @@ export function parseManifest(
     errors.push("template: true/false 여야 함");
   }
 
-  let runtimeDependencies: RuntimeDependencies | undefined;
+  let runtimeDependencies: RuntimeDependencyIntents | undefined;
   if (raw.runtimeDependencies !== undefined) {
-    const parsed = parseRuntimeDependencies(raw.runtimeDependencies);
+    const parsed = parseRuntimeDependencyIntents(raw.runtimeDependencies);
     if (parsed.ok) {
       runtimeDependencies = parsed.value;
       if (parsed.value.plugins?.some((dependency) => dependency.id === raw.id)) errors.push("runtimeDependencies.plugins: self dependency forbidden");

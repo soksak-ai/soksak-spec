@@ -15,11 +15,17 @@ export const RELEASE_KINDS = ["contract", "kit", "plugin", "sidecar", "spec"] as
 export type ReleaseKind = (typeof RELEASE_KINDS)[number];
 
 // Component identity is flat because registry identity is qualified separately.
-// A third-party author does not need a soksak prefix.
 export const COMPONENT_ID_RE = /^[a-z0-9][a-z0-9-]{0,127}$/;
+// Bare filename inside a release directory: no separator, not "." or "..". Same pattern as
+// release.schema.json $defs.file. Every release asset name is validated by this grammar.
+export const RELEASE_FILE_RE = /^(?!\.\.?$)[A-Za-z0-9._-]+$/;
 
 export const SHA256_RE = /^[a-f0-9]{64}$/;
 export const GIT_COMMIT_RE = /^[a-f0-9]{40}$/;
+
+// Every release is published under this GitHub organization: source.repository is
+// https://github.com/<GITHUB_ORG>/<id> and the release directory is derived from it.
+export const GITHUB_ORG = "soksak-ai";
 
 export const ANY_TARGET = "any" as const;
 export const RUST_SIDECAR_TARGETS = [
@@ -87,109 +93,4 @@ export function isSafeRelativeArtifactPath(value: unknown): value is string {
     !/[<>:"\\|?*]/.test(part) &&
     !isWindowsReservedPathSegment(part)
   );
-}
-
-export interface GithubRepositoryParts {
-  owner: string;
-  repository: string;
-}
-
-const GITHUB_OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
-const GITHUB_REPOSITORY_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
-const RELEASE_ASSET_RE = /^[a-z0-9][a-z0-9._-]{0,254}$/;
-
-export function parseCanonicalGithubRepository(value: unknown): GithubRepositoryParts | null {
-  if (typeof value !== "string") return null;
-  try {
-    const url = new URL(value);
-    if (
-      url.protocol !== "https:" ||
-      url.hostname !== "github.com" ||
-      url.port !== "" ||
-      url.username !== "" ||
-      url.password !== "" ||
-      url.search !== "" ||
-      url.hash !== "" ||
-      url.toString() !== value
-    ) {
-      return null;
-    }
-    const parts = url.pathname.split("/").filter(Boolean);
-    if (
-      parts.length !== 2 ||
-      url.pathname !== `/${parts[0]}/${parts[1]}` ||
-      !GITHUB_OWNER_RE.test(parts[0]) ||
-      !GITHUB_REPOSITORY_RE.test(parts[1]) ||
-      parts[1].endsWith(".git")
-    ) {
-      return null;
-    }
-    return { owner: parts[0], repository: parts[1] };
-  } catch {
-    return null;
-  }
-}
-
-export interface GithubReleaseAssetParts extends GithubRepositoryParts {
-  releaseTag: string;
-  asset: string;
-}
-
-// Kept separate from URL parsing so release.ts can bind owner/repository/tag to the
-// parsed owner manifest instead of treating a URL as self-authenticating.
-export function parseCanonicalGithubReleaseAssetUrl(value: unknown): GithubReleaseAssetParts | null {
-  if (typeof value !== "string") return null;
-  try {
-    const url = new URL(value);
-    if (
-      url.protocol !== "https:" ||
-      url.hostname !== "github.com" ||
-      url.port !== "" ||
-      url.username !== "" ||
-      url.password !== "" ||
-      url.search !== "" ||
-      url.hash !== "" ||
-      url.toString() !== value
-    ) {
-      return null;
-    }
-    const parts = url.pathname.split("/").filter(Boolean);
-    if (parts.length !== 6 || parts[2] !== "releases" || parts[3] !== "download") return null;
-    const owner = parts[0];
-    const repository = parts[1];
-    const releaseTag = decodeURIComponent(parts[4]);
-    const asset = decodeURIComponent(parts[5]);
-    if (
-      parts[4] !== releaseTag ||
-      parts[5] !== asset ||
-      url.pathname !== `/${owner}/${repository}/releases/download/${releaseTag}/${asset}` ||
-      !GITHUB_OWNER_RE.test(owner) ||
-      !GITHUB_REPOSITORY_RE.test(repository) ||
-      repository.endsWith(".git") ||
-      releaseTag.length === 0 ||
-      !RELEASE_ASSET_RE.test(asset)
-    ) {
-      return null;
-    }
-    return { owner, repository, releaseTag, asset };
-  } catch {
-    return null;
-  }
-}
-
-export function releaseTagMatches(id: string, version: string, tag: unknown): tag is string {
-  return typeof tag === "string" && (tag === `v${version}` || tag === `${id}-v${version}`);
-}
-
-export function githubReleaseAssetBelongsTo(
-  url: unknown,
-  repository: string,
-  releaseTag: string,
-): boolean {
-  const source = parseCanonicalGithubRepository(repository);
-  const asset = parseCanonicalGithubReleaseAssetUrl(url);
-  return !!source && !!asset &&
-    source.owner === asset.owner &&
-    source.repository === asset.repository &&
-    asset.releaseTag === releaseTag;
 }

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { parseManifest, PLUGIN_ID_RE, PROGRAM_PLATFORMS } from "../src/spec.js";
+import * as primitives from "../src/release-primitives.js";
 import {
   ANY_TARGET,
   RUST_SIDECAR_TARGETS,
   STRICT_SEMVER_RE,
   COMPONENT_ID_RE,
+  GITHUB_ORG,
   RELEASE_KINDS,
   ARTIFACT_TARGETS,
-  parseCanonicalGithubReleaseAssetUrl,
-  parseCanonicalGithubRepository,
   isSafeRelativeArtifactPath,
   isDependencyRange,
 } from "../src/release-primitives.js";
@@ -76,34 +76,34 @@ describe("public plugin, sidecar, and kit identity source", () => {
     }
   });
 
-  it("accepts exactly one canonical spelling for GitHub repositories and release assets", () => {
-    expect(parseCanonicalGithubRepository("https://github.com/example/weather")).toEqual({
-      owner: "example",
-      repository: "weather",
-    });
-    for (const value of [
-      "https://github.com/example/weather/",
-      "https://github.com//example/weather",
-      "https://github.com/example//weather",
-    ]) {
-      expect(parseCanonicalGithubRepository(value), value).toBeNull();
-    }
-
-    const asset =
-      "https://github.com/example/weather/releases/download/v1.0.0/weather-1.0.0.tgz";
-    expect(parseCanonicalGithubReleaseAssetUrl(asset)).toMatchObject({
-      owner: "example",
-      repository: "weather",
-      releaseTag: "v1.0.0",
-      asset: "weather-1.0.0.tgz",
-    });
-    for (const value of [
-      `${asset}/`,
-      asset.replace("/releases/", "//releases/"),
-      asset.replace("/download/", "//download/"),
-    ]) {
-      expect(parseCanonicalGithubReleaseAssetUrl(value), value).toBeNull();
-    }
+  it("defines the GitHub org once and exports exactly the release primitives", () => {
+    expect(GITHUB_ORG).toBe("soksak-ai");
+    expect(Object.keys(primitives).sort()).toEqual([
+      "ANY_TARGET",
+      "ARTIFACT_FORMATS",
+      "ARTIFACT_TARGETS",
+      "COMPONENT_ID_RE",
+      "GITHUB_ORG",
+      "GIT_COMMIT_RE",
+      "MAX_DEPENDENCY_CLAUSES",
+      "MAX_DEPENDENCY_RANGE_LENGTH",
+      "MAX_SEMVER_LENGTH",
+      "PORTABLE_ARCHIVE_PATH_MAX_BYTES",
+      "PORTABLE_ARCHIVE_SEGMENT_MAX_BYTES",
+      "RELEASE_FILE_RE",
+      "RELEASE_KINDS",
+      "RUST_SIDECAR_TARGETS",
+      "SHA256_RE",
+      "STRICT_SEMVER_PATTERN",
+      "STRICT_SEMVER_RE",
+      "isArtifactFormat",
+      "isArtifactTarget",
+      "isDependencyRange",
+      "isReleaseKind",
+      "isRustSidecarTarget",
+      "isSafeRelativeArtifactPath",
+      "isStrictSemver",
+    ]);
   });
 
   it("keeps source identity solely in the owner release manifest", () => {
@@ -127,12 +127,27 @@ describe("public plugin, sidecar, and kit identity source", () => {
       version: "1.0.0",
       appVersionRequirement: "0.0.1",
       description: "Weather plugin",
-      runtimeDependencies: { plugins: [{ id: "weather-data", version, url: `https://github.com/example/weather-data/releases/download/v${version}/release.json`, size: 1, sha256: "a".repeat(64) }] },
+      runtimeDependencies: { plugins: [{ id: "weather-data", version }] },
       permissions: [],
       contributes: {},
     });
     expect(parseManifest(manifest("0.0.1"), "weather").validation.ok).toBe(true);
     expect(parseManifest(manifest(">=0.0.1 <1.0.0"), "weather").validation.ok).toBe(false);
+  });
+
+  it("keeps location and integrity out of manifest runtime dependencies", () => {
+    const manifest = (dependency: Record<string, unknown>) => ({
+      id: "weather",
+      name: "Weather",
+      version: "1.0.0",
+      appVersionRequirement: "0.0.1",
+      description: "Weather plugin",
+      runtimeDependencies: { plugins: [dependency] },
+      permissions: [],
+      contributes: {},
+    });
+    expect(parseManifest(manifest({ id: "weather-data", version: "0.0.1", size: 1, sha256: "a".repeat(64) }), "weather").validation.ok).toBe(false);
+    expect(parseManifest(manifest({ id: "weather-data", version: "0.0.1", url: "https://github.com/soksak-ai/weather-data/releases/download/v0.0.1/release.json" }), "weather").validation.ok).toBe(false);
   });
 
   it("keeps sidecar artifact location solely in the owner release manifest", () => {

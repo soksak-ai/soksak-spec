@@ -3,18 +3,18 @@
   "id": "weather-plugin",
   "version": "0.0.1",
   "manifest": {
-    "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin.json",
+    "file": "plugin.json",
     "size": 24,
     "sha256": "e0b4f06af96f48d98fc90ddd21f8157ec3959db28d9439d1a725ee6800c45222"
   },
   "source": {
-    "repository": "https://github.com/example/weather-plugin",
+    "repository": "https://github.com/soksak-ai/weather-plugin",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "artifacts": [
     {
       "target": "any",
-      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/weather-plugin-0.0.1.tgz",
+      "file": "weather-plugin-0.0.1.tgz",
       "size": 12345,
       "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "format": "tgz",
@@ -23,12 +23,12 @@
   ],
   "evidence": [
     {
-      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-kind.conformance.json",
+      "file": "plugin-kind.conformance.json",
       "size": 12345,
       "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
     },
     {
-      "url": "https://github.com/example/weather-plugin/releases/download/v0.0.1/plugin-release.conformance.json",
+      "file": "plugin-release.conformance.json",
       "size": 12345,
       "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
     }

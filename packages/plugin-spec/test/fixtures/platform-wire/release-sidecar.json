@@ -3,18 +3,18 @@
   "id": "weather-sidecar",
   "version": "0.0.1",
   "manifest": {
-    "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/sidecar.json",
+    "file": "sidecar.json",
     "size": 25,
     "sha256": "ed1a4fd8a8d169758eae6ec9db5155d34150ab4f184ecb6549267b885672a9ef"
   },
   "source": {
-    "repository": "https://github.com/example/weather-sidecar",
+    "repository": "https://github.com/soksak-ai/weather-sidecar",
     "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   },
   "artifacts": [
     {
       "target": "aarch64-apple-darwin",
-      "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-aarch64-apple-darwin.tar.gz",
+      "file": "weather-sidecar-aarch64-apple-darwin.tar.gz",
       "size": 12345,
       "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
       "format": "tar.gz",
@@ -22,7 +22,7 @@
     },
     {
       "target": "x86_64-unknown-linux-gnu",
-      "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/weather-sidecar-x86_64-unknown-linux-gnu.tar.gz",
+      "file": "weather-sidecar-x86_64-unknown-linux-gnu.tar.gz",
       "size": 12345,
       "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "format": "tar.gz",
@@ -31,17 +31,17 @@
   ],
   "evidence": [
     {
-      "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/sidecar-interface.conformance.json",
+      "file": "sidecar-interface.conformance.json",
       "size": 12345,
       "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
     },
     {
-      "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/sidecar-kind.conformance.json",
+      "file": "sidecar-kind.conformance.json",
       "size": 12345,
       "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
     },
     {
-      "url": "https://github.com/example/weather-sidecar/releases/download/v0.0.1/sidecar-release.conformance.json",
+      "file": "sidecar-release.conformance.json",
       "size": 12345,
       "sha256": "1010101010101010101010101010101010101010101010101010101010101010"
     }
