@@ -132,3 +132,23 @@ func TestRegistryAndLocalStillRequireArtifactDigest(t *testing.T) {
 		}
 	}
 }
+
+// A sidecar declares which version of its wire it implements. The grammar bounds the shape of that
+// declaration, not the number: a parser that pinned one number would refuse every unit the day a
+// wire moved, and which numbers exist is the wire contract's to say, not this grammar's.
+func TestSidecarManifestAcceptsAnyStrictInterfaceVersion(t *testing.T) {
+	manifest := func(version string) []byte {
+		return []byte(`{"id":"unit","version":"0.0.14","interface":{"id":"wire","version":"` +
+			version + `"},"process":"dist/unit"}`)
+	}
+	for _, version := range []string{"0.0.1", "0.0.2", "1.2.3", "0.0.2-rc.1"} {
+		if _, err := ParseSidecarManifest(manifest(version)); err != nil {
+			t.Errorf("interface %s: %v", version, err)
+		}
+	}
+	for _, version := range []string{"", "v0.0.2", "0.0", "0.0.02"} {
+		if _, err := ParseSidecarManifest(manifest(version)); err == nil {
+			t.Errorf("interface %q was accepted", version)
+		}
+	}
+}
