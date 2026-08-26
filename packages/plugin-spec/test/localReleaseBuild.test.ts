@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { buildLocalRelease } from "../release-template/local-release-build.mjs";
+import { buildLocalRelease, removeWorkDirectory } from "../release-template/local-release-build.mjs";
 import { runLocalRelease } from "../release-template/local-release.mjs";
 import { inspectLocalRelease } from "../release-template/local-release-store.mjs";
 import { releaseDirectory } from "../release-template/resolve-release.mjs";
@@ -171,5 +171,16 @@ describe("local release owner tools", () => {
     } finally {
       process.env.PATH = previous;
     }
+  });
+});
+
+describe("local release work directory", () => {
+  it("retries the cleanup and names the leftover directory next to the published result", () => {
+    const calls: number[] = [];
+    const remove = (directory: string) => { calls.push(calls.length); if (calls.length < 3) { const error = new Error("ENOTEMPTY") as NodeJS.ErrnoException; error.code = "ENOTEMPTY"; throw error; } };
+    expect(removeWorkDirectory("/tmp/work", { state: "published" }, remove)).toEqual({ state: "published" });
+    expect(calls.length).toBe(3);
+    const stuck = () => { const error = new Error("ENOTEMPTY") as NodeJS.ErrnoException; error.code = "ENOTEMPTY"; throw error; };
+    expect(() => removeWorkDirectory("/tmp/work", { state: "published" }, stuck)).toThrow(/published.*\/tmp\/work/s);
   });
 });

@@ -101,6 +101,8 @@ function assembleSidecar(root, commit, targets, work, env) {
 export function buildLocalRelease({ store, source, targets = [], registry, template = path.dirname(fileURLToPath(import.meta.url)) }) {
   const verify = ["verify", ...(registry === undefined ? [] : [`REGISTRY=${registry}`])];
   let env = ownerEnvironment;
+  let result;
+  let failure;
   if (!path.isAbsolute(store) || !path.isAbsolute(source)) throw new Error("store and source must be absolute");
   const sourceRoot = fs.realpathSync(source);
   if (run("git", ["status", "--porcelain"], sourceRoot) !== "") throw new Error("owner source must be clean");
@@ -117,6 +119,22 @@ export function buildLocalRelease({ store, source, targets = [], registry, templ
     else if (kind === "kit" || kind === "contract") { release = path.join(work, "release"); run("make", verify, checkout, env); fs.mkdirSync(release); run(process.execPath, [path.join(template, "build-portable-release.mjs"), "--commit", commit, "--out", release], checkout); }
     else if (kind === "spec") { run("make", verify, checkout, env); release = path.join(checkout, "artifacts"); }
     else release = assembleSidecar(checkout, commit, targets, work, env);
-    return publishLocalRelease({ store, release });
-  } finally { fs.rmSync(work, { recursive: true, force: true }); }
+    result = publishLocalRelease({ store, release });
+  } catch (error) { failure = error; }
+  // A build failure and a cleanup failure are two facts; neither hides the other.
+  try { removeWorkDirectory(work, result); }
+  catch (error) { throw failure === undefined ? error : new Error(`${failure instanceof Error ? failure.message : String(failure)}\n${error instanceof Error ? error.message : String(error)}`); }
+  if (failure !== undefined) throw failure;
+  return result;
+}
+
+// The work directory is removed after the build. macOS returns ENOTEMPTY when a process the build
+// started is still writing there; the removal is retried, and a directory that stays is named next
+// to the result so a published release is not reported as a failure without its state.
+export function removeWorkDirectory(work, result, remove = (directory) => fs.rmSync(directory, { recursive: true, force: true })) {
+  let failure;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try { remove(work); return result; } catch (error) { failure = error; }
+  }
+  throw new Error(`release ${JSON.stringify(result)}; work directory could not be removed: ${work}: ${failure instanceof Error ? failure.message : String(failure)}`);
 }
