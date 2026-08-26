@@ -155,3 +155,21 @@ describe("local release command entry", () => {
     expect(() => runLocalRelease(["build", "--store", store, "--source", source, "--registry", "localhost:4873"])).toThrow(/--registry must be an absolute http\(s\) URL/);
   });
 });
+
+describe("local release owner tools", () => {
+  it("hands the owner's make the validator this package ships, ahead of any soksak-validate on PATH", () => {
+    // An owner preflight calls soksak-validate by name; in Actions the spec package is installed
+    // globally, locally the local release tool supplies its own bin.
+    write("Makefile", "verify:\n\t@soksak-validate --help >/dev/null || exit 78\n\t@test -f plugin.json\n");
+    commit();
+    const shadow = path.join(root, "shadow"); fs.mkdirSync(shadow);
+    fs.writeFileSync(path.join(shadow, "soksak-validate"), "#!/bin/sh\necho 'other tool' >&2; exit 2\n", { mode: 0o755 });
+    const previous = process.env.PATH;
+    process.env.PATH = `${shadow}:${previous}`;
+    try {
+      expect(buildLocalRelease({ store, source })).toMatchObject({ state: "published", kind: "plugin" });
+    } finally {
+      process.env.PATH = previous;
+    }
+  });
+});

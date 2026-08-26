@@ -17,7 +17,7 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 // The owner's make receives only the variables named on its command line: GNU make would otherwise
 // read the calling make's command-line variables from MAKEFLAGS and treat them as its own.
 const { MAKEFLAGS: _makeflags, MFLAGS: _mflags, GNUMAKEFLAGS: _gnumakeflags, ...ownerEnvironment } = process.env;
-function run(command, args, cwd) { const result = spawnSync(command, args, { cwd, encoding: "utf8", env: ownerEnvironment }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}${result.stderr}`); return result.stdout.trim(); }
+function run(command, args, cwd, env = ownerEnvironment) { const result = spawnSync(command, args, { cwd, encoding: "utf8", env }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}${result.stderr}`); return result.stdout.trim(); }
 function read(pathname) { const info = fs.lstatSync(pathname); if (info.isSymbolicLink() || !info.isFile()) throw new Error(`regular file required: ${pathname}`); return fs.readFileSync(pathname); }
 // Every file name the release document records or the build writes satisfies the release file grammar.
 function releaseFile(name) { if (!RELEASE_FILE_RE.test(name)) throw new Error(`release file name is invalid: ${name}`); return name; }
@@ -63,7 +63,17 @@ function packageSidecarStage({ source, manifest, stage, target, output }) {
   for (const name of licenses) fs.copyFileSync(path.join(source, name), path.join(output, name), fs.constants.COPYFILE_EXCL);
 }
 
-function assembleSidecar(root, commit, targets, work) {
+// An owner preflight calls soksak-validate by name. Actions install the spec package globally; the
+// local build supplies the validator this package ships, ahead of anything else on PATH.
+function ownerTools(work, template) {
+  const bin = path.join(work, "bin");
+  fs.mkdirSync(bin);
+  const validator = path.resolve(template, "..", "bin", "validate.mjs");
+  fs.writeFileSync(path.join(bin, "soksak-validate"), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(validator)} "$@"\n`, { mode: 0o755 });
+  return { ...ownerEnvironment, PATH: `${bin}${path.delimiter}${ownerEnvironment.PATH ?? ""}` };
+}
+
+function assembleSidecar(root, commit, targets, work, env) {
   if (targets.length === 0 || new Set(targets).size !== targets.length) throw new Error("Sidecar build requires unique --target values");
   const manifest = JSON.parse(read(path.join(root, "sidecar.json")));
   const output = path.join(work, "release"); fs.mkdirSync(output);
@@ -72,8 +82,8 @@ function assembleSidecar(root, commit, targets, work) {
     const name = releaseFile(`${manifest.id}-${manifest.version}-${target}.tar.gz`);
     const stage = path.join(work, `stage-${target}`); const packaged = path.join(work, `package-${target}`);
     fs.mkdirSync(stage); fs.mkdirSync(packaged);
-    run("make", ["verify", `TARGET=${target}`], root);
-    run("make", ["stage", `TARGET=${target}`, `OUT=${stage}`], root);
+    run("make", ["verify", `TARGET=${target}`], root, env);
+    run("make", ["stage", `TARGET=${target}`, `OUT=${stage}`], root, env);
     packageSidecarStage({ source: root, manifest, stage, target, output: packaged });
     const packed = packSidecarTarget({ source: packaged, target, out: path.join(output, name) });
     artifacts.push({ target, file: name, size: packed.size, sha256: packed.sha256, format: "tar.gz", manifest: "sidecar.json" });
@@ -90,6 +100,7 @@ function assembleSidecar(root, commit, targets, work) {
 // over as the command-line variable REGISTRY; an owner without such packages ignores it.
 export function buildLocalRelease({ store, source, targets = [], registry, template = path.dirname(fileURLToPath(import.meta.url)) }) {
   const verify = ["verify", ...(registry === undefined ? [] : [`REGISTRY=${registry}`])];
+  let env = ownerEnvironment;
   if (!path.isAbsolute(store) || !path.isAbsolute(source)) throw new Error("store and source must be absolute");
   const sourceRoot = fs.realpathSync(source);
   if (run("git", ["status", "--porcelain"], sourceRoot) !== "") throw new Error("owner source must be clean");
@@ -99,12 +110,13 @@ export function buildLocalRelease({ store, source, targets = [], registry, templ
   try {
     run("git", ["clone", "--quiet", "--no-local", sourceRoot, checkout], work);
     if (run("git", ["rev-parse", "HEAD"], checkout) !== commit) throw new Error("local build clone commit mismatch");
+    env = ownerTools(work, template);
     const kind = kindOf(checkout); let release;
     // A local Plugin build composes its runtime dependencies against the store it publishes into.
-    if (kind === "plugin") { release = path.join(work, "release"); run("make", verify, checkout); run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", release, "--store", store], checkout); }
-    else if (kind === "kit" || kind === "contract") { release = path.join(work, "release"); run("make", verify, checkout); fs.mkdirSync(release); run(process.execPath, [path.join(template, "build-portable-release.mjs"), "--commit", commit, "--out", release], checkout); }
-    else if (kind === "spec") { run("make", verify, checkout); release = path.join(checkout, "artifacts"); }
-    else release = assembleSidecar(checkout, commit, targets, work);
+    if (kind === "plugin") { release = path.join(work, "release"); run("make", verify, checkout, env); run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", release, "--store", store], checkout); }
+    else if (kind === "kit" || kind === "contract") { release = path.join(work, "release"); run("make", verify, checkout, env); fs.mkdirSync(release); run(process.execPath, [path.join(template, "build-portable-release.mjs"), "--commit", commit, "--out", release], checkout); }
+    else if (kind === "spec") { run("make", verify, checkout, env); release = path.join(checkout, "artifacts"); }
+    else release = assembleSidecar(checkout, commit, targets, work, env);
     return publishLocalRelease({ store, release });
   } finally { fs.rmSync(work, { recursive: true, force: true }); }
 }
