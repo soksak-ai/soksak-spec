@@ -175,6 +175,20 @@ describe("local release owner tools", () => {
 });
 
 describe("local release work directory", () => {
+  it.skipIf(process.platform === "win32")("removes owner output sealed read-only by its gate", () => {
+    const work = path.join(root, "readonly-work");
+    const sealed = path.join(work, "sealed");
+    fs.mkdirSync(sealed, { recursive: true });
+    fs.writeFileSync(path.join(sealed, "artifact"), "verified\n");
+    fs.chmodSync(sealed, 0o555);
+    try {
+      expect(removeWorkDirectory(work, { state: "published" })).toEqual({ state: "published" });
+      expect(fs.existsSync(work)).toBe(false);
+    } finally {
+      if (fs.existsSync(sealed)) fs.chmodSync(sealed, 0o755);
+    }
+  });
+
   it("retries the cleanup and names the leftover directory next to the published result", () => {
     const calls: number[] = [];
     const remove = (directory: string) => { calls.push(calls.length); if (calls.length < 3) { const error = new Error("ENOTEMPTY") as NodeJS.ErrnoException; error.code = "ENOTEMPTY"; throw error; } };

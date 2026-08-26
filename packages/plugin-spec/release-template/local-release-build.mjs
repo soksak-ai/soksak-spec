@@ -44,6 +44,20 @@ function copyRegularTree(from, to) {
   else throw new Error(`sidecar stage contains a non-regular entry: ${from}`);
 }
 
+function makeTreeOwnerWritable(pathname) {
+  const info = fs.lstatSync(pathname);
+  if (info.isSymbolicLink()) return;
+  if (info.isDirectory()) {
+    fs.chmodSync(pathname, info.mode | 0o700);
+    for (const name of fs.readdirSync(pathname)) makeTreeOwnerWritable(path.join(pathname, name));
+  } else if (info.isFile()) fs.chmodSync(pathname, info.mode | 0o600);
+}
+
+function removeWorkTree(directory) {
+  if (fs.existsSync(directory)) makeTreeOwnerWritable(directory);
+  fs.rmSync(directory, { recursive: true, force: true });
+}
+
 // make stage TARGET=<target> OUT=<stage> writes sidecar.json and the process binary, flat, into
 // the stage. The package for one target is sidecar.json, dist/<everything else staged>, and the
 // source license files.
@@ -128,10 +142,8 @@ export function buildLocalRelease({ store, source, targets = [], registry, templ
   return result;
 }
 
-// The work directory is removed after the build. macOS returns ENOTEMPTY when a process the build
-// started is still writing there; the removal is retried, and a directory that stays is named next
-// to the result so a published release is not reported as a failure without its state.
-export function removeWorkDirectory(work, result, remove = (directory) => fs.rmSync(directory, { recursive: true, force: true })) {
+// Owner gates may seal verified artifacts read-only; cleanup restores owner access before removal.
+export function removeWorkDirectory(work, result, remove = removeWorkTree) {
   let failure;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try { remove(work); return result; } catch (error) { failure = error; }
