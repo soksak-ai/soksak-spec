@@ -131,3 +131,18 @@ func TestReleaseManifestRuntimeDependenciesAreReleaseReferences(t *testing.T) {
 	kit["runtimeDependencies"] = map[string]any{"plugins": []any{reference("a-plugin")}}
 	rejects(t, "runtime dependencies on kit", kit)
 }
+
+// IsReleaseFile is the file grammar of release.schema.json $defs.file, exported for a
+// consumer that receives a bare file name outside a release document.
+func TestIsReleaseFileIsTheOneFileGrammar(t *testing.T) {
+	for _, file := range []string{"", ".", "..", "a b", "x?y", "x#y", "réport.json", "dist/view.tgz", "../view.tgz", "view~1.tgz", "https://github.com/soksak-ai/view/releases/download/v0.0.1/view.tgz"} {
+		if IsReleaseFile(file) {
+			t.Errorf("file %q accepted", file)
+		}
+	}
+	for _, file := range []string{"a", "...", ".hidden", "Report_1.tar.gz", "view-0.0.1.tgz", "plugin.json"} {
+		if !IsReleaseFile(file) {
+			t.Errorf("file %q rejected", file)
+		}
+	}
+}

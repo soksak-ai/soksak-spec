@@ -49,7 +49,7 @@ type ReleaseDocument struct {
 }
 
 // releaseFilePattern is the file grammar of release.schema.json $defs.file; "." and ".."
-// are excluded in validateIntegrity.
+// are excluded in IsReleaseFile.
 var releaseFilePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -126,8 +126,15 @@ func ValidateReleaseManifest(value ReleaseDocument) error {
 	return nil
 }
 
+// IsReleaseFile reports whether name is one bare file name of the release file grammar
+// (release.schema.json $defs.file): [A-Za-z0-9._-]+, neither "." nor "..". A consumer that
+// receives a file name outside a release document checks it here.
+func IsReleaseFile(name string) bool {
+	return releaseFilePattern.MatchString(name) && name != "." && name != ".."
+}
+
 func validateIntegrity(value IntegrityReference) error {
-	if !releaseFilePattern.MatchString(value.File) || value.File == "." || value.File == ".." || !validDigest(value.Size, value.SHA256) {
+	if !IsReleaseFile(value.File) || !validDigest(value.Size, value.SHA256) {
 		return fmt.Errorf("invalid integrity reference")
 	}
 	return nil
