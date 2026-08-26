@@ -129,6 +129,18 @@ func ValidateReleaseManifest(value ReleaseDocument) error {
 // IsReleaseFile reports whether name is one bare file name of the release file grammar
 // (release.schema.json $defs.file): [A-Za-z0-9._-]+, neither "." nor "..". A consumer that
 // receives a file name outside a release document checks it here.
+// IsComponentID reports whether id is one component identifier of release.schema.json
+// $defs.id, the grammar every plugin, sidecar, kit, contract, and spec id follows.
+func IsComponentID(id string) bool {
+	return idPattern.MatchString(id)
+}
+
+// IsStrictSemver reports whether version is one strict SemVer 2.0.0 version of
+// release.schema.json $defs.version, bounded in length.
+func IsStrictSemver(version string) bool {
+	return strictSemver(version)
+}
+
 func IsReleaseFile(name string) bool {
 	return releaseFilePattern.MatchString(name) && name != "." && name != ".."
 }

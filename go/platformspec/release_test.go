@@ -146,3 +146,28 @@ func TestIsReleaseFileIsTheOneFileGrammar(t *testing.T) {
 		}
 	}
 }
+
+// IsComponentID and IsStrictSemver are the identity grammars of release.schema.json, exported for a
+// consumer that derives a location from an id and a version it received outside a release document.
+func TestIdentityGrammarsAreExported(t *testing.T) {
+	for _, id := range []string{"", "Weather", "weather plugin", "../weather", "weather/plugin", "-weather"} {
+		if IsComponentID(id) {
+			t.Errorf("id %q accepted", id)
+		}
+	}
+	for _, id := range []string{"weather-plugin", "soksak-sidecar-pty", "a"} {
+		if !IsComponentID(id) {
+			t.Errorf("id %q rejected", id)
+		}
+	}
+	for _, version := range []string{"", "v1.0.0", "01.0.0", "1.0", "latest", "1.0.0/", "../1.0.0"} {
+		if IsStrictSemver(version) {
+			t.Errorf("version %q accepted", version)
+		}
+	}
+	for _, version := range []string{"0.0.1", "1.2.3-rc.1", "1.2.3+build.5"} {
+		if !IsStrictSemver(version) {
+			t.Errorf("version %q rejected", version)
+		}
+	}
+}
