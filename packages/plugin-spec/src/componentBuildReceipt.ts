@@ -139,7 +139,7 @@ export function parseComponentBuildReceipt(value: unknown): ComponentBuildReceip
     source: source(raw.source, subject),
     manifest: integrity(raw.manifest, "component build manifest", `${subject.kind}.json`),
     spec: input(raw.spec, "spec", "soksak-spec", "component build spec") as ComponentBuildReceipt["spec"],
-    tooling: input(raw.tooling, "kit", "soksak-component-tools", "component build tooling") as ComponentBuildReceipt["tooling"],
+    tooling: input(raw.tooling, "kit", "soksak-sdk", "component build tooling") as ComponentBuildReceipt["tooling"],
     command: "make verify",
     execution: execution(raw.execution),
     tools: tools(raw.tools),

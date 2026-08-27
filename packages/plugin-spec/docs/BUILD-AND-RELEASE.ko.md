@@ -91,7 +91,7 @@ workstation 상태를 source에 직렬화하지 않습니다.
   run을 다시 실행하지 않습니다.
 <!-- rule:component-tooling-receipt -->
 - **BR17 — 하나의 Component Tooling receipt.** Plugin, Sidecar, Kit, Contract, Spec build는 exact
-  `soksak-component-tools` Kit release를 통해 같은 공개 `make verify` 경계를 실행합니다. Build는
+  `soksak-sdk` Kit release를 통해 같은 공개 `make verify` 경계를 실행합니다. Build는
   `soksak-component-build-receipt-v1` schema의 `component-build-receipt.json`을 만들고 component
   identity, source commit, manifest byte, 전체 artifact matrix, exact Spec·tooling release reference,
   execution mode/platform/architecture, exact tool version을 묶습니다. 같은 source의 local과 Actions

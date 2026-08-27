@@ -91,7 +91,7 @@ toolchain installer and does not serialize a developer workstation into source.
   A failed run is not rerun without a source or declared-environment change.
 <!-- rule:component-tooling-receipt -->
 - **BR17 — One Component Tooling receipt.** Plugin, Sidecar, Kit, Contract, and Spec builds run the
-  same public `make verify` boundary through the exact `soksak-component-tools` Kit release. The
+  same public `make verify` boundary through the exact `soksak-sdk` Kit release. The
   build emits `component-build-receipt.json` with schema `soksak-component-build-receipt-v1` and
   binds the component identity, source commit, manifest bytes, complete artifact matrix, exact Spec
   and tooling release references, execution mode/platform/architecture, and exact tool versions.
