@@ -204,12 +204,12 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
   });
 
   it("keeps the component patch version independent from its interface version", () => {
-    writeFixture({ sidecar: { version: "0.0.4", interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" } }, cargoVersion: "0.0.4" });
+    writeFixture({ sidecar: { version: "0.0.4", interface: { id: "soksak-spec-sidecar-example", version: "0.0.2" } }, cargoVersion: "0.0.4" });
     const result = build("v0.0.4");
     expect(result.status, result.stderr).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
     expect(release).toMatchObject({ kind: "sidecar", version: "0.0.4" });
-    expect(JSON.parse(fs.readFileSync(path.join(outDir, "conformance-interface.json"), "utf8")).claim.contract.version).toBe("0.0.1");
+    expect(JSON.parse(fs.readFileSync(path.join(outDir, "conformance-interface.json"), "utf8")).claim.contract.version).toBe("0.0.2");
   });
 
   // --emit-summary lets a caller (the core `release.build` command handler) parse the manifest +
