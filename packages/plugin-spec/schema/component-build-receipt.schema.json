@@ -4,7 +4,7 @@
   "title": "Soksak component build receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "subject", "source", "manifest", "spec", "tooling", "command", "execution", "tools", "artifacts"],
+  "required": ["schema", "subject", "source", "manifest", "spec", "tooling", "command", "artifacts"],
   "properties": {
     "schema": { "const": "soksak-component-build-receipt-v1" },
     "subject": { "$ref": "#/$defs/subject" },
@@ -13,8 +13,6 @@
     "spec": { "$ref": "#/$defs/spec" },
     "tooling": { "$ref": "#/$defs/tooling" },
     "command": { "const": "make verify" },
-    "execution": { "$ref": "#/$defs/execution" },
-    "tools": { "$ref": "#/$defs/tools" },
     "artifacts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/artifact" } }
   },
   "allOf": [
@@ -37,6 +35,6 @@
     "execution": { "type": "object", "additionalProperties": false, "required": ["mode", "platform", "architecture"], "properties": { "mode": { "enum": ["native", "container", "cross"] }, "platform": { "enum": ["darwin", "linux", "win32"] }, "architecture": { "enum": ["arm64", "x64"] } } },
     "tools": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/id" }, "additionalProperties": { "$ref": "#/$defs/version" } },
     "nativeTarget": { "enum": ["aarch64-apple-darwin", "aarch64-pc-windows-msvc", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"] },
-    "artifact": { "type": "object", "additionalProperties": false, "required": ["target", "sha256"], "properties": { "target": { "oneOf": [{ "const": "any" }, { "$ref": "#/$defs/nativeTarget" }] }, "sha256": { "$ref": "#/$defs/sha256" } } }
+    "artifact": { "type": "object", "additionalProperties": false, "required": ["target", "sha256", "execution", "tools"], "properties": { "target": { "oneOf": [{ "const": "any" }, { "$ref": "#/$defs/nativeTarget" }] }, "sha256": { "$ref": "#/$defs/sha256" }, "execution": { "$ref": "#/$defs/execution" }, "tools": { "$ref": "#/$defs/tools" } } }
   }
 }

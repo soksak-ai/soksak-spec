@@ -44,9 +44,9 @@ function fixture() {
     spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 946, sha256: "e".repeat(64) },
     tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", size: 1024, sha256: "f".repeat(64) },
     command: "make verify",
-    execution: { mode: "native", platform: "linux", architecture: "x64" },
-    tools: { node: "26.7.0" },
-    artifacts: manifest.artifacts.map(({ target, sha256 }) => ({ target, sha256 })),
+    artifacts: manifest.artifacts.map(({ target, sha256 }) => ({
+      target, sha256, execution: { mode: "native", platform: "linux", architecture: "x64" }, tools: { node: "26.7.0" },
+    })),
   }, null, 2)}\n`);
   writeFileSync(join(directory, "component-build-receipt.json"), receipt);
   manifest.evidence.push({ file: "component-build-receipt.json", size: receipt.length, sha256: sha256(receipt) });

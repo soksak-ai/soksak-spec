@@ -93,8 +93,9 @@ toolchain installer and does not serialize a developer workstation into source.
 - **BR17 — One Component Tooling receipt.** Plugin, Sidecar, Kit, Contract, and Spec builds run the
   same public `make verify` boundary through the exact `soksak-sdk` Kit release. The
   build emits `component-build-receipt.json` with schema `soksak-component-build-receipt-v1` and
-  binds the component identity, source commit, manifest bytes, complete artifact matrix, exact Spec
-  and tooling release references, execution mode/platform/architecture, and exact tool versions.
+  binds the component identity, source commit, manifest bytes, exact Spec and tooling release
+  references, and every artifact digest to that target's execution mode/platform/architecture and
+  exact tool versions. A multi-target Sidecar never projects one publish job onto the whole matrix.
   Local and Actions builds of the same source use the same command and receipt grammar.
 <!-- rule:sdk-not-release-identity -->
 - **BR18 — SDK dependency is not release identity.** An author SDK may help a Plugin or Sidecar

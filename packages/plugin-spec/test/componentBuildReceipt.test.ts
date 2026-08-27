@@ -35,9 +35,11 @@ function receipt(kind: ReleaseKind) {
     spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: sha("e") },
     tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", size: 2000, sha256: sha("f") },
     command: "make verify",
-    execution: { mode: "native", platform: "darwin", architecture: "arm64" },
-    tools: { node: "26.7.0", pnpm: "11.22.0" },
-    artifacts: built.artifacts.map(({ target, sha256 }) => ({ target, sha256 })),
+    artifacts: built.artifacts.map(({ target, sha256 }) => ({
+      target, sha256,
+      execution: { mode: "native", platform: "darwin", architecture: "arm64" },
+      tools: { node: "26.7.0", pnpm: "11.22.0" },
+    })),
   };
 }
 
@@ -61,7 +63,7 @@ describe("component build receipt", () => {
       ...built.artifacts[0], target: "x86_64-pc-windows-msvc",
       file: "soksak-sidecar-example-1.2.3-x86_64-pc-windows-msvc.tar.gz", sha256: sha("9"),
     });
-    const { execution: _execution, tools: _tools, ...base } = receipt("sidecar");
+    const base = receipt("sidecar");
     const value = {
       ...base,
       artifacts: [
@@ -76,10 +78,14 @@ describe("component build receipt", () => {
 
   it("rejects noncanonical commands, runtime shapes, and release drift", () => {
     expect(() => parseComponentBuildReceipt({ ...receipt("plugin"), command: "pnpm build" })).toThrow(/make verify/);
+    const invalidExecution = receipt("plugin"); invalidExecution.artifacts[0] = {
+      ...invalidExecution.artifacts[0], execution: { mode: "fallback", platform: "darwin", architecture: "arm64" },
+    } as never;
     expect(() => parseComponentBuildReceipt({
-      ...receipt("plugin"), execution: { mode: "fallback", platform: "darwin", architecture: "arm64" },
+      ...invalidExecution,
     })).toThrow(/execution/);
-    expect(() => parseComponentBuildReceipt({ ...receipt("plugin"), tools: { node: "latest" } })).toThrow(/tool version/);
+    const invalidTools = receipt("plugin"); invalidTools.artifacts[0] = { ...invalidTools.artifacts[0], tools: { node: "latest" } };
+    expect(() => parseComponentBuildReceipt(invalidTools)).toThrow(/tool version/);
 
     const changed = release("plugin");
     changed.artifacts[0] = { ...changed.artifacts[0], sha256: sha("0") };

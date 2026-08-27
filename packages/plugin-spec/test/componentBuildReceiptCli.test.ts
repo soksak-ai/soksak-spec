@@ -24,8 +24,10 @@ function fixture() {
     spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: "e".repeat(64) },
     tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.2", size: 2000, sha256: "f".repeat(64) },
     command: "make verify",
-    execution: { mode: "native", platform: "linux", architecture: "x64" },
-    tools: { node: "26.7.0" }, artifacts: [{ target: "any", sha256: "c".repeat(64) }],
+    artifacts: [{
+      target: "any", sha256: "c".repeat(64),
+      execution: { mode: "native", platform: "linux", architecture: "x64" }, tools: { node: "26.7.0" },
+    }],
   };
   const releasePath = join(root, "release.json"); const receiptPath = join(root, "component-build-receipt.json");
   writeFileSync(releasePath, JSON.stringify(release)); writeFileSync(receiptPath, JSON.stringify(receipt));

@@ -93,8 +93,9 @@ workstation 상태를 source에 직렬화하지 않습니다.
 - **BR17 — 하나의 Component Tooling receipt.** Plugin, Sidecar, Kit, Contract, Spec build는 exact
   `soksak-sdk` Kit release를 통해 같은 공개 `make verify` 경계를 실행합니다. Build는
   `soksak-component-build-receipt-v1` schema의 `component-build-receipt.json`을 만들고 component
-  identity, source commit, manifest byte, 전체 artifact matrix, exact Spec·tooling release reference,
-  execution mode/platform/architecture, exact tool version을 묶습니다. 같은 source의 local과 Actions
+  identity, source commit, manifest byte, exact Spec·tooling release reference와 각 artifact digest를
+  해당 target의 execution mode/platform/architecture·exact tool version에 묶습니다. 여러 target인
+  Sidecar가 publish job 하나를 전체 matrix의 실행 근거로 투영하면 안 됩니다. 같은 source의 local과 Actions
   build는 같은 command와 receipt grammar를 사용합니다.
 <!-- rule:sdk-not-release-identity -->
 - **BR18 — SDK dependency는 release identity가 아닙니다.** Author SDK는 Plugin 또는 Sidecar가 공개

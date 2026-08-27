@@ -13,9 +13,11 @@ const receipt = {
   spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: "c".repeat(64) },
   tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", size: 2000, sha256: "d".repeat(64) },
   command: "make verify",
-  execution: { mode: "container", platform: "linux", architecture: "x64" },
-  tools: { node: "26.7.0", pnpm: "11.22.0" },
-  artifacts: [{ target: "any", sha256: "e".repeat(64) }],
+  artifacts: [{
+    target: "any", sha256: "e".repeat(64),
+    execution: { mode: "container", platform: "linux", architecture: "x64" },
+    tools: { node: "26.7.0", pnpm: "11.22.0" },
+  }],
 };
 
 describe("component build receipt schema", () => {

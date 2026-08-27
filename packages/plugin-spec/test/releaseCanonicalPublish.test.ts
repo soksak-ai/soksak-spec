@@ -20,9 +20,9 @@ function attachReceipt(directory: string, release: Record<string, any>): void {
     spec: { kind: "spec", id: "soksak-spec", version: "0.0.37", size: 946, sha256: "e".repeat(64) },
     tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", size: 1024, sha256: "f".repeat(64) },
     command: "make verify",
-    execution: { mode: "native", platform: "linux", architecture: "x64" },
-    tools: { node: "26.7.0" },
-    artifacts: release.artifacts.map(({ target, sha256 }: { target: string; sha256: string }) => ({ target, sha256 })),
+    artifacts: release.artifacts.map(({ target, sha256 }: { target: string; sha256: string }) => ({
+      target, sha256, execution: { mode: "native", platform: "linux", architecture: "x64" }, tools: { node: "26.7.0" },
+    })),
   };
   const bytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`);
   const file = "component-build-receipt.json";

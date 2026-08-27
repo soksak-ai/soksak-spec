@@ -24,7 +24,12 @@ export interface ComponentBuildExecution {
   platform: "darwin" | "linux" | "win32";
   architecture: "arm64" | "x64";
 }
-export interface ComponentBuildArtifact { target: "any" | (typeof RUST_SIDECAR_TARGETS)[number]; sha256: string }
+export interface ComponentBuildArtifact {
+  target: "any" | (typeof RUST_SIDECAR_TARGETS)[number];
+  sha256: string;
+  execution: ComponentBuildExecution;
+  tools: Readonly<Record<string, string>>;
+}
 export interface ComponentBuildReceipt {
   schema: "soksak-component-build-receipt-v1";
   subject: ReleaseIdentity;
@@ -33,8 +38,6 @@ export interface ComponentBuildReceipt {
   spec: ComponentBuildInput & { kind: "spec" };
   tooling: ComponentBuildInput & { kind: "kit" };
   command: "make verify";
-  execution: ComponentBuildExecution;
-  tools: Readonly<Record<string, string>>;
   artifacts: readonly ComponentBuildArtifact[];
 }
 
@@ -112,12 +115,15 @@ function tools(value: unknown): Readonly<Record<string, string>> {
 function artifacts(value: unknown): readonly ComponentBuildArtifact[] {
   if (!Array.isArray(value) || value.length === 0) throw new Error("component build artifacts are required");
   const parsed = value.map((item) => {
-    const raw = strict(item, ["target", "sha256"], "component build artifact");
+    const raw = strict(item, ["target", "sha256", "execution", "tools"], "component build artifact");
     if (raw.target !== ANY_TARGET && !(RUST_SIDECAR_TARGETS as readonly unknown[]).includes(raw.target)) {
       throw new Error("component build artifact target is invalid");
     }
     if (typeof raw.sha256 !== "string" || !SHA256_RE.test(raw.sha256)) throw new Error("component build artifact digest is invalid");
-    return { target: raw.target as ComponentBuildArtifact["target"], sha256: raw.sha256 };
+    return {
+      target: raw.target as ComponentBuildArtifact["target"], sha256: raw.sha256,
+      execution: execution(raw.execution), tools: tools(raw.tools),
+    };
   });
   const targets = parsed.map(({ target }) => target);
   if (new Set(targets).size !== targets.length || targets.some((target, index) => target !== [...targets].sort()[index])) {
@@ -128,7 +134,7 @@ function artifacts(value: unknown): readonly ComponentBuildArtifact[] {
 
 export function parseComponentBuildReceipt(value: unknown): ComponentBuildReceipt {
   const raw = strict(value, [
-    "schema", "subject", "source", "manifest", "spec", "tooling", "command", "execution", "tools", "artifacts",
+    "schema", "subject", "source", "manifest", "spec", "tooling", "command", "artifacts",
   ], "component build receipt");
   if (raw.schema !== "soksak-component-build-receipt-v1") throw new Error("component build receipt schema is invalid");
   const subject = identity(raw.subject);
@@ -141,8 +147,6 @@ export function parseComponentBuildReceipt(value: unknown): ComponentBuildReceip
     spec: input(raw.spec, "spec", "soksak-spec", "component build spec") as ComponentBuildReceipt["spec"],
     tooling: input(raw.tooling, "kit", "soksak-sdk", "component build tooling") as ComponentBuildReceipt["tooling"],
     command: "make verify",
-    execution: execution(raw.execution),
-    tools: tools(raw.tools),
     artifacts: artifacts(raw.artifacts),
   });
 }
@@ -159,7 +163,8 @@ export function verifyComponentBuildReceipt(input: { receipt: unknown; release: 
     throw new Error("component build receipt manifest differs from release");
   }
   const artifacts = input.release.artifacts.map(({ target, sha256 }) => ({ target, sha256 }));
-  if (JSON.stringify(receipt.artifacts) !== JSON.stringify(artifacts)) {
+  const receiptArtifacts = receipt.artifacts.map(({ target, sha256 }) => ({ target, sha256 }));
+  if (JSON.stringify(receiptArtifacts) !== JSON.stringify(artifacts)) {
     throw new Error("component build receipt artifact matrix differs from release");
   }
   return receipt;
