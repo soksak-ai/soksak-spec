@@ -10,6 +10,7 @@ import {
   certifyRegistry,
   parseBuildDependencies,
   parseBuildDependencyReceipt,
+  parseComponentBuildReceipt,
   parseConformanceReport,
   parseDependencyIntent,
   parseManifest,
@@ -21,6 +22,7 @@ import {
   transparencyViolations,
   resolveBuildDependency,
   verifyBuildDependencyReceipt,
+  verifyComponentBuildReceipt,
   verifyConformanceReport,
 } from "../dist/spec.js";
 import { authenticateRegistry, buildRegistry, verifyReleaseClosure } from "../dist/registryPublication.js";
@@ -32,6 +34,7 @@ const USAGE = `사용:
   soksak-validate build-dependencies <build-dependencies.json> [--dependency <id> --target <triple>]
   soksak-validate build-receipt-create <build-dependencies.json> --dependency <id> --target <triple> --output-root <directory> --out <receipt.json>
   soksak-validate build-receipt <receipt.json> --dependencies <build-dependencies.json> --output-root <directory>
+  soksak-validate component-build-receipt <receipt.json> --release <release.json>
   soksak-validate release <release.json>...
   soksak-validate conformance <report.json>... --release <release.json> [--plugin-manifest <plugin.json> | --sidecar-manifest <sidecar.json>]
   soksak-validate registry <registry.json> --public-key <key.json> --registry-id <id> --key-id <id> [--at <ISO-8601>] [--high-water <sequence>:<sha256>]
@@ -42,7 +45,7 @@ const USAGE = `사용:
 
 종료코드: 0 = 통과, 1 = 문서/무결성 위반, 2 = 사용법 오류.`;
 
-const MODES = new Set(["plugin", "build-dependencies", "build-receipt-create", "build-receipt", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
+const MODES = new Set(["plugin", "build-dependencies", "build-receipt-create", "build-receipt", "component-build-receipt", "release", "conformance", "registry", "registry-verify", "registry-build", "registry-authenticate", "registry-publish"]);
 
 function usageExit(message) {
   if (message) console.error(message);
@@ -302,6 +305,32 @@ function validateBuildReceipt(args) {
   }
 }
 
+function validateComponentReceipt(args) {
+  const parsedArgs = parseOptions(args, new Set(["--release"]));
+  if (!parsedArgs.ok || parsedArgs.positional.length !== 1 || !parsedArgs.options.has("--release")) {
+    return usageExit(parsedArgs.ok ? "component-build-receipt: receipt와 --release가 필요합니다" : parsedArgs.error);
+  }
+  const receiptPath = parsedArgs.positional[0];
+  const releasePath = parsedArgs.options.get("--release");
+  const receiptDocument = readDocument(receiptPath);
+  const releaseDocument = readDocument(releasePath);
+  if (!receiptDocument || !releaseDocument) return 1;
+  const parsedRelease = parseReleaseManifest(releaseDocument.raw);
+  if (!parsedRelease.ok) {
+    printErrors(releasePath, parsedRelease.errors);
+    return 1;
+  }
+  try {
+    const receipt = parseComponentBuildReceipt(receiptDocument.raw);
+    verifyComponentBuildReceipt({ receipt, release: parsedRelease.value });
+    console.log(`✓ ${receiptPath} (${receipt.subject.kind}:${receipt.subject.id}@${receipt.subject.version})`);
+    return 0;
+  } catch (error) {
+    printErrors(receiptPath, [error instanceof Error ? error.message : String(error)]);
+    return 1;
+  }
+}
+
 function validateReleases(paths) {
   let failed = 0;
   for (const path of paths) {
@@ -547,6 +576,7 @@ async function main(argv) {
   if (mode === "build-dependencies") return validateBuildDependencies(args);
   if (mode === "build-receipt-create") return createBuildReceipt(args);
   if (mode === "build-receipt") return validateBuildReceipt(args);
+  if (mode === "component-build-receipt") return validateComponentReceipt(args);
   if (mode === "release") return validateReleases(args);
   if (mode === "conformance") return validateConformance(args);
   if (mode.startsWith("registry-")) return registryPublication(mode, args);
