@@ -119,7 +119,7 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.deepEqual(workspace.devEngines, {
     runtime: { name: "node", version: workspace.engines.node, onFail: "error" },
   });
-  assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
+  assert.equal(workspace.scripts?.build, "pnpm --filter @soksak/soksak-spec build");
   assert.equal(
     workspace.scripts?.["test:unit"],
     "pnpm build && node --test scripts/*.test.mjs && vitest run --config vitest.config.mjs && cargo test --workspace --locked && cd go/platformspec && go test ./... && go vet ./...",
@@ -139,6 +139,7 @@ test("repository owns a complete reproducible release boundary", () => {
   });
 
   const pluginSpec = json("packages/plugin-spec/package.json");
+  assert.equal(pluginSpec.name, "@soksak/soksak-spec");
   assert.equal(pluginSpec.version, releaseVersion);
   assert.equal(pluginSpec.private, undefined);
   assert.deepEqual(pluginSpec.publishConfig, { access: "public" });
