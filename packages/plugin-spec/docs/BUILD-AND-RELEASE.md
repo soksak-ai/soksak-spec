@@ -168,6 +168,8 @@ reference that resolves to different bytes or to no stored release fails with
    manifest and lockfile; owner manifests and lockfiles remain unchanged.
 2. The canonical builder creates one flat release output. Portable components produce `any`; a
    Sidecar produces every requested target supported by the selected native or Docker toolchain.
+   The Sidecar builder's optional `--target <declared-target>` selects one local development target;
+   omitting it remains the publication boundary and requires the repository's complete target matrix.
    The exact Component Tooling release writes `component-build-receipt.json` after `make verify`
    and before publication; its artifact matrix is the matrix the release records.
 3. The local publisher validates and atomically stores the output. Same `source.commit` and same

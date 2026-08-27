@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   ID, INTERFACE, SIDECAR, VERSION,
   assertBaseline, assertCommit, assertNativeBinaryTarget, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
-  parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, writeRegularFile,
+  parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, targetEntry, writeRegularFile,
 } from "./release-contract.mjs";
 
 // --emit-summary is an additive boolean flag: the core release.build handler passes it to read the
@@ -14,14 +14,18 @@ import {
 // bare file name; the release directory is derived from id and version by the reader.
 const rawArgs = process.argv.slice(2);
 const emitSummary = rawArgs.includes("--emit-summary");
-const options = parseOptions(rawArgs.filter((arg) => arg !== "--emit-summary"), ["commit", "tag", "artifacts", "out"]);
+const options = parseOptions(
+  rawArgs.filter((arg) => arg !== "--emit-summary"),
+  ["commit", "tag", "artifacts", "out"], ["target"],
+);
 assertBaseline();
 assertCommit(options.commit);
 assertTag(options.tag);
 const artifactsDir = assertNoLinkPath(options.artifacts, "directory");
 const out = ensureEmptyDirectory(options.out);
 const expectedNames = [];
-const artifacts = readTargetMatrix().map(({ target }) => {
+const requestedTargets = options.target ? [targetEntry(options.target)] : readTargetMatrix();
+const artifacts = requestedTargets.map(({ target }) => {
   const asset = releaseAssetName(target);
   const checksumName = `${asset}.sha256`;
   expectedNames.push(asset, checksumName);

@@ -72,8 +72,8 @@ export function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-export function parseOptions(argv, required) {
-  const wanted = new Set(required);
+export function parseOptions(argv, required, optional = []) {
+  const wanted = new Set([...required, ...optional]);
   const values = new Map();
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index];

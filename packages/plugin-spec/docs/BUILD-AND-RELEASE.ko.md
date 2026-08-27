@@ -169,6 +169,8 @@ byte로 해석되거나 저장 release가 없는 reference는 dependent release�
    lockfile에서 옵니다. Owner manifest와 lockfile은 바뀌지 않습니다.
 2. Canonical builder가 flat release output 하나를 만듭니다. Portable component는 `any`를 만들고,
    Sidecar는 선택한 native 또는 Docker toolchain이 지원하는 요청 target을 모두 만듭니다.
+   Sidecar builder의 선택적 `--target <declared-target>`은 local development target 하나를 고릅니다.
+   이 옵션을 생략한 publication 경계는 저장소의 전체 target matrix를 계속 요구합니다.
    Exact Component Tooling release는 `make verify` 뒤 publication 전에
    `component-build-receipt.json`을 만들며 receipt의 artifact matrix가 release matrix가 됩니다.
 3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 `source.commit`에 같은 byte는
