@@ -73,15 +73,15 @@ func TestEnvironmentIsTheOnlyLocalComponentDiscoveryDocument(t *testing.T) {
 }
 
 func TestSidecarManifestIsExact(t *testing.T) {
-	body := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/terminal-provider\"}")
+	body := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/terminal-provider\"}")
 	if _, err := ParseSidecarManifest(body); err != nil {
 		t.Fatal(err)
 	}
-	windows := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/terminal-provider.exe\"}")
+	windows := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/terminal-provider.exe\"}")
 	if _, err := ParseSidecarManifest(windows); err != nil {
 		t.Fatal(err)
 	}
-	wrong := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":{\"id\":\"terminal-state\",\"version\":\"0.0.1\"},\"process\":\"dist/other.exe\"}")
+	wrong := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/other.exe\"}")
 	if _, err := ParseSidecarManifest(wrong); err == nil {
 		t.Fatal("mismatched Windows process was accepted")
 	}
@@ -138,8 +138,8 @@ func TestRegistryAndLocalStillRequireArtifactDigest(t *testing.T) {
 // wire moved, and which numbers exist is the wire contract's to say, not this grammar's.
 func TestSidecarManifestAcceptsAnyStrictInterfaceVersion(t *testing.T) {
 	manifest := func(version string) []byte {
-		return []byte(`{"id":"unit","version":"0.0.14","interface":{"id":"wire","version":"` +
-			version + `"},"process":"dist/unit"}`)
+		return []byte(`{"id":"unit","version":"0.0.14","interface":[{"id":"wire","version":"` +
+			version + `"}],"process":"dist/unit"}`)
 	}
 	for _, version := range []string{"0.0.1", "0.0.2", "1.2.3", "0.0.2-rc.1"} {
 		if _, err := ParseSidecarManifest(manifest(version)); err != nil {

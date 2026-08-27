@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  ID, INTERFACE, SIDECAR, VERSION,
+  ID, INTERFACE, INTERFACES, SIDECAR, VERSION,
   assertBaseline, assertCommit, assertNativeBinaryTarget, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
   parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, targetEntry, writeRegularFile,
 } from "./release-contract.mjs";
@@ -38,7 +38,7 @@ const artifacts = requestedTargets.map(({ target }) => {
   const process = `dist/${ID}${target.includes("windows") ? ".exe" : ""}`;
   if (
     manifest.id !== ID || manifest.version !== VERSION ||
-    JSON.stringify(manifest.interface) !== JSON.stringify(INTERFACE) || manifest.process !== process
+    JSON.stringify(manifest.interface) !== JSON.stringify(INTERFACES) || manifest.process !== process
   ) throw new Error(`${asset}: archive sidecar manifest differs from the release identity`);
   const archivedProcess = archived.find((entry) => entry.name === process);
   if (!archivedProcess) throw new Error(`${asset}: archive has no declared sidecar process`);

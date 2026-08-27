@@ -16,10 +16,13 @@ type Reference struct {
 	Version string `json:"version"`
 }
 type SidecarManifest struct {
-	ID        string    `json:"id"`
-	Version   string    `json:"version"`
-	Interface Reference `json:"interface"`
-	Process   string    `json:"process"`
+	ID      string `json:"id"`
+	Version string `json:"version"`
+	// Interfaces lists every contract this sidecar serves; the first entry is
+	// its primary role. One sidecar, several contracts — a terminal engine
+	// also serves the surface channel.
+	Interfaces []Reference `json:"interface"`
+	Process    string      `json:"process"`
 }
 
 const (
@@ -66,8 +69,15 @@ func ParseSidecarManifest(body []byte) (SidecarManifest, error) {
 		return SidecarManifest{}, err
 	}
 	process := "dist/" + value.ID
-	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !idPattern.MatchString(value.Interface.ID) || !strictSemver(value.Interface.Version) || (value.Process != process && value.Process != process+".exe") {
+	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || len(value.Interfaces) == 0 || (value.Process != process && value.Process != process+".exe") {
 		return SidecarManifest{}, fmt.Errorf("invalid sidecar manifest")
+	}
+	seen := map[string]bool{}
+	for _, ref := range value.Interfaces {
+		if !idPattern.MatchString(ref.ID) || !strictSemver(ref.Version) || seen[ref.ID] {
+			return SidecarManifest{}, fmt.Errorf("invalid sidecar manifest")
+		}
+		seen[ref.ID] = true
 	}
 	return value, nil
 }

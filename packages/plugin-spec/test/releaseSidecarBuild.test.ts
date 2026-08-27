@@ -65,7 +65,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   const sidecar = {
     id: "soksak-sidecar-example",
     version: "0.0.1",
-    interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+    interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
     process: "dist/soksak-sidecar-example",
     ...overrides.sidecar,
   };
@@ -220,7 +220,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
   });
 
   it("keeps the component patch version independent from its interface version", () => {
-    writeFixture({ sidecar: { version: "0.0.4", interface: { id: "soksak-spec-sidecar-example", version: "0.0.2" } }, cargoVersion: "0.0.4" });
+    writeFixture({ sidecar: { version: "0.0.4", interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.2" }] }, cargoVersion: "0.0.4" });
     const result = build("v0.0.4");
     expect(result.status, result.stderr).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
@@ -309,7 +309,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
       id: "soksak-sidecar-example",
       version: "0.0.1",
-      interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+      interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
       process: "dist/soksak-sidecar-example",
     }));
     fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example"), binaryFixture("x86_64-apple-darwin"));
@@ -339,7 +339,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
       id: "soksak-sidecar-example",
       version: "0.0.0",
-      interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+      interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
       process: "dist/soksak-sidecar-example.exe",
     }));
     fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example.exe"), binaryFixture(target));
@@ -363,7 +363,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
       id: "soksak-sidecar-example",
       version: "0.0.1",
-      interface: { id: "soksak-spec-sidecar-example", version: "0.0.1" },
+      interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
       process: "dist/soksak-sidecar-example",
     }));
     fs.writeFileSync(path.join(archiveRoot, "dist/soksak-sidecar-example"), binaryFixture(target));
@@ -392,7 +392,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
   });
 
   it("refuses an interface id outside the sidecar contract namespace", () => {
-    writeFixture({ sidecar: { interface: { id: "soksak-browser-spec", version: "0.0.1" } } });
+    writeFixture({ sidecar: { interface: [{ id: "soksak-browser-spec", version: "0.0.1" }] } });
     const r = build();
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/interface provider must match the sidecar version/);

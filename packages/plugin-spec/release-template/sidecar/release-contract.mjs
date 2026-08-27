@@ -40,13 +40,19 @@ export function parseSidecarManifest(raw) {
   if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "version"])) throw new Error("sidecar manifest keys are closed");
   if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id) || typeof raw.version !== "string" || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
   if (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`) throw new Error("sidecar process path must match its platform executable");
-  if (
-    !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
-    JSON.stringify(Object.keys(raw.interface).sort()) !== JSON.stringify(["id", "version"]) ||
-    !/^soksak-spec-sidecar-[a-z0-9][a-z0-9-]*$/.test(raw.interface.id) ||
-    typeof raw.interface.version !== "string" || !SEMVER.test(raw.interface.version)
-  ) throw new Error("interface provider must match the sidecar version");
-  return Object.freeze({ ...raw, interface: Object.freeze({ ...raw.interface }) });
+  if (!Array.isArray(raw.interface) || raw.interface.length === 0)
+    throw new Error("interface providers must be a non-empty array");
+  const seen = new Set();
+  for (const entry of raw.interface) {
+    if (
+      !entry || typeof entry !== "object" || Array.isArray(entry) ||
+      JSON.stringify(Object.keys(entry).sort()) !== JSON.stringify(["id", "version"]) ||
+      !/^soksak-spec-sidecar-[a-z0-9][a-z0-9-]*$/.test(entry.id) ||
+      typeof entry.version !== "string" || !SEMVER.test(entry.version) || seen.has(entry.id)
+    ) throw new Error("interface provider must match the sidecar version");
+    seen.add(entry.id);
+  }
+  return Object.freeze({ ...raw, interface: Object.freeze(raw.interface.map((entry) => Object.freeze({ ...entry }))) });
 }
 
 export function readSidecarManifest(filename = path.join(ROOT, "sidecar.json")) {
@@ -58,7 +64,10 @@ export const ID = SIDECAR.id;
 export const VERSION = SIDECAR.version;
 export const TAG = `v${VERSION}`;
 export const REPOSITORY = `https://github.com/${GITHUB_ORG}/${ID}`;
-export const INTERFACE = SIDECAR.interface;
+// The primary contract is the first entry; the conformance-interface report
+// attests exactly the conformance run it binds, which covers the primary.
+export const INTERFACE = SIDECAR.interface[0];
+export const INTERFACES = SIDECAR.interface;
 export function releaseAssetName(target, sidecar = SIDECAR) {
   return releaseFileName(`${sidecar.id}-${sidecar.version}-${target}.tar.gz`);
 }

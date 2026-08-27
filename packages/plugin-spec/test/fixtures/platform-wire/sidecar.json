@@ -1,9 +1,11 @@
 {
   "id": "weather-sidecar",
   "version": "0.0.1",
-  "interface": {
-    "id": "soksak-spec-sidecar-weather",
-    "version": "0.0.1"
-  },
+  "interface": [
+    {
+      "id": "soksak-spec-sidecar-weather",
+      "version": "0.0.1"
+    }
+  ],
   "process": "dist/weather-sidecar"
 }

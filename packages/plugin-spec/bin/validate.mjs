@@ -421,7 +421,7 @@ function validateConformance(args) {
     const verified = verifyConformanceReport(
       report.value,
       release.value,
-      [...(ownerPlugin?.implements ?? []), ...(ownerSidecar ? [ownerSidecar.interface] : [])],
+      [...(ownerPlugin?.implements ?? []), ...(ownerSidecar ? ownerSidecar.interface : [])],
     );
     if (!verified.ok) {
       printErrors(path, verified.errors);
