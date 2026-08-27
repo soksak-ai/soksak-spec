@@ -7,4 +7,11 @@ describe("plugin permission vocabulary", () => {
     expect(PERMISSIONS).toContain("sidecar");
     expect(PERMISSIONS).toContain("terminal");
   });
+
+  it("names a native surface permission apart from the webview one", () => {
+    // A terminal pane composited as a native surface drives no web view; gating its label and
+    // input provider behind "webview" would show a person a consent sentence that is false.
+    expect(PERMISSIONS).toContain("surface");
+    expect(PERMISSIONS).toContain("webview");
+  });
 });
