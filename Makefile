@@ -37,7 +37,7 @@ require-tooling:
 attest: require-tooling release
 	@platform="$$(node -p 'process.platform')"; architecture="$$(node -p 'process.arch')"; \
 		node_version="$$(node -p 'process.versions.node')"; pnpm_version="$$(pnpm --version)"; \
-		rust_version="$$(rustc --version | awk '{print $$2}')"; go_version="$$(go version | awk '{sub(/^go/, "", $$3); print $$3}')"; \
+		rust_version="$$(rustc --version | awk '{print $$2}')"; go_version="$$(go -C "$(CURDIR)/go/platformspec" env GOVERSION | sed 's/^go//')"; \
 		node "$(SDK_ROOT)/bin/soksak-sdk.mjs" attest --release-dir "$(CURDIR)/artifacts" \
 		--spec-root "$(SDK_ROOT)/.dependencies/soksak-spec" --tooling-release "$(SDK_RELEASE)" \
 		--mode native --platform "$$platform" --architecture "$$architecture" \
