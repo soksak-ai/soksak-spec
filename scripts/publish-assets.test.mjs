@@ -15,7 +15,7 @@ function sha256(bytes) {
 }
 
 function fixture() {
-  const version = "0.0.35";
+  const version = JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")).version;
   const directory = mkdtempSync(join(tmpdir(), "soksak-spec-publish-"));
   const archiveName = `soksak-soksak-spec-${version}.tgz`;
   const archive = Buffer.from(`spec-${version}`);

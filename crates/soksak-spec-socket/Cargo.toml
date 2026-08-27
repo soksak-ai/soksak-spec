@@ -1,6 +1,6 @@
 [package]
 name = "soksak-spec-socket"
-version = "0.0.35"
+version = "0.0.36"
 edition.workspace = true
 publish = false
 license = "MIT"
