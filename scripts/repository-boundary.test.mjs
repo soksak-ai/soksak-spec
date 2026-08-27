@@ -79,7 +79,6 @@ test("repository owns a complete reproducible release boundary", () => {
     "cargo-dependencies.mjs",
     "compose-runtime-dependencies.mjs",
     "entry.mjs",
-    "local-release-build.mjs",
     "local-release-store.mjs",
     "local-release.mjs",
     "package-dependencies.mjs",
@@ -88,6 +87,7 @@ test("repository owns a complete reproducible release boundary", () => {
     "resolve-release.mjs",
     "verify-plugin-release.mjs",
   ]);
+  assert.equal(existsSync(join(root, "packages/plugin-spec/release-template/local-release-build.mjs")), false);
   assert.deepEqual(files(".github/workflows", ".yml"), ["release.yml", "verify.yml"]);
   for (const path of [
     ".node-version",
