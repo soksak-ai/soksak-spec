@@ -2,6 +2,23 @@ name: release
 
 on:
   workflow_dispatch:
+    inputs:
+      sdk_archive_url:
+        description: Exact immutable soksak-sdk archive URL from the release train
+        required: true
+        type: string
+      sdk_archive_sha256:
+        description: SHA-256 of the exact soksak-sdk archive
+        required: true
+        type: string
+      sdk_release_url:
+        description: Exact immutable soksak-sdk release.json URL
+        required: true
+        type: string
+      sdk_release_sha256:
+        description: SHA-256 of the exact soksak-sdk release.json
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -43,8 +60,31 @@ jobs:
         with:
           go-version-file: go/platformspec/go.mod
           cache-dependency-path: go/platformspec/go.sum
-      - name: Prove the complete release from the clean checkout
-        run: make verify
+      - name: Materialize the exact Component Tooling release
+        shell: bash
+        run: |
+          case "${{ inputs.sdk_archive_url }}" in
+            https://github.com/soksak-ai/soksak-sdk/releases/download/v*/soksak-sdk-*-any.tgz) ;;
+            *) echo "sdk_archive_url is not an immutable SDK release asset" >&2; exit 1 ;;
+          esac
+          case "${{ inputs.sdk_release_url }}" in
+            https://github.com/soksak-ai/soksak-sdk/releases/download/v*/release.json) ;;
+            *) echo "sdk_release_url is not an immutable SDK release document" >&2; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/soksak-sdk"
+          curl -fsSL "${{ inputs.sdk_archive_url }}" -o "$RUNNER_TEMP/soksak-sdk.tgz"
+          curl -fsSL "${{ inputs.sdk_release_url }}" -o "$RUNNER_TEMP/soksak-sdk-release.json"
+          archive_sha="$(sha256sum "$RUNNER_TEMP/soksak-sdk.tgz" | awk '{print $1}')"
+          release_sha="$(sha256sum "$RUNNER_TEMP/soksak-sdk-release.json" | awk '{print $1}')"
+          test "$archive_sha" = "${{ inputs.sdk_archive_sha256 }}"
+          test "$release_sha" = "${{ inputs.sdk_release_sha256 }}"
+          declared_archive_sha="$(node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync(process.argv[1]));process.stdout.write(r.artifacts[0].sha256)' "$RUNNER_TEMP/soksak-sdk-release.json")"
+          test "$declared_archive_sha" = "$archive_sha"
+          tar -xzf "$RUNNER_TEMP/soksak-sdk.tgz" -C "$RUNNER_TEMP/soksak-sdk" --strip-components=1
+          test -z "$(find "$RUNNER_TEMP/soksak-sdk" -type l -print -quit)"
+          node "$RUNNER_TEMP/soksak-sdk/bin/soksak-sdk.mjs" prepare
+      - name: Prove and attest the complete release from the clean checkout
+        run: make attest SDK_ROOT="$RUNNER_TEMP/soksak-sdk" SDK_RELEASE="$RUNNER_TEMP/soksak-sdk-release.json"
       - name: Bind publication to main and the exact checkout
         run: node scripts/release-context.mjs
       - name: Mint a least-privilege installation token

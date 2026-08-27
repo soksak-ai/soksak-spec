@@ -165,7 +165,7 @@ test("repository owns a complete reproducible release boundary", () => {
   for (const input of ["sdk_archive_url:", "sdk_archive_sha256:", "sdk_release_url:", "sdk_release_sha256:"]) {
     assert.match(releaseWorkflow, new RegExp(input));
   }
-  assert.match(releaseWorkflow, /soksak-sdk[.]mjs prepare/);
+  assert.match(releaseWorkflow, /soksak-sdk[.]mjs["']?\s+prepare/);
   assert.match(releaseWorkflow, /make attest SDK_ROOT=/);
   assert.match(
     releaseWorkflow,
@@ -208,10 +208,10 @@ test("repository owns a complete reproducible release boundary", () => {
   for (const command of pnpmCommands) {
     assert.match(command, /CI=1 PNPM_DISABLE_SELF_UPDATE_CHECK=1 pnpm/);
   }
-  assert.match(makefile, /^attest:\s+release\s+require-tooling$/m);
+  assert.match(makefile, /^attest:\s+require-tooling\s+release$/m);
   assert.match(makefile, /SDK_ROOT.*command line/);
   assert.match(makefile, /SDK_RELEASE.*command line/);
-  assert.match(makefile, /bin\/soksak-sdk[.]mjs attest/);
+  assert.match(makefile, /bin\/soksak-sdk[.]mjs["']?\s+attest/);
   const verifier = read("scripts/build-verifier-image.sh");
   assert.match(verifier, /package\.json/);
   assert.match(verifier, /go\/platformspec\/go\.mod/);
