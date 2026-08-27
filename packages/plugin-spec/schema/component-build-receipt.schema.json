@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:soksak:spec:component-build-receipt:1",
+  "title": "Soksak component build receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "subject", "source", "manifest", "spec", "tooling", "command", "execution", "tools", "artifacts"],
+  "properties": {
+    "schema": { "const": "soksak-component-build-receipt-v1" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "source": { "$ref": "#/$defs/source" },
+    "manifest": { "$ref": "#/$defs/integrity" },
+    "spec": { "$ref": "#/$defs/spec" },
+    "tooling": { "$ref": "#/$defs/tooling" },
+    "command": { "const": "make verify" },
+    "execution": { "$ref": "#/$defs/execution" },
+    "tools": { "$ref": "#/$defs/tools" },
+    "artifacts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/artifact" } }
+  },
+  "allOf": [
+    { "if": { "properties": { "subject": { "type": "object", "properties": { "kind": { "const": "plugin" } } } } }, "then": { "properties": { "manifest": { "type": "object", "properties": { "file": { "const": "plugin.json" } } }, "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" } } } } } } },
+    { "if": { "properties": { "subject": { "type": "object", "properties": { "kind": { "const": "sidecar" } } } } }, "then": { "properties": { "manifest": { "type": "object", "properties": { "file": { "const": "sidecar.json" } } }, "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "$ref": "#/$defs/nativeTarget" } } } } } } },
+    { "if": { "properties": { "subject": { "type": "object", "properties": { "kind": { "const": "kit" } } } } }, "then": { "properties": { "manifest": { "type": "object", "properties": { "file": { "const": "kit.json" } } }, "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" } } } } } } },
+    { "if": { "properties": { "subject": { "type": "object", "properties": { "kind": { "const": "contract" } } } } }, "then": { "properties": { "manifest": { "type": "object", "properties": { "file": { "const": "contract.json" } } }, "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" } } } } } } },
+    { "if": { "properties": { "subject": { "type": "object", "properties": { "kind": { "const": "spec" } } } } }, "then": { "properties": { "manifest": { "type": "object", "properties": { "file": { "const": "spec.json" } } }, "artifacts": { "type": "array", "items": { "type": "object", "properties": { "target": { "const": "any" } } } } } } }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,127}$" },
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "file": { "type": "string", "pattern": "^(?!\\.\\.?$)[A-Za-z0-9._-]+$" },
+    "subject": { "type": "object", "additionalProperties": false, "required": ["kind", "id", "version"], "properties": { "kind": { "enum": ["plugin", "sidecar", "kit", "contract", "spec"] }, "id": { "$ref": "#/$defs/id" }, "version": { "$ref": "#/$defs/version" } } },
+    "source": { "type": "object", "additionalProperties": false, "required": ["repository", "commit"], "properties": { "repository": { "type": "string", "pattern": "^https://github\\.com/soksak-ai/[a-z0-9][a-z0-9-]{0,127}$" }, "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" } } },
+    "integrity": { "type": "object", "additionalProperties": false, "required": ["file", "size", "sha256"], "properties": { "file": { "$ref": "#/$defs/file" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "spec": { "type": "object", "additionalProperties": false, "required": ["kind", "id", "version", "size", "sha256"], "properties": { "kind": { "const": "spec" }, "id": { "const": "soksak-spec" }, "version": { "$ref": "#/$defs/version" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "tooling": { "type": "object", "additionalProperties": false, "required": ["kind", "id", "version", "size", "sha256"], "properties": { "kind": { "const": "kit" }, "id": { "const": "soksak-component-tools" }, "version": { "$ref": "#/$defs/version" }, "size": { "type": "integer", "minimum": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "execution": { "type": "object", "additionalProperties": false, "required": ["mode", "platform", "architecture"], "properties": { "mode": { "enum": ["native", "container", "cross"] }, "platform": { "enum": ["darwin", "linux", "win32"] }, "architecture": { "enum": ["arm64", "x64"] } } },
+    "tools": { "type": "object", "minProperties": 1, "propertyNames": { "$ref": "#/$defs/id" }, "additionalProperties": { "$ref": "#/$defs/version" } },
+    "nativeTarget": { "enum": ["aarch64-apple-darwin", "aarch64-pc-windows-msvc", "aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"] },
+    "artifact": { "type": "object", "additionalProperties": false, "required": ["target", "sha256"], "properties": { "target": { "oneOf": [{ "const": "any" }, { "$ref": "#/$defs/nativeTarget" }] }, "sha256": { "$ref": "#/$defs/sha256" } } }
+  }
+}
