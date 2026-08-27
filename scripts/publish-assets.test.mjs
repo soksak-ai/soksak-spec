@@ -41,8 +41,8 @@ function fixture() {
     subject: { kind: manifest.kind, id: manifest.id, version: manifest.version },
     source: manifest.source,
     manifest: manifest.manifest,
-    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 946, sha256: "e".repeat(64) },
-    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", size: 1024, sha256: "f".repeat(64) },
+    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", target: "any", file: "soksak-soksak-spec-0.0.36.tgz", size: 133017, sha256: "e".repeat(64) },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", target: "any", file: "soksak-sdk-0.0.7-any.tgz", size: 100380, sha256: "f".repeat(64) },
     command: "make verify",
     artifacts: manifest.artifacts.map(({ target, sha256 }) => ({
       target, sha256, execution: { mode: "native", platform: "linux", architecture: "x64" }, tools: { node: "26.7.0" },

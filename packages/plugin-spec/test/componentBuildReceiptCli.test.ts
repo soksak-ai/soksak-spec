@@ -21,8 +21,8 @@ function fixture() {
     schema: "soksak-component-build-receipt-v1",
     subject: { kind: release.kind, id: release.id, version: release.version },
     source: release.source, manifest: release.manifest,
-    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: "e".repeat(64) },
-    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.2", size: 2000, sha256: "f".repeat(64) },
+    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", target: "any", file: "soksak-spec-0.0.36-any.tgz", size: 1000, sha256: "e".repeat(64) },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.2", target: "any", file: "soksak-sdk-0.0.2-any.tgz", size: 2000, sha256: "f".repeat(64) },
     command: "make verify",
     artifacts: [{
       target: "any", sha256: "c".repeat(64),

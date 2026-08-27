@@ -10,8 +10,8 @@ const receipt = {
   subject: { kind: "plugin", id: "soksak-plugin-example", version: "1.2.3" },
   source: { repository: "https://github.com/soksak-ai/soksak-plugin-example", commit: "a".repeat(40) },
   manifest: { file: "plugin.json", size: 123, sha256: "b".repeat(64) },
-  spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: "c".repeat(64) },
-  tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", size: 2000, sha256: "d".repeat(64) },
+  spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", target: "any", file: "soksak-spec-0.0.36-any.tgz", size: 1000, sha256: "c".repeat(64) },
+  tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", target: "any", file: "soksak-sdk-0.0.1-any.tgz", size: 2000, sha256: "d".repeat(64) },
   command: "make verify",
   artifacts: [{
     target: "any", sha256: "e".repeat(64),

@@ -1,4 +1,3 @@
-import type { ReleaseReference } from "./distribution.js";
 import {
   type IntegrityReference,
   type ReleaseDocument,
@@ -18,7 +17,15 @@ import {
 } from "./release-primitives.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
-export interface ComponentBuildInput extends ReleaseReference { kind: "spec" | "kit" }
+export interface ComponentBuildInput {
+  kind: "spec" | "kit";
+  id: string;
+  version: string;
+  target: "any";
+  file: string;
+  size: number;
+  sha256: string;
+}
 export interface ComponentBuildExecution {
   mode: "native" | "container" | "cross";
   platform: "darwin" | "linux" | "win32";
@@ -80,13 +87,14 @@ function integrity(value: unknown, label: string, file?: string): IntegrityRefer
 }
 
 function input(value: unknown, kind: "spec" | "kit", id: string, label: string): ComponentBuildInput {
-  const raw = strict(value, ["kind", "id", "version", "size", "sha256"], label);
+  const raw = strict(value, ["kind", "id", "version", "target", "file", "size", "sha256"], label);
   if (raw.kind !== kind || raw.id !== id || typeof raw.version !== "string" || !STRICT_SEMVER_RE.test(raw.version) ||
+      raw.target !== ANY_TARGET || typeof raw.file !== "string" || !RELEASE_FILE_RE.test(raw.file) ||
       !Number.isSafeInteger(raw.size) || (raw.size as number) < 1 ||
       typeof raw.sha256 !== "string" || !SHA256_RE.test(raw.sha256)) {
     throw new Error(`${label} release reference is invalid`);
   }
-  return { kind, id, version: raw.version, size: raw.size as number, sha256: raw.sha256 };
+  return { kind, id, version: raw.version, target: ANY_TARGET, file: raw.file, size: raw.size as number, sha256: raw.sha256 };
 }
 
 function execution(value: unknown): ComponentBuildExecution {
