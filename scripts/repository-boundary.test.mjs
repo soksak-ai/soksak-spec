@@ -116,6 +116,9 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.equal(workspace.version, releaseVersion);
   assert.match(workspace.engines.node, /^\d+\.\d+\.\d+$/);
   assert.match(workspace.packageManager, /^pnpm@\d+\.\d+\.\d+$/);
+  assert.deepEqual(workspace.devEngines, {
+    runtime: { name: "node", version: workspace.engines.node, onFail: "error" },
+  });
   assert.equal(workspace.scripts?.build, "pnpm --filter @soksak-ai/plugin-spec build");
   assert.equal(
     workspace.scripts?.["test:unit"],
@@ -182,6 +185,17 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.match(pnpmWorkspace, /symlink: false/);
   assert.match(pnpmWorkspace, /preferSymlinkedExecutables: false/);
   assert.match(pnpmWorkspace, /allowBuilds:/);
+  assert.match(pnpmWorkspace, /^engineStrict: true$/m);
+  assert.match(pnpmWorkspace, /^pmOnFail: error$/m);
+  assert.match(pnpmWorkspace, /^verifyDepsBeforeRun: error$/m);
+  for (const document of [
+    read("packages/plugin-spec/docs/BUILD-AND-RELEASE.md"),
+    read("packages/plugin-spec/docs/BUILD-AND-RELEASE.ko.md"),
+  ]) {
+    assert.match(document, /devEngines[.]runtime/);
+    assert.match(document, /direct pnpm/);
+    assert.match(document, /implicit install/);
+  }
   const verifier = read("scripts/build-verifier-image.sh");
   assert.match(verifier, /package\.json/);
   assert.match(verifier, /go\/platformspec\/go\.mod/);
