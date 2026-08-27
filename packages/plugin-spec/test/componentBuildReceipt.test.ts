@@ -33,7 +33,7 @@ function receipt(kind: ReleaseKind) {
     source: built.source,
     manifest: built.manifest,
     spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: sha("e") },
-    tooling: { kind: "kit", id: "soksak-component-tools", version: "0.0.1", size: 2000, sha256: sha("f") },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", size: 2000, sha256: sha("f") },
     command: "make verify",
     execution: { mode: "native", platform: "darwin", architecture: "arm64" },
     tools: { node: "26.7.0", pnpm: "11.22.0" },

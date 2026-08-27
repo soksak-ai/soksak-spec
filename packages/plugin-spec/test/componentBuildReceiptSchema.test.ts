@@ -11,7 +11,7 @@ const receipt = {
   source: { repository: "https://github.com/soksak-ai/soksak-plugin-example", commit: "a".repeat(40) },
   manifest: { file: "plugin.json", size: 123, sha256: "b".repeat(64) },
   spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: "c".repeat(64) },
-  tooling: { kind: "kit", id: "soksak-component-tools", version: "0.0.1", size: 2000, sha256: "d".repeat(64) },
+  tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", size: 2000, sha256: "d".repeat(64) },
   command: "make verify",
   execution: { mode: "container", platform: "linux", architecture: "x64" },
   tools: { node: "26.7.0", pnpm: "11.22.0" },

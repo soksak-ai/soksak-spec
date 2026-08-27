@@ -16,7 +16,7 @@ describe("component tooling policy", () => {
   it("requires one receipt for all five kinds without making an SDK dependency release identity", () => {
     for (const document of [english, korean]) {
       expect(document).toContain("soksak-component-build-receipt-v1");
-      expect(document).toContain("soksak-component-tools");
+      expect(document).toContain("soksak-sdk");
       expect(document).toContain("make verify");
       for (const kind of ["Plugin", "Sidecar", "Kit", "Contract", "Spec"]) expect(document).toContain(kind);
       expect(document).toContain("SDK dependency");
