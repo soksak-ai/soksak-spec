@@ -21,10 +21,8 @@ verify: prepare
 	@scripts/check-build-environment.test.sh
 	@CI=1 PNPM_DISABLE_SELF_UPDATE_CHECK=1 pnpm test
 
-# release:verify packs the package twice, proves the bytes equal, and leaves the archive and its
-# release document in artifacts/.
+# verify runs release:verify once; release names that proven candidate for downstream targets.
 release: verify
-	@CI=1 PNPM_DISABLE_SELF_UPDATE_CHECK=1 pnpm release:verify
 
 require-tooling:
 	@case "$(origin SDK_ROOT)" in "command line") ;; *) echo 'SDK_ROOT must be an absolute command-line path to an extracted soksak-sdk release' >&2; exit 64 ;; esac

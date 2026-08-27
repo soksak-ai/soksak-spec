@@ -205,7 +205,7 @@ test("repository owns a complete reproducible release boundary", () => {
   const makefile = read("Makefile");
   assert.doesNotMatch(makefile, /@soksak-ai/);
   const pnpmCommands = makefile.split("\n").filter((line) => /\bpnpm (?:install|build|test|release:verify|publish)\b/.test(line));
-  assert.ok(pnpmCommands.length >= 5);
+  assert.equal(pnpmCommands.length, 4);
   for (const command of pnpmCommands) {
     assert.match(command, /CI=1 PNPM_DISABLE_SELF_UPDATE_CHECK=1 pnpm/);
   }
