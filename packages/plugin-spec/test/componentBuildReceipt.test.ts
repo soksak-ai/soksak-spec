@@ -55,6 +55,25 @@ describe("component build receipt", () => {
     expect(() => parseComponentBuildReceipt(value)).toThrow(/unknown key/);
   });
 
+  it("binds every Sidecar target to its own execution and toolchain", () => {
+    const built = release("sidecar");
+    built.artifacts.push({
+      ...built.artifacts[0], target: "x86_64-pc-windows-msvc",
+      file: "soksak-sidecar-example-1.2.3-x86_64-pc-windows-msvc.tar.gz", sha256: sha("9"),
+    });
+    const { execution: _execution, tools: _tools, ...base } = receipt("sidecar");
+    const value = {
+      ...base,
+      artifacts: [
+        { target: "aarch64-apple-darwin", sha256: sha("c"), execution: { mode: "native", platform: "darwin", architecture: "arm64" }, tools: { rust: "1.98.0" } },
+        { target: "x86_64-pc-windows-msvc", sha256: sha("9"), execution: { mode: "native", platform: "win32", architecture: "x64" }, tools: { rust: "1.98.0" } },
+      ],
+    };
+    const parsed = parseComponentBuildReceipt(value);
+    expect(parsed.artifacts.map(({ target, execution }) => ({ target, execution }))).toEqual(value.artifacts.map(({ target, execution }) => ({ target, execution })));
+    expect(() => verifyComponentBuildReceipt({ receipt: parsed, release: built })).not.toThrow();
+  });
+
   it("rejects noncanonical commands, runtime shapes, and release drift", () => {
     expect(() => parseComponentBuildReceipt({ ...receipt("plugin"), command: "pnpm build" })).toThrow(/make verify/);
     expect(() => parseComponentBuildReceipt({
