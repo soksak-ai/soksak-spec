@@ -89,6 +89,19 @@ workstation 상태를 source에 직렬화하지 않습니다.
   release-store 검증, installed-product test를 로컬에서 실행합니다. Local에서 만들 수 없는 native evidence
   또는 최종 공개에만 Actions run을 시작합니다. Source나 선언된 환경이 바뀌지 않았다면 실패한
   run을 다시 실행하지 않습니다.
+<!-- rule:component-tooling-receipt -->
+- **BR17 — 하나의 Component Tooling receipt.** Plugin, Sidecar, Kit, Contract, Spec build는 exact
+  `soksak-component-tools` Kit release를 통해 같은 공개 `make verify` 경계를 실행합니다. Build는
+  `soksak-component-build-receipt-v1` schema의 `component-build-receipt.json`을 만들고 component
+  identity, source commit, manifest byte, 전체 artifact matrix, exact Spec·tooling release reference,
+  execution mode/platform/architecture, exact tool version을 묶습니다. 같은 source의 local과 Actions
+  build는 같은 command와 receipt grammar를 사용합니다.
+<!-- rule:sdk-not-release-identity -->
+- **BR18 — SDK dependency는 release identity가 아닙니다.** Author SDK는 Plugin 또는 Sidecar가 공개
+  계약을 구현하도록 도울 수 있지만 dependency package 이름은 artifact 동작의 증거가 아닙니다.
+  Kit, Contract, Spec에는 가상의 SDK를 만들지 않고 공통 tooling만 적용합니다. Publication은 receipt,
+  manifest, artifact byte, conformance claim을 검증하며 source metadata에 SDK dependency가 있다는
+  이유만으로 그것을 요구하거나 신뢰하지 않습니다.
 
 ## Component와 상태 소유권
 
@@ -155,6 +168,8 @@ byte로 해석되거나 저장 release가 없는 reference는 dependent release�
    lockfile에서 옵니다. Owner manifest와 lockfile은 바뀌지 않습니다.
 2. Canonical builder가 flat release output 하나를 만듭니다. Portable component는 `any`를 만들고,
    Sidecar는 선택한 native 또는 Docker toolchain이 지원하는 요청 target을 모두 만듭니다.
+   Exact Component Tooling release는 `make verify` 뒤 publication 전에
+   `component-build-receipt.json`을 만들며 receipt의 artifact matrix가 release matrix가 됩니다.
 3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 `source.commit`에 같은 byte는
    `unchanged`를 반환하고, 같은 commit에 다른 byte는 `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로
    실패하며, 다른 commit은 BR12에 따라 version directory를 교체합니다.
@@ -176,8 +191,8 @@ byte로 해석되거나 저장 release가 없는 reference는 dependent release�
 
 다음 gate가 모두 계속 GREEN이어야 완료입니다. Local-store transaction safety, release 5종, local/registry
 transport parity, digest-conflict 거부, Sidecar in-use 거부, event-driven install progress, cross-build/native
-  evidence 구분, publish-job no-rebuild, 영어/한국어 command·error code 정확한 일치. 이후 실패는 완료
-  주장을 무효로 만듭니다.
+evidence 구분, publish-job no-rebuild, 영어/한국어 command·error code 정확한 일치. Component Tooling
+receipt와 그것이 묶은 모든 byte도 필수입니다. 이후 실패는 완료 주장을 무효로 만듭니다.
 
 ## Command 경계
 

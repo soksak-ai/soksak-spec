@@ -89,6 +89,19 @@ toolchain installer and does not serialize a developer workstation into source.
   Docker cross-builds, local release-store verification, and installed-product tests locally. An
   Actions run begins only for native evidence unavailable locally or for the final publication.
   A failed run is not rerun without a source or declared-environment change.
+<!-- rule:component-tooling-receipt -->
+- **BR17 — One Component Tooling receipt.** Plugin, Sidecar, Kit, Contract, and Spec builds run the
+  same public `make verify` boundary through the exact `soksak-component-tools` Kit release. The
+  build emits `component-build-receipt.json` with schema `soksak-component-build-receipt-v1` and
+  binds the component identity, source commit, manifest bytes, complete artifact matrix, exact Spec
+  and tooling release references, execution mode/platform/architecture, and exact tool versions.
+  Local and Actions builds of the same source use the same command and receipt grammar.
+<!-- rule:sdk-not-release-identity -->
+- **BR18 — SDK dependency is not release identity.** An author SDK may help a Plugin or Sidecar
+  implement the public contract, but a dependency package name does not prove artifact behavior.
+  Kit, Contract, and Spec use the common tooling without an invented SDK. Publication verifies the
+  receipt, manifest, artifact bytes, and conformance claims; it neither requires nor trusts an SDK
+  dependency merely because it appears in source metadata.
 
 ## Component and state ownership
 
@@ -154,6 +167,8 @@ reference that resolves to different bytes or to no stored release fails with
    manifest and lockfile; owner manifests and lockfiles remain unchanged.
 2. The canonical builder creates one flat release output. Portable components produce `any`; a
    Sidecar produces every requested target supported by the selected native or Docker toolchain.
+   The exact Component Tooling release writes `component-build-receipt.json` after `make verify`
+   and before publication; its artifact matrix is the matrix the release records.
 3. The local publisher validates and atomically stores the output. Same `source.commit` and same
    bytes return `unchanged`; same commit and different bytes fail with
    `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit replaces the version directory
@@ -177,7 +192,8 @@ reference that resolves to different bytes or to no stored release fails with
 Completion requires all of these gates to remain GREEN: local-store transaction safety; all five
 release kinds; local and registry transport parity; digest-conflict refusal; Sidecar in-use refusal;
 event-driven install progress; cross-build versus native evidence; publish-job no-rebuild; and exact
-English/Korean command and error-code parity. A later failure invalidates completion.
+English/Korean command and error-code parity. The Component Tooling receipt and every byte it binds
+are also required. A later failure invalidates completion.
 
 ## Command boundary
 
