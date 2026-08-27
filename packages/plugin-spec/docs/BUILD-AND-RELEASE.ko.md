@@ -214,20 +214,15 @@ target은 명시적 target triple과 staging directory를 받을 수 있지만 p
 GitHub release 변경은 Actions에만 둡니다.
 
 ```sh
-soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
-soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
-soksak-local-release build --store <absolute-store> --source <absolute-clean-plugin-repository> --registry http://host:port/
+soksak-sdk package <kind-specific-options>
+soksak-sdk attest <release-and-execution-options>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
 soksak-local-release inspect --store <absolute-store> --kind plugin --id <id> --version <version>
 soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --version <version>
 ```
 
-`--registry`는 소유 저장소의 `make verify`에 명령줄 변수 `REGISTRY`로 전달됩니다. `@soksak` 패키지를
-install하는 소유 저장소는 그것 없이 빌드를 거부합니다.
-
-`build`는 exact clean owner commit을 disposable directory에 clone하고 owner Make gate와 canonical
-packager를 실행하며 검증된 release를 atomically 저장한 뒤 clone을 제거합니다. Sidecar target은 선택한
-native 또는 관리되는 Docker 환경이 해당 owner preflight를 통과할 때만 build할 수 있습니다. Command는
-owner preflight를 약화하거나 raw compiler command로 바꾸지 않습니다. Runtime dependency는 주소
-지정된 `--store`에서만 해석합니다.
+Component Tooling이 build, kind별 packaging, attestation을 소유합니다. Spec의 local-release
+command는 owner 저장소를 clone하거나 build하지 않습니다. exact build receipt가 이미 첨부된 release만
+받아 전체 asset set을 검증하고 지정된 store를 atomically 변경합니다. Runtime dependency는 그
+`--store`에서만 해석합니다.

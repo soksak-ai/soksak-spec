@@ -215,20 +215,15 @@ Release-only targets may accept an explicit target triple and staging directory,
 credentials and GitHub release mutation stay in Actions.
 
 ```sh
-soksak-local-release build --store <absolute-store> --source <absolute-clean-owner-repository>
-soksak-local-release build --store <absolute-store> --source <absolute-clean-sidecar-repository> --targets <target-one>,<target-two>
-soksak-local-release build --store <absolute-store> --source <absolute-clean-plugin-repository> --registry http://host:port/
+soksak-sdk package <kind-specific-options>
+soksak-sdk attest <release-and-execution-options>
 soksak-local-release publish --store <absolute-store> --release <absolute-release-directory>
 soksak-local-release verify --store <absolute-store>
 soksak-local-release inspect --store <absolute-store> --kind plugin --id <id> --version <version>
 soksak-local-release delete --store <absolute-store> --kind plugin --id <id> --version <version>
 ```
 
-`--registry` is handed to the owner's `make verify` as the command-line variable `REGISTRY`; an owner
-that installs `@soksak` packages refuses to build without it.
-
-`build` clones the exact clean owner commit into a disposable directory, runs the owner Make gate,
-uses the canonical packager, publishes the verified release atomically, and removes the clone. A
-requested Sidecar target is eligible only when the selected native or maintained Docker environment
-passes that owner's preflight. The command never weakens an owner preflight or substitutes a raw
-compiler command. Runtime dependencies are resolved from the addressed `--store` only.
+Component Tooling owns build, kind-specific packaging, and attestation. The Spec local-release
+command never clones or builds an owner repository. It accepts only a release whose exact build
+receipt is already attached, validates the complete asset set, and mutates the addressed store
+atomically. Runtime dependencies are resolved from that `--store` only.

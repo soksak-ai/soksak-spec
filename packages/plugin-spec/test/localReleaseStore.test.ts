@@ -34,14 +34,26 @@ function releaseFixture({ identity = PLUGIN, content = "archive", commit = COMMI
   fs.writeFileSync(path.join(directory, archiveName), archive);
   fs.writeFileSync(path.join(directory, `${kind}.json`), manifest);
   fs.writeFileSync(path.join(directory, "conformance-release.json"), evidence);
-  fs.writeFileSync(path.join(directory, "release.json"), `${JSON.stringify({
+  const release = {
     kind, id, version,
     manifest: { file: `${kind}.json`, size: manifest.length, sha256: sha256(manifest) },
     source: { repository: `https://github.com/${GITHUB_ORG}/${id}`, commit },
     artifacts: [{ target, file: archiveName, size: archive.length, sha256: sha256(archive), format, manifest: `${kind}.json` }],
     ...(runtimeDependencies ? { runtimeDependencies } : {}),
     evidence: [{ file: "conformance-release.json", size: evidence.length, sha256: sha256(evidence) }],
+  };
+  const receipt = Buffer.from(`${JSON.stringify({
+    schema: "soksak-component-build-receipt-v1",
+    subject: { kind, id, version }, source: release.source, manifest: release.manifest,
+    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 946, sha256: "e".repeat(64) },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", size: 1024, sha256: "f".repeat(64) },
+    command: "make verify", execution: { mode: "native", platform: "linux", architecture: "x64" },
+    tools: { node: "26.7.0" }, artifacts: release.artifacts.map(({ target, sha256 }) => ({ target, sha256 })),
   }, null, 2)}\n`);
+  fs.writeFileSync(path.join(directory, "component-build-receipt.json"), receipt);
+  release.evidence.push({ file: "component-build-receipt.json", size: receipt.length, sha256: sha256(receipt) });
+  release.evidence.sort((left, right) => left.file.localeCompare(right.file));
+  fs.writeFileSync(path.join(directory, "release.json"), `${JSON.stringify(release, null, 2)}\n`);
   return directory;
 }
 // The release reference a dependent records: size and sha256 of the dependency's release.json.
@@ -64,7 +76,7 @@ describe("canonical local release store", () => {
     const second = publishLocalRelease({ store, release });
     expect(first).toMatchObject({ state: "published", ...PLUGIN });
     expect(first.directory).toBe(path.join(store, "plugins", "soksak-plugin-example", "0.0.1"));
-    expect(fs.readdirSync(first.directory).sort()).toEqual(["conformance-release.json", "plugin.json", "release.json", "soksak-plugin-example-0.0.1-any.tgz"]);
+    expect(fs.readdirSync(first.directory).sort()).toEqual(["component-build-receipt.json", "conformance-release.json", "plugin.json", "release.json", "soksak-plugin-example-0.0.1-any.tgz"]);
     expect(second).toMatchObject({ state: "unchanged", directory: first.directory });
     expect(inspectLocalRelease({ store, ...PLUGIN })).toMatchObject({ digest: first.digest });
     expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 1 });

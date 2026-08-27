@@ -11,7 +11,27 @@ function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function fixture() {
+function attachReceipt(directory: string, release: Record<string, any>): void {
+  const receipt = {
+    schema: "soksak-component-build-receipt-v1",
+    subject: { kind: release.kind, id: release.id, version: release.version },
+    source: release.source,
+    manifest: release.manifest,
+    spec: { kind: "spec", id: "soksak-spec", version: "0.0.37", size: 946, sha256: "e".repeat(64) },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", size: 1024, sha256: "f".repeat(64) },
+    command: "make verify",
+    execution: { mode: "native", platform: "linux", architecture: "x64" },
+    tools: { node: "26.7.0" },
+    artifacts: release.artifacts.map(({ target, sha256 }: { target: string; sha256: string }) => ({ target, sha256 })),
+  };
+  const bytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`);
+  const file = "component-build-receipt.json";
+  fs.writeFileSync(path.join(directory, file), bytes);
+  release.evidence.push({ file, size: bytes.length, sha256: sha256(bytes) });
+  release.evidence.sort((left: { file: string }, right: { file: string }) => left.file.localeCompare(right.file));
+}
+
+function fixture(withReceipt = true) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "portable-publish-"));
   const repository = `${GITHUB_ORG}/soksak-kit-example`;
   const commit = "a".repeat(40);
@@ -34,6 +54,7 @@ function fixture() {
     artifacts: [{ target: "any", file: archiveName, sha256: sha256(archive), size: archive.length, format: "tgz", manifest: "kit.json" }],
     evidence,
   };
+  if (withReceipt) attachReceipt(directory, release);
   const manifest = path.join(directory, "release.json");
   fs.writeFileSync(manifest, `${JSON.stringify(release, null, 2)}\n`);
   return { directory, repository, commit, manifest, archiveName, archive };
@@ -41,7 +62,7 @@ function fixture() {
 
 describe("canonical release asset collection", () => {
   it("refuses publication without a verified component build receipt", () => {
-    const value = fixture();
+    const value = fixture(false);
     expect(() => collectCanonicalReleaseAssets({
       repository: value.repository, commit: value.commit, artifacts: value.directory, manifest: value.manifest,
     })).toThrow(/component build receipt.*required/i);
@@ -53,7 +74,7 @@ describe("canonical release asset collection", () => {
     const result = collectCanonicalReleaseAssets({ repository: value.repository, commit: value.commit, artifacts: value.directory, manifest: value.manifest });
     expect(result.tag).toBe("v0.0.1");
     expect(result.assets.map(({ name }) => name)).toEqual([
-      "conformance-manifest.json", "conformance-release.json", "kit.json", "release.json", value.archiveName,
+      "component-build-receipt.json", "conformance-manifest.json", "conformance-release.json", "kit.json", "release.json", value.archiveName,
     ].sort());
     const archive = result.assets.find(({ name }) => name === value.archiveName);
     expect(archive).toMatchObject({ size: value.archive.length, digest: `sha256:${sha256(value.archive)}`, contentType: "application/gzip" });
@@ -77,10 +98,12 @@ describe("canonical release asset collection", () => {
       fs.writeFileSync(path.join(directory, name), bytes);
       return { file: name, size: bytes.length, sha256: sha256(bytes) };
     });
+    const release = { kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1", manifest: { file: "sidecar.json", size: sidecarManifest.length, sha256: sha256(sidecarManifest) }, source: { repository: `https://github.com/${repository}`, commit }, artifacts, evidence };
+    attachReceipt(directory, release);
     const manifest = path.join(directory, "release.json");
-    fs.writeFileSync(manifest, `${JSON.stringify({ kind: "sidecar", id: "soksak-sidecar-example", version: "0.0.1", manifest: { file: "sidecar.json", size: sidecarManifest.length, sha256: sha256(sidecarManifest) }, source: { repository: `https://github.com/${repository}`, commit }, artifacts, evidence }, null, 2)}\n`);
+    fs.writeFileSync(manifest, `${JSON.stringify(release, null, 2)}\n`);
     const result = collectCanonicalReleaseAssets({ repository, commit, artifacts: directory, manifest });
-    expect(result.assets).toHaveLength(7);
+    expect(result.assets).toHaveLength(8);
     fs.writeFileSync(path.join(directory, `${artifacts[0].file}.sha256`), artifacts[0].sha256);
     expect(() => collectCanonicalReleaseAssets({ repository, commit, artifacts: directory, manifest })).toThrow(/asset set/);
     fs.rmSync(directory, { recursive: true, force: true });

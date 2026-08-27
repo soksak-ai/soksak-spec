@@ -36,6 +36,21 @@ function fixture() {
     artifacts: [{ target: "any", file: archiveName, size: archive.length, sha256: sha256(archive), format: "tgz", manifest: "spec.json" }],
     evidence,
   };
+  const receipt = Buffer.from(`${JSON.stringify({
+    schema: "soksak-component-build-receipt-v1",
+    subject: { kind: manifest.kind, id: manifest.id, version: manifest.version },
+    source: manifest.source,
+    manifest: manifest.manifest,
+    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 946, sha256: "e".repeat(64) },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.7", size: 1024, sha256: "f".repeat(64) },
+    command: "make verify",
+    execution: { mode: "native", platform: "linux", architecture: "x64" },
+    tools: { node: "26.7.0" },
+    artifacts: manifest.artifacts.map(({ target, sha256 }) => ({ target, sha256 })),
+  }, null, 2)}\n`);
+  writeFileSync(join(directory, "component-build-receipt.json"), receipt);
+  manifest.evidence.push({ file: "component-build-receipt.json", size: receipt.length, sha256: sha256(receipt) });
+  manifest.evidence.sort((left, right) => left.file.localeCompare(right.file));
   writeFileSync(join(directory, archiveName), archive);
   writeFileSync(join(directory, manifestName), `${JSON.stringify(manifest, null, 2)}\n`);
   return { directory, archiveName, manifestName, tag };
@@ -51,7 +66,7 @@ test("release assets and tag are derived from the verified owner manifest", (con
     manifest: join(value.directory, value.manifestName),
   });
   assert.equal(result.tag, value.tag);
-  assert.deepEqual(result.assets.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json", value.manifestName, value.archiveName, "spec.json"]);
+  assert.deepEqual(result.assets.map(({ name }) => name), ["component-build-receipt.json", "conformance-manifest.json", "conformance-release.json", value.manifestName, value.archiveName, "spec.json"]);
 });
 
 test("asset collection rejects a release whose version differs from the workspace", (context) => {

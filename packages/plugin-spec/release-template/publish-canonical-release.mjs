@@ -4,6 +4,7 @@ import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { RELEASE_FILE_RE } from "../dist/release-primitives.js";
+import { verifyComponentBuildReceipt } from "../dist/componentBuildReceipt.js";
 import { parseReleaseManifest, releaseIdentity } from "../dist/release.js";
 import { GitHubApi, publishImmutableRelease } from "./publish-release.mjs";
 import { isEntryModule } from "./entry.mjs";
@@ -39,6 +40,16 @@ export function collectCanonicalReleaseAssets({ repository, commit, artifacts, m
   const parsed = parseReleaseManifest(JSON.parse(regularFile(manifestPath, "release manifest")));
   if (!parsed.ok) throw new Error(`release manifest is invalid: ${parsed.errors.join("; ")}`);
   const identity = releaseIdentity(parsed.value);
+  const receiptReference = parsed.value.evidence.find(({ file }) => file === "component-build-receipt.json");
+  if (!receiptReference) throw new Error("component build receipt is required for publication");
+  const receiptBytes = regularFile(join(directory, receiptReference.file), "component build receipt");
+  if (receiptBytes.length !== receiptReference.size || digest(receiptBytes) !== receiptReference.sha256) {
+    throw new Error("component build receipt metadata mismatch");
+  }
+  let receipt;
+  try { receipt = JSON.parse(receiptBytes.toString("utf8")); }
+  catch { throw new Error("component build receipt must be JSON"); }
+  verifyComponentBuildReceipt({ receipt, release: parsed.value });
   const repositoryURL = `https://github.com/${repository}`;
   if (parsed.value.source.repository !== repositoryURL || parsed.value.source.commit !== commit || identity.id !== repository.split("/")[1]) {
     throw new Error("release identity does not match repository and commit");
