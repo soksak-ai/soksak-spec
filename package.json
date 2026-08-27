@@ -4,6 +4,9 @@
   "private": true,
   "engines": { "node": "26.7.0" },
   "packageManager": "pnpm@11.22.0",
+  "devEngines": {
+    "runtime": { "name": "node", "version": "26.7.0", "onFail": "error" }
+  },
   "soksakRelease": {
     "spec": { "id": "soksak-spec", "version": "0.0.35" },
     "repository": "https://github.com/soksak-ai/soksak-spec",

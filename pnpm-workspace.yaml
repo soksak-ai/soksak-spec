@@ -8,3 +8,7 @@ storeDir: .pnpm-store
 
 allowBuilds:
   esbuild: true
+
+engineStrict: true
+pmOnFail: error
+verifyDepsBeforeRun: error

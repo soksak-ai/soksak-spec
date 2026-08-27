@@ -12,14 +12,19 @@ toolchain installer and does not serialize a developer workstation into source.
 - **BR2 — Declarative owners.** Tool versions live in `.node-version`, `packageManager`,
   `go.mod`, and `rust-toolchain.toml`. External build sources, exact commits, tool requirements,
   and target outputs live in `build-dependencies.json`. The Makefile owns commands only and does
-  not copy this metadata.
+  not copy this metadata. A Node package projects `.node-version` into `engines.node` for consumers
+  and `devEngines.runtime` for direct pnpm entrypoints; tests require every projection to equal the
+  owner.
 - **BR3 — Injected environment.** Source must not contain an installed executable path,
   workspace-relative repository discovery, injected `PATH`, symlink, cache location, or a
   fallback tool. A clean CI job injects the declared versions. A developer's selected local
   environment may contain other tools; `make preflight` checks only the addressed executables
   and rejects a mismatch before any product command. It never searches for or installs another
   copy. A package manager that delegates from a bootstrap executable is judged by the effective
-  version returned in the addressed repository, not by the bootstrap package's own version.
+  version returned in the addressed repository, not by the bootstrap package's own version. A
+  direct pnpm command under a mismatched runtime fails before dependency resolution. pnpm never
+  performs an implicit install before a script: an out-of-date dependency tree is a refusal, and
+  `make prepare` is the one materialization entrypoint.
 - **BR4 — Read-only preflight.** Preflight reports the required and actual version, operating
   system, and architecture. It never installs, deletes, repairs, or selects a tool. An invalid
   environment is a precondition failure, not a product RED.
@@ -187,7 +192,9 @@ make build
 workspace sibling, a remembered shell export, or a machine-specific path. If a required tool is
 not selected, preflight stops and names the mismatch; it never searches for another copy.
 
-GitHub Actions inject tools from the declarative owners and invoke the same targets.
+GitHub Actions inject tools from the declarative owners and invoke the same targets. The selected
+local environment invokes those same targets; direct pnpm entrypoints enforce the same declarations
+but do not select or install a tool.
 Release-only targets may accept an explicit target triple and staging directory, but publication
 credentials and GitHub release mutation stay in Actions.
 
