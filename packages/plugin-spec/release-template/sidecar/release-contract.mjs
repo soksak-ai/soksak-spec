@@ -44,7 +44,7 @@ export function parseSidecarManifest(raw) {
     !raw.interface || typeof raw.interface !== "object" || Array.isArray(raw.interface) ||
     JSON.stringify(Object.keys(raw.interface).sort()) !== JSON.stringify(["id", "version"]) ||
     !/^soksak-spec-sidecar-[a-z0-9][a-z0-9-]*$/.test(raw.interface.id) ||
-    raw.interface.version !== "0.0.1"
+    typeof raw.interface.version !== "string" || !SEMVER.test(raw.interface.version)
   ) throw new Error("interface provider must match the sidecar version");
   return Object.freeze({ ...raw, interface: Object.freeze({ ...raw.interface }) });
 }
