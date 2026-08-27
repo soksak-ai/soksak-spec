@@ -19,6 +19,7 @@ export type PluginPermission =
   | "commands:inject" // danger:"inject" 명령 실행(term.send/exec, browser.eval …)
   | "process" // 외부 서브프로세스 spawn + 양방향 raw stdio(범용 — LSP/MCP/ACP/임의 CLI 통합)
   | "webview" // 코어가 임베드한 child webview(WKWebView) 구동 — 브라우저류 콘텐츠 뷰(네이티브 페이지 로드·eval·inject)
+  | "surface" // 네이티브 표면 소유 — 표면 label 발급·deliver verb·표면 입력 제공(웹뷰 아닌 네이티브 pane 콘텐츠)
   | "sidecar" // runtimeDependencies에 고정된 Sidecar와 불투명 채널로 통신
   | "service" // 상주 plugin service — 코어가 스폰·라우팅하는 커맨드 소유 프로세스(service 선언 필수 — docs/PLUGIN-SERVICE.md)
   | "storage" // 전용 저장소(~/.soksak/plugins-data/<id>/)
@@ -47,6 +48,7 @@ export const PERMISSIONS: readonly PluginPermission[] = [
   "commands:inject",
   "process",
   "webview",
+  "surface",
   "sidecar",
   "service",
   "storage",
@@ -125,6 +127,11 @@ export const PERMISSION_INFO: Record<
     detail:
       "코어가 임베드한 네이티브 webview 를 띄워 임의 웹페이지를 로드하고 그 페이지에서 스크립트를 실행·주입합니다(브라우저류 콘텐츠 뷰).",
     caution: true,
+  },
+  surface: {
+    label: "네이티브 표면",
+    detail:
+      "자기 콘텐츠 뷰 자리에 네이티브 표면(사이드카가 그리는 화면)을 놓고, 그 표면의 주소 발급·명령 전달·포인터 입력 제공을 맡습니다.",
   },
   sidecar: {
     label: "네이티브 엔진 모듈 로드",
