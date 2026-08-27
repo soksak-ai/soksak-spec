@@ -1,5 +1,5 @@
 {
-  "name": "@soksak-ai/plugin-spec",
+  "name": "@soksak/soksak-spec",
   "version": "0.0.35",
   "publishConfig": { "access": "public" },
   "description": "Public Soksak plugin, component release, conformance, and authenticated registry contracts.",

@@ -20,7 +20,7 @@ function localAsset(name, value, contentType) {
 }
 
 const assets = [
-  localAsset("soksak-ai-plugin-spec-0.9.7.tgz", "archive", "application/gzip"),
+  localAsset("soksak-soksak-spec-0.9.7.tgz", "archive", "application/gzip"),
   localAsset("release.json", "{}\n", "application/json"),
 ];
 

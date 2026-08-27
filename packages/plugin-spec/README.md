@@ -1,4 +1,4 @@
-# @soksak-ai/plugin-spec
+# @soksak/soksak-spec
 
 The public soksak platform boundary for independently released plugins, sidecars, kits, contracts, specs,
 conformance reports, and signed registries. It is a validation library and CLI, not a
@@ -11,7 +11,7 @@ npm-compatible tarball and publishes it as an immutable GitHub Release asset:
 
 ```text
 tag:   v<version>
-asset: soksak-ai-plugin-spec-<version>.tgz
+asset: soksak-soksak-spec-<version>.tgz
 url:   https://github.com/soksak-ai/soksak-spec/releases/download/<tag>/<asset>
 ```
 
@@ -49,7 +49,7 @@ import {
   certifyRegistryIndex,
   parseManifest,
   parseReleaseManifest,
-} from "@soksak-ai/plugin-spec";
+} from "@soksak/soksak-spec";
 ```
 
 All external input starts as `unknown` and must cross the relevant parser. Only

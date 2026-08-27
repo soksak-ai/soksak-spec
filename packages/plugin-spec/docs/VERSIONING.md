@@ -135,7 +135,7 @@ does not silently change the component and runtime-interface versions validated 
       "target": "any",
       "format": "tgz",
       "manifest": "spec.json",
-      "file": "soksak-ai-plugin-spec-0.0.9.tgz",
+      "file": "soksak-soksak-spec-0.0.9.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }

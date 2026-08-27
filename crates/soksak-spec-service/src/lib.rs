@@ -10,7 +10,7 @@
 //! framing is NDJSON over stdio: one JSON value per line, both directions.
 //! The first service line is `hello`; the core answers `ready` (PS5).
 //! The manifest-side mirror of [`service_contract_requirement`] lives in
-//! `@soksak-ai/plugin-spec` (service.ts) — the service.test.ts / lib.rs test
+//! `@soksak/soksak-spec` (service.ts) — the service.test.ts / lib.rs test
 //! pair pins both sides to the same literal.
 
 mod serve;
@@ -91,7 +91,7 @@ pub fn judge_hello(declared: Option<u32>) -> soksak_spec_socket::Compat {
 /// core-owned derived file — the app rewrites it on every enablement, consent,
 /// or install transition, and the core reads it at boot. It carries the
 /// already-judged subset of the manifest; the single manifest judge stays
-/// `@soksak-ai/plugin-spec`. Protocol-keyed so a breaking bump runs side by
+/// `@soksak/soksak-spec`. Protocol-keyed so a breaking bump runs side by
 /// side with the previous generation.
 pub fn ledger_path(home: &Path) -> PathBuf {
     home.join("run")

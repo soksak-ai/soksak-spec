@@ -5,7 +5,7 @@ released plugins, sidecars, kits, registries, and developer tooling.
 
 This repository owns only platform-wide boundaries:
 
-- `@soksak-ai/plugin-spec`: plugin, release, conformance, and signed-registry
+- `@soksak/soksak-spec`: plugin, release, conformance, and signed-registry
   schemas plus the headless validator.
 - `soksak-spec-contract`: canonical provider `{id, version}` and consumer
   `{id, requirement}` references.
@@ -21,7 +21,7 @@ protocol is not part of this repository.
 
 - Rust consumers use `git+https://github.com/soksak-ai/soksak-spec.git` pinned
   to an exact 40-character commit.
-- JavaScript consumers declare `"@soksak-ai/plugin-spec": "<version>"` and
+- JavaScript consumers declare `"@soksak/soksak-spec": "<version>"` and
   install it from a package registry named on the make command line
   (`make prepare REGISTRY=http://host:port/`). The lockfile records the
   archive integrity only, so the same lockfile resolves from a local registry

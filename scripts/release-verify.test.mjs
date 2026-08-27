@@ -44,7 +44,7 @@ test("spec release projects the derived owner identity", () => {
   const { workspace, pluginSpec } = metadata();
   const release = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.35.tgz",
+    archiveName: "soksak-soksak-spec-0.0.35.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
@@ -63,13 +63,13 @@ test("spec release names every file by bare name; the location is derived by the
   const { workspace, pluginSpec } = metadata();
   const { evidenceFiles, ...release } = buildPlatformRelease({
     commit,
-    archiveName: "soksak-ai-plugin-spec-0.0.35.tgz",
+    archiveName: "soksak-soksak-spec-0.0.35.tgz",
     archiveDigest: digest,
     archiveSize: 81840,
     identity: specReleaseIdentity(workspace, pluginSpec),
     manifestBytes: Buffer.from('{}\n'),
   });
-  assert.equal(release.artifacts[0].file, "soksak-ai-plugin-spec-0.0.35.tgz");
+  assert.equal(release.artifacts[0].file, "soksak-soksak-spec-0.0.35.tgz");
   assert.equal(release.manifest.file, "spec.json");
   assert.deepEqual(release.evidence.map(({ file }) => file), ["conformance-manifest.json", "conformance-release.json"]);
   assert.deepEqual(evidenceFiles.map(({ name }) => name), ["conformance-manifest.json", "conformance-release.json"]);
@@ -96,7 +96,7 @@ test("spec release takes the strict SemVer grammar and its length bound from the
   const identity = specReleaseIdentity(workspace, pluginSpec);
   const build = (version) => buildPlatformRelease({
     commit,
-    archiveName: `soksak-ai-plugin-spec-${version}.tgz`,
+    archiveName: `soksak-soksak-spec-${version}.tgz`,
     archiveDigest: digest,
     archiveSize: 1,
     identity: { ...identity, version },

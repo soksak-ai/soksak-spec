@@ -1,7 +1,7 @@
 # soksak public platform wire 0.0.1
 
 This document is normative for the public JSON boundaries exported by
-`@soksak-ai/plugin-spec`. The TypeScript parsers enforce the full rules; the JSON Schemas
+`@soksak/soksak-spec`. The TypeScript parsers enforce the full rules; the JSON Schemas
 are the language-neutral structural form; the checked-in corpus fixes canonical bytes and
 cryptographic results.
 

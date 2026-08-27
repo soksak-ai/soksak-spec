@@ -133,7 +133,7 @@ asset을 교체하지 않는다. Package/spec 릴리스 버전은 게시된 바�
       "target": "any",
       "format": "tgz",
       "manifest": "spec.json",
-      "file": "soksak-ai-plugin-spec-0.0.9.tgz",
+      "file": "soksak-soksak-spec-0.0.9.tgz",
       "size": 12345,
       "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     }
