@@ -203,6 +203,7 @@ test("repository owns a complete reproducible release boundary", () => {
     assert.match(document, /implicit install/);
   }
   const makefile = read("Makefile");
+  assert.doesNotMatch(makefile, /@soksak-ai/);
   const pnpmCommands = makefile.split("\n").filter((line) => /\bpnpm (?:install|build|test|release:verify|publish)\b/.test(line));
   assert.ok(pnpmCommands.length >= 5);
   for (const command of pnpmCommands) {
