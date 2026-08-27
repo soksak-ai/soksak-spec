@@ -3,7 +3,7 @@ SHELL := /bin/sh
 .PHONY: preflight prepare build verify release attest publish require-registry require-tooling
 
 # REGISTRY is a make command-line argument; a value from the environment or a file is refused.
-publish_flags = --registry "$(REGISTRY)" --@soksak:registry="$(REGISTRY)" --@soksak-ai:registry="$(REGISTRY)" --no-git-checks
+publish_flags = --registry "$(REGISTRY)" --@soksak:registry="$(REGISTRY)" --no-git-checks
 
 preflight:
 	@scripts/check-build-environment.sh
