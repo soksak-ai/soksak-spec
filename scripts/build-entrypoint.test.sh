@@ -18,13 +18,14 @@ printf '%s\n' "$manifest_flat" | grep -Eq '"packageManager"[[:space:]]*:[[:space
 grep -Eq '^channel = "[0-9]+[.][0-9]+[.][0-9]+"$' "$root/rust-toolchain.toml" || fail 'rust-toolchain.toml must own an exact Rust version'
 grep -Eq '^go [0-9]+[.][0-9]+[.][0-9]+$' "$root/go/platformspec/go.mod" || fail 'go.mod must own an exact Go version'
 
-for target in preflight prepare build verify release publish; do
+for target in preflight prepare build verify release attest publish; do
   grep -Eq "^${target}:" "$root/Makefile" || fail "Makefile target is missing: $target"
 done
 grep -Eq '^[A-Z0-9_]*(VERSION|REPOSITORY|COMMIT|TARGETS)[[:space:]]*:=' "$root/Makefile" && fail 'Makefile duplicates declarative build metadata'
 # The sub-makes below run with MAKEFLAGS cleared: the make that runs this test hands its own
 # command-line variables (REGISTRY=...) to every sub-make through MAKEFLAGS.
 grep -Eq '^publish: require-registry release$' "$root/Makefile" || fail 'publish must require a command-line REGISTRY and the release'
+grep -Eq '^attest: require-tooling release$' "$root/Makefile" || fail 'attest must require exact tooling and the verified release'
 grep -Eq '^	set -- artifacts/\*\.tgz;' "$root/Makefile" || fail 'publish must publish the single verified archive from artifacts/'
 status=0; out=$(env -u MAKEFLAGS -u MFLAGS -u GNUMAKEFLAGS make -f "$root/Makefile" -C "$root" publish 2>&1) || status=$?
 [ "$status" -eq 2 ] && printf '%s\n' "$out" | grep -q 'REGISTRY' || fail 'make publish without REGISTRY must be refused'
@@ -41,6 +42,6 @@ for workflow in "$root/.github/workflows/verify.yml" "$root/.github/workflows/re
 done
 
 grep -Fq 'make verify' "$root/.github/workflows/verify.yml" || fail 'verify workflow does not call make verify'
-grep -Fq 'make verify' "$root/.github/workflows/release.yml" || fail 'release workflow does not call make verify'
+grep -Fq 'make attest SDK_ROOT=' "$root/.github/workflows/release.yml" || fail 'release workflow does not call make attest'
 
 printf 'BUILD_ENTRYPOINT_READY node=%s\n' "$node_owner"
