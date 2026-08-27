@@ -40,6 +40,14 @@ function fixture() {
 }
 
 describe("canonical release asset collection", () => {
+  it("refuses publication without a verified component build receipt", () => {
+    const value = fixture();
+    expect(() => collectCanonicalReleaseAssets({
+      repository: value.repository, commit: value.commit, artifacts: value.directory, manifest: value.manifest,
+    })).toThrow(/component build receipt.*required/i);
+    fs.rmSync(value.directory, { recursive: true, force: true });
+  });
+
   it("maps the bare file names of release.json onto the release asset set of one immutable tag", () => {
     const value = fixture();
     const result = collectCanonicalReleaseAssets({ repository: value.repository, commit: value.commit, artifacts: value.directory, manifest: value.manifest });
