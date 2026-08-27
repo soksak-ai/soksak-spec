@@ -103,12 +103,13 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
 }
 
 // The canonical script discovers sidecar.json from the fixture repository.
-function build(tag = "v0.0.1", emitSummary = false, deVendored = false): { status: number | null; stdout: string; stderr: string } {
+function build(tag = "v0.0.1", emitSummary = false, deVendored = false, target?: string): { status: number | null; stdout: string; stderr: string } {
   const script = deVendored
     ? path.join(TEMPLATE, "build-release.mjs")
     : path.join(root, "scripts", "build-release.mjs");
   const args = [script, "--commit", COMMIT, "--tag", tag, "--artifacts", artifactsDir, "--out", outDir];
   if (emitSummary) args.push("--emit-summary");
+  if (target) args.push("--target", target);
   const r = spawnSync("node", args, { encoding: "utf8", cwd: root });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
@@ -189,6 +190,21 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     expect(r.status).toBe(0);
     const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
     expect(release.artifacts.map((artifact: { target: string }) => artifact.target)).toEqual(targets);
+  });
+
+  it("builds one requested local target through the canonical release builder", () => {
+    const target = "aarch64-apple-darwin";
+    writeFixture();
+    for (const name of fs.readdirSync(artifactsDir)) {
+      if (!name.includes(target)) fs.rmSync(path.join(artifactsDir, name));
+    }
+    const result = build("v0.0.1", false, false, target);
+    expect(result.status, result.stderr).toBe(0);
+    const release = JSON.parse(fs.readFileSync(path.join(outDir, "release.json"), "utf8"));
+    expect(release.artifacts.map((artifact: { target: string }) => artifact.target)).toEqual([target]);
+    for (const file of ["conformance-interface.json", "conformance-release.json", "conformance-sidecar.json"]) {
+      expect(JSON.parse(fs.readFileSync(path.join(outDir, file), "utf8")).artifacts).toHaveLength(1);
+    }
   });
 
   it("accepts a Go sidecar whose identity is owned by sidecar.json", () => {
