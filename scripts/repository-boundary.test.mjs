@@ -213,6 +213,8 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.match(makefile, /SDK_ROOT.*command line/);
   assert.match(makefile, /SDK_RELEASE.*command line/);
   assert.match(makefile, /bin\/soksak-sdk[.]mjs["']?\s+attest/);
+  assert.match(makefile, /go -C .*go\/platformspec.* env GOVERSION/);
+  assert.doesNotMatch(makefile, /go_version=.*go version/);
   const verifier = read("scripts/build-verifier-image.sh");
   assert.match(verifier, /package\.json/);
   assert.match(verifier, /go\/platformspec\/go\.mod/);
