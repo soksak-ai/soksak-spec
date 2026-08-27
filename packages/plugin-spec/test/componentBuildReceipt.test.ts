@@ -32,8 +32,8 @@ function receipt(kind: ReleaseKind) {
     subject: { kind, id: built.id, version: built.version },
     source: built.source,
     manifest: built.manifest,
-    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", size: 1000, sha256: sha("e") },
-    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", size: 2000, sha256: sha("f") },
+    spec: { kind: "spec", id: "soksak-spec", version: "0.0.36", target: "any", file: "soksak-spec-0.0.36-any.tgz", size: 1000, sha256: sha("e") },
+    tooling: { kind: "kit", id: "soksak-sdk", version: "0.0.1", target: "any", file: "soksak-sdk-0.0.1-any.tgz", size: 2000, sha256: sha("f") },
     command: "make verify",
     artifacts: built.artifacts.map(({ target, sha256 }) => ({
       target, sha256,
