@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { publishVerifiedCandidate } from "./verified-release-output.mjs";
+
 const option = (name) => { const index = process.argv.indexOf(name); return index < 0 ? undefined : process.argv[index + 1]; };
 const commit = option("--commit");
 const output = path.resolve(option("--out") ?? "dist-release");
@@ -13,7 +15,8 @@ if (registry !== undefined && !/^https?:\/\//.test(registry)) throw new Error("-
 if (!/^[a-f0-9]{40}$/.test(commit ?? "")) throw new Error("--commit must be an exact Git commit");
 let root = path.resolve(process.cwd());
 while (!fs.existsSync(path.join(root, "release-files.json"))) { const parent = path.dirname(root); if (parent === root) throw new Error("plugin root not found"); root = parent; }
-if (output === root || !output.startsWith(root + path.sep)) throw new Error("--out must be inside the plugin repository");
+if (output === root) throw new Error("--out must not replace the plugin repository");
+fs.mkdirSync(path.dirname(output), { recursive: true });
 const run = (command, args, cwd = root) => { const result = spawnSync(command, args, { cwd, stdio: "inherit", env: process.env }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed`); };
 const capture = (command, args, cwd = root) => { const result = spawnSync(command, args, { cwd, encoding: "utf8", env: process.env }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}${result.stderr}`); return result.stdout.trim(); };
 run("make", ["verify", ...(registry === undefined ? [] : [`REGISTRY=${registry}`])]);
@@ -31,8 +34,16 @@ try {
   run(process.execPath, [validator, "release", path.join(first, "release.json")]);
   const evidence = left.filter((name) => /^conformance-.*[.]json$/.test(name)).map((name) => path.join(first, name));
   run(process.execPath, [validator, "conformance", ...evidence, "--release", path.join(first, "release.json"), "--plugin-manifest", path.join(root, "plugin.json")]);
-  fs.rmSync(output, { recursive: true, force: true });
-  fs.renameSync(first, output);
+  publishVerifiedCandidate(first, output);
+
+  const finalNames = files(output);
+  const finalRelease = path.join(output, "release.json");
+  run(process.execPath, [validator, "release", finalRelease]);
+  const finalEvidence = finalNames.filter((name) => /^conformance-.*[.]json$/.test(name)).map((name) => path.join(output, name));
+  run(process.execPath, [validator, "conformance", ...finalEvidence, "--release", finalRelease, "--plugin-manifest", path.join(root, "plugin.json")]);
+  if (finalNames.includes("component-build-receipt.json")) {
+    run(process.execPath, [validator, "component-build-receipt", path.join(output, "component-build-receipt.json"), "--release", finalRelease]);
+  }
 } finally {
   if (fs.existsSync(first)) fs.rmSync(first, { recursive: true, force: true });
   if (fs.existsSync(second)) fs.rmSync(second, { recursive: true, force: true });

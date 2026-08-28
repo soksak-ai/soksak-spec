@@ -85,6 +85,7 @@ test("repository owns a complete reproducible release boundary", () => {
     "publish-canonical-release.mjs",
     "publish-release.mjs",
     "resolve-release.mjs",
+    "verified-release-output.mjs",
     "verify-plugin-release.mjs",
   ]);
   assert.equal(existsSync(join(root, "packages/plugin-spec/release-template/local-release-build.mjs")), false);
