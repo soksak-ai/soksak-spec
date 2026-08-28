@@ -38,6 +38,7 @@ function archive(binary: Buffer): Buffer {
   fs.mkdirSync(path.join(root, "dist"));
   fs.writeFileSync(path.join(root, "sidecar.json"), JSON.stringify({
     id: ID, version: VERSION,
+    processRole: "sidecar-example",
     interface: { id: "soksak-spec-sidecar-example", version: VERSION },
     process: `dist/${ID}`,
   }));

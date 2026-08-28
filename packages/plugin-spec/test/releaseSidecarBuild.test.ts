@@ -65,6 +65,7 @@ function writeFixture(overrides: { sidecar?: Record<string, unknown>; cargoVersi
   const sidecar = {
     id: "soksak-sidecar-example",
     version: "0.0.1",
+    processRole: "sidecar-example",
     interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
     process: "dist/soksak-sidecar-example",
     ...overrides.sidecar,
@@ -309,6 +310,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
       id: "soksak-sidecar-example",
       version: "0.0.1",
+      processRole: "sidecar-example",
       interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
       process: "dist/soksak-sidecar-example",
     }));
@@ -339,6 +341,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
       id: "soksak-sidecar-example",
       version: "0.0.0",
+      processRole: "sidecar-example",
       interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
       process: "dist/soksak-sidecar-example.exe",
     }));
@@ -363,6 +366,7 @@ describe("release-template/sidecar — canonical sidecar release documents", () 
     fs.writeFileSync(path.join(archiveRoot, "sidecar.json"), JSON.stringify({
       id: "soksak-sidecar-example",
       version: "0.0.1",
+      processRole: "sidecar-example",
       interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
       process: "dist/soksak-sidecar-example",
     }));

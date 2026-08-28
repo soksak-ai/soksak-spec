@@ -5,6 +5,7 @@ import { checkKnownKeys, isRecord } from "./util.js";
 export interface SidecarManifest {
   id: string;
   version: string;
+  processRole: string;
   /** Every contract this sidecar serves; the first entry is its primary role. */
   interface: ContractProviderRef[];
   process: string;
@@ -13,12 +14,13 @@ export interface SidecarManifest {
 export function parseSidecarManifest(raw: unknown): { ok: true; value: SidecarManifest } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(raw)) return { ok: false, errors: ["sidecar manifest must be an object"] };
-  checkKnownKeys(raw, ["id", "interface", "process", "version"], "sidecar", errors);
-  for (const key of ["id", "interface", "process", "version"]) {
+  checkKnownKeys(raw, ["id", "interface", "process", "processRole", "version"], "sidecar", errors);
+  for (const key of ["id", "interface", "process", "processRole", "version"]) {
     if (!(key in raw)) errors.push(`sidecar.${key}: required`);
   }
   if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id)) errors.push("sidecar.id: sidecar id required");
   if (typeof raw.version !== "string" || !STRICT_SEMVER_RE.test(raw.version)) errors.push("sidecar.version: strict SemVer required");
+  if (typeof raw.processRole !== "string" || !/^sidecar(?:-[a-z0-9]+)+$/.test(raw.processRole)) errors.push("sidecar.processRole: project-independent Sidecar role required");
   if (typeof raw.process !== "string" || (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`)) errors.push("sidecar.process: platform executable path required");
   const interfaces: ContractProviderRef[] = [];
   if (!Array.isArray(raw.interface) || raw.interface.length === 0) {
@@ -37,5 +39,5 @@ export function parseSidecarManifest(raw: unknown): { ok: true; value: SidecarMa
     });
   }
   if (errors.length > 0 || interfaces.length === 0 || typeof raw.id !== "string") return { ok: false, errors };
-  return { ok: true, value: { id: raw.id, version: raw.version as string, interface: interfaces, process: raw.process as string } };
+  return { ok: true, value: { id: raw.id, version: raw.version as string, processRole: raw.processRole as string, interface: interfaces, process: raw.process as string } };
 }

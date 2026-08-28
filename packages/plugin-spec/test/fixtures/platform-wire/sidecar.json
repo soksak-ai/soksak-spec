@@ -1,6 +1,7 @@
 {
   "id": "weather-sidecar",
   "version": "0.0.1",
+  "processRole": "sidecar-weather",
   "interface": [
     {
       "id": "soksak-spec-sidecar-weather",

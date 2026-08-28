@@ -20,6 +20,7 @@ function stage(binary = macho()): void {
   fs.mkdirSync(path.join(root, "dist"), { recursive: true });
   fs.writeFileSync(path.join(root, "sidecar.json"), `${JSON.stringify({
     id: "soksak-sidecar-example", version: "0.0.1",
+    processRole: "sidecar-example",
     interface: [{ id: "soksak-spec-sidecar-example", version: "0.0.1" }],
     process: "dist/soksak-sidecar-example",
   }, null, 2)}\n`);

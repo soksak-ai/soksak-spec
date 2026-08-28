@@ -37,9 +37,10 @@ function releaseFileName(name) {
 export function parseSidecarManifest(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("sidecar manifest must be an object");
   const keys = Object.keys(raw).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "version"])) throw new Error("sidecar manifest keys are closed");
+  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "processRole", "version"])) throw new Error("sidecar manifest keys are closed");
   if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id) || typeof raw.version !== "string" || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
   if (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`) throw new Error("sidecar process path must match its platform executable");
+  if (typeof raw.processRole !== "string" || !/^sidecar(?:-[a-z0-9]+)+$/.test(raw.processRole)) throw new Error("sidecar process role must be project-independent");
   if (!Array.isArray(raw.interface) || raw.interface.length === 0)
     throw new Error("interface providers must be a non-empty array");
   const seen = new Set();
