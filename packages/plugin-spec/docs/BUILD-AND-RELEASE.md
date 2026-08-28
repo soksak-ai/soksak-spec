@@ -235,3 +235,8 @@ Component Tooling owns build, kind-specific packaging, and attestation. The Spec
 command never clones or builds an owner repository. It accepts only a release whose exact build
 receipt is already attached, validates the complete asset set, and mutates the addressed store
 atomically. Runtime dependencies are resolved from that `--store` only.
+
+For a Plugin with runtime dependencies, the owner passes the absolute store to the verified release
+command. That command forwards the same store to both independent candidate generations before
+comparing their bytes. Omitting the store selects published GitHub releases; a failed local lookup
+is never retried against GitHub.

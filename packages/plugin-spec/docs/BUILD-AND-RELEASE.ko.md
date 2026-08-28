@@ -233,3 +233,7 @@ Component Tooling이 build, kind별 packaging, attestation을 소유합니다. S
 command는 owner 저장소를 clone하거나 build하지 않습니다. exact build receipt가 이미 첨부된 release만
 받아 전체 asset set을 검증하고 지정된 store를 atomically 변경합니다. Runtime dependency는 그
 `--store`에서만 해석합니다.
+
+Runtime dependency가 있는 Plugin은 owner가 절대 store 경로를 verified release 명령에 전달합니다.
+그 명령은 같은 store를 두 개의 독립 candidate 생성에 모두 전달한 뒤 byte를 비교합니다. Store를
+생략하면 공개 GitHub release를 선택하며, 실패한 local 조회를 GitHub에서 다시 시도하지 않습니다.
