@@ -192,6 +192,8 @@ describe("canonical local release store", () => {
   it("rejects partial mutation and undeclared files", () => {
     const published = publishLocalRelease({ store, release: releaseFixture() });
     fs.writeFileSync(path.join(published.directory, "extra"), "no");
-    expect(refusal(() => verifyLocalReleaseStore({ store }))).toMatch(/^LOCAL_RELEASE_CORRUPT: /);
+    const message = refusal(() => verifyLocalReleaseStore({ store }));
+    expect(message).toMatch(/^LOCAL_RELEASE_CORRUPT: /);
+    expect(message).toContain(published.directory);
   });
 });
