@@ -14,4 +14,12 @@ describe("plugin owner release gate", () => {
     expect(source).toContain('`REGISTRY=${registry}`');
     expect(source).not.toContain('run("make", ["verify"])');
   });
+  it("passes one absolute local store to both independent release generations", () => {
+    const source = readFileSync(join(import.meta.dirname, "../release-template/verify-plugin-release.mjs"), "utf8");
+    expect(source).toContain('process.argv.includes("--store")');
+    expect(source).toContain('path.isAbsolute(store)');
+    expect(source).toContain('const buildArgs = (out) =>');
+    expect(source).toContain('...(store === undefined ? [] : ["--store", store])');
+    expect(source.match(/run\(process\.execPath, buildArgs\(/g)).toHaveLength(2);
+  });
 });
