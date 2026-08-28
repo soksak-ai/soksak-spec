@@ -9,7 +9,7 @@ import (
 func TestEnvironmentOwnsLocalMaterializationAndUserChoices(t *testing.T) {
 	environment := EmptyEnvironment()
 	environment.Plugins["soksak-plugin-browser-wails3"] = Plugin{Component: Component{Version: "0.0.1", Path: "/installed/browser", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official"}, Enabled: true}
-	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", ArtifactSHA256: strings.Repeat("b", 64), Source: LocalSource, Target: "aarch64-apple-darwin"}
+	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/installed/terminal-provider", Process: "/installed/terminal-provider/dist/soksakv3-sidecar-terminal-provider", ArtifactSHA256: strings.Repeat("b", 64), Source: LocalSource, Target: "aarch64-apple-darwin"}
 	if err := ValidateEnvironment(environment); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestEnvironmentIsTheOnlyLocalComponentDiscoveryDocument(t *testing.T) {
 		t.Fatalf("environment file=%q", EnvironmentFile)
 	}
 	environment := EmptyEnvironment()
-	environment.Sidecars["pty"] = Component{Version: "0.0.1", Path: "/local/pty", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
+	environment.Sidecars["pty"] = Component{Version: "0.0.1", Path: "/local/pty", Process: "/local/pty/dist/soksakv3-sidecar-pty", ArtifactSHA256: strings.Repeat("a", 64), Source: RegistrySource, Registry: "official", Target: "aarch64-apple-darwin"}
 	body, err := json.Marshal(environment)
 	if err != nil {
 		t.Fatal(err)
@@ -73,15 +73,15 @@ func TestEnvironmentIsTheOnlyLocalComponentDiscoveryDocument(t *testing.T) {
 }
 
 func TestSidecarManifestIsExact(t *testing.T) {
-	body := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/terminal-provider\"}")
+	body := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"processRole\":\"sidecar-terminal-provider\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/terminal-provider\"}")
 	if _, err := ParseSidecarManifest(body); err != nil {
 		t.Fatal(err)
 	}
-	windows := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/terminal-provider.exe\"}")
+	windows := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"processRole\":\"sidecar-terminal-provider\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/terminal-provider.exe\"}")
 	if _, err := ParseSidecarManifest(windows); err != nil {
 		t.Fatal(err)
 	}
-	wrong := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/other.exe\"}")
+	wrong := []byte("{\"id\":\"terminal-provider\",\"version\":\"0.0.1\",\"processRole\":\"sidecar-terminal-provider\",\"interface\":[{\"id\":\"terminal-state\",\"version\":\"0.0.1\"}],\"process\":\"dist/other.exe\"}")
 	if _, err := ParseSidecarManifest(wrong); err == nil {
 		t.Fatal("mismatched Windows process was accepted")
 	}
@@ -112,7 +112,7 @@ func TestEnvironmentDeclaresTheMaterializedSidecarProcess(t *testing.T) {
 func TestDevelopmentRecordHasNoArtifactAndNoRegistry(t *testing.T) {
 	environment := EmptyEnvironment()
 	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource}, Enabled: true}
-	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/work/terminal-provider", Source: DevelopmentSource, Target: "aarch64-apple-darwin"}
+	environment.Sidecars["terminal-provider"] = Component{Version: "0.0.2", Path: "/work/terminal-provider", Process: "/work/terminal-provider/dist/soksakv3-sidecar-terminal-provider", Source: DevelopmentSource, Target: "aarch64-apple-darwin"}
 	if err := ValidateEnvironment(environment); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestRegistryAndLocalStillRequireArtifactDigest(t *testing.T) {
 // wire moved, and which numbers exist is the wire contract's to say, not this grammar's.
 func TestSidecarManifestAcceptsAnyStrictInterfaceVersion(t *testing.T) {
 	manifest := func(version string) []byte {
-		return []byte(`{"id":"unit","version":"0.0.14","interface":[{"id":"wire","version":"` +
+		return []byte(`{"id":"unit","version":"0.0.14","processRole":"sidecar-unit","interface":[{"id":"wire","version":"` +
 			version + `"}],"process":"dist/unit"}`)
 	}
 	for _, version := range []string{"0.0.1", "0.0.2", "1.2.3", "0.0.2-rc.1"} {

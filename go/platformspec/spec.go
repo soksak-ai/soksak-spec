@@ -7,6 +7,7 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 const EnvironmentFile = "environment.json"
@@ -16,8 +17,9 @@ type Reference struct {
 	Version string `json:"version"`
 }
 type SidecarManifest struct {
-	ID      string `json:"id"`
-	Version string `json:"version"`
+	ID          string `json:"id"`
+	Version     string `json:"version"`
+	ProcessRole string `json:"processRole"`
 	// Interfaces lists every contract this sidecar serves; the first entry is
 	// its primary role. One sidecar, several contracts — a terminal engine
 	// also serves the surface channel.
@@ -34,6 +36,7 @@ const (
 type Component struct {
 	Version        string `json:"version"`
 	Path           string `json:"path"`
+	Process        string `json:"process,omitempty"`
 	ArtifactSHA256 string `json:"artifactSha256"`
 	Source         string `json:"source"`
 	Registry       string `json:"registry,omitempty"`
@@ -50,6 +53,7 @@ type Environment struct {
 }
 
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,127}$`)
+var processRolePattern = regexp.MustCompile(`^sidecar(?:-[a-z0-9]+)+$`)
 var registryPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 func decode(body []byte, value any) error {
@@ -69,7 +73,7 @@ func ParseSidecarManifest(body []byte) (SidecarManifest, error) {
 		return SidecarManifest{}, err
 	}
 	process := "dist/" + value.ID
-	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || len(value.Interfaces) == 0 || (value.Process != process && value.Process != process+".exe") {
+	if !idPattern.MatchString(value.ID) || !strictSemver(value.Version) || !processRolePattern.MatchString(value.ProcessRole) || len(value.Interfaces) == 0 || (value.Process != process && value.Process != process+".exe") {
 		return SidecarManifest{}, fmt.Errorf("invalid sidecar manifest")
 	}
 	seen := map[string]bool{}
@@ -113,6 +117,17 @@ func ValidateEnvironment(value Environment) error {
 func validComponent(value Component, sidecar bool) error {
 	if !strictSemver(value.Version) || !filepath.IsAbs(value.Path) || filepath.Clean(value.Path) != value.Path {
 		return fmt.Errorf("component requires exact version and absolute path")
+	}
+	if sidecar {
+		if !filepath.IsAbs(value.Process) || filepath.Clean(value.Process) != value.Process {
+			return fmt.Errorf("sidecar requires an absolute materialized process")
+		}
+		relative, err := filepath.Rel(value.Path, value.Process)
+		if err != nil || relative == "." || relative == ".." || filepath.IsAbs(relative) || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("sidecar process must be inside its component path")
+		}
+	} else if value.Process != "" {
+		return fmt.Errorf("process is sidecar-only")
 	}
 	switch value.Source {
 	case RegistrySource:
