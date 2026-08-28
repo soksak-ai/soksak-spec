@@ -115,7 +115,8 @@ references; Core does not record them as runtime processes.
 exact version, materialized path, source (`local`, `registry`, or `development`), and artifact
 SHA-256. A `development` record references a source directory, reads its version from the manifest
 there, and records an empty artifact SHA-256 and no registry. A Sidecar also records its target; a
-Plugin also records its enabled state. `release.json` retains
+Sidecar additionally records the exact absolute process materialized from the build's project name
+and the manifest's `processRole`; a Plugin records its enabled state. `release.json` retains
 repository, source commit, dependency identity, size, and digest. `environment.json` is owned and
 validated by the Go module; the TypeScript package exports nothing for it.
 

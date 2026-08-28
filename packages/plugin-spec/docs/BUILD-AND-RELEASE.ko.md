@@ -114,7 +114,8 @@ runtime process로 기록하지 않습니다.
 `environment.json`은 Plugin과 Sidecar runtime 선택만 기록합니다. 각 record에는 exact version,
 materialized path, source(`local`, `registry` 또는 `development`), artifact SHA-256이 있습니다.
 `development` record의 path는 source directory이고, 그 manifest에서 version을 읽으며, 빈 artifact
-SHA-256과 registry 없음을 기록합니다. Sidecar는 target을, Plugin은 enabled 상태를 추가로
+SHA-256과 registry 없음을 기록합니다. Sidecar는 target과 build project 이름 및 manifest의
+`processRole`에서 materialize한 정확한 절대 process 경로를, Plugin은 enabled 상태를 추가로
 기록합니다. `release.json`은 repository, source commit, dependency identity, size, digest를
 보존합니다. `environment.json`은 Go module이 소유하고 검증합니다. TypeScript package는 이 문서에
 대해 아무것도 내보내지 않습니다.

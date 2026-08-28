@@ -294,8 +294,9 @@ lockfile만 소유한다.
 레지스트리 index는 plugin당 `{ id, version, size, sha256 }` 참조 하나를 게시한다. 각
 `release.json`은 source commit, artifact file 이름, 크기, digest, runtime dependency 참조를 기록한다.
 `environment.json`은 exact 선택 버전, registry ID, 절대 local path, source kind, 해당되는 target,
-plugin 활성화와 설치된 정확한 component identity를 기록하는 유일한 local state다. repository, commit, digest를
-레지스트리에서 복제하지 않는다.
+plugin 활성화와 설치된 정확한 component identity를 기록하는 유일한 local state다. Sidecar record는
+component path 안의 regular file인 절대 materialized process 경로도 기록한다. repository, commit,
+digest를 레지스트리에서 복제하지 않는다.
 
 인스톨러는 transaction 디렉터리에 다운로드하고 압축 해제 전에 크기와 SHA-256을 검사하며
 모든 manifest와 조건을 검증한 후 내용을 배치하고 `environment.json`을 원자적으로 교체한다.
@@ -306,6 +307,12 @@ write lock은 transaction 동안만 존재하며 영구 lock 문서는 없다. �
 workspace checkout path, PATH 또는 symbolic link로 다른 저장소를 찾지 않는다. build-time 관계는
 package dependency를 사용하고 runtime 관계는 environment에서 component ID로 해석하며 remote byte는
 release 참조로 읽는다. 테스트도 같은 공개 interface를 사용하고 sibling source topology를 만들지 않는다.
+
+Sidecar release는 `sidecar-terminal-alacritty` 같은 project-independent `processRole`과
+`dist/soksak-sidecar-terminal-alacritty` 같은 canonical artifact entry를 선언한다. Installer는 선언된
+project 이름을 받아 staged component 안에 실행 파일을 `<project>-<processRole>`로 materialize하고 그
+정확한 절대 경로를 `environment.json`에 기록한다. Core는 그 기록된 경로만 실행한다. Wrapper, symbolic
+link, `argv[0]` 치환 또는 process 내부 display-name 덮어쓰기는 process-name 계약이 아니다.
 
 ## 8. 충돌과 업데이트
 

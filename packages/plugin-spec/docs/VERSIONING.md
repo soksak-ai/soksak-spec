@@ -299,8 +299,9 @@ The registry index publishes one `{ id, version, size, sha256 }` reference per p
 `release.json` records the source commit, artifact file names, sizes, digests, and runtime
 dependency references. `environment.json` is the single local state: exact selected version,
 registry ID, absolute materialized path, source kind, target where applicable, plugin activation,
-and exact installed component identities. It does not copy repository, commit, or digest facts out
-of the registry.
+and exact installed component identities. A Sidecar record also names its absolute materialized
+process. The process must be a regular file inside that component path. It does not copy repository,
+commit, or digest facts out of the registry.
 
 The installer downloads into a transaction directory, checks size and SHA-256 before extraction,
 validates every manifest and requirement, moves all content into place, and atomically replaces
@@ -312,6 +313,14 @@ another repository through `../`, an injected repository root, a workspace check
 or a symbolic link. Build-time relationships use package dependencies. Runtime relationships use
 component IDs resolved through the environment. Remote bytes are read through release references.
 Tests use the same public interfaces and do not invent a sibling-source topology.
+
+A Sidecar release declares a project-independent `processRole` such as
+`sidecar-terminal-alacritty` and a canonical artifact entry such as
+`dist/soksak-sidecar-terminal-alacritty`. The installer receives the project's declared name,
+materializes the executable as `<project>-<processRole>` inside the staged component, and records
+that exact absolute path in `environment.json`. Core executes only that recorded path. A wrapper,
+symbolic link, `argv[0]` substitution, or in-process display-name override is not the process-name
+contract.
 
 ## 8. Conflicts and updates
 
