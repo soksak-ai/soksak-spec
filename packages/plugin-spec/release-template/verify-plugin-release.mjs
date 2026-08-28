@@ -12,6 +12,8 @@ const output = path.resolve(option("--out") ?? "dist-release");
 // The owner Makefile takes its package registry on the make command line; --registry is that value.
 const registry = option("--registry");
 if (registry !== undefined && !/^https?:\/\//.test(registry)) throw new Error("--registry must be an absolute http(s) URL");
+const store = process.argv.includes("--store") ? option("--store") ?? "" : undefined;
+if (store !== undefined && !path.isAbsolute(store)) throw new Error("--store must be an absolute local release store");
 if (!/^[a-f0-9]{40}$/.test(commit ?? "")) throw new Error("--commit must be an exact Git commit");
 let root = path.resolve(process.cwd());
 while (!fs.existsSync(path.join(root, "release-files.json"))) { const parent = path.dirname(root); if (parent === root) throw new Error("plugin root not found"); root = parent; }
@@ -22,11 +24,15 @@ const capture = (command, args, cwd = root) => { const result = spawnSync(comman
 run("make", ["verify", ...(registry === undefined ? [] : [`REGISTRY=${registry}`])]);
 const template = path.dirname(fileURLToPath(import.meta.url));
 const validator = path.resolve(template, "../bin/validate.mjs");
+const buildArgs = (out) => [
+  path.join(template, "build-release.mjs"), "--commit", commit, "--out", out,
+  ...(store === undefined ? [] : ["--store", store]),
+];
 const first = fs.mkdtempSync(path.join(path.dirname(output), ".plugin-release-a-"));
 const second = fs.mkdtempSync(path.join(path.dirname(output), ".plugin-release-b-"));
 try {
-  run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", first]);
-  run(process.execPath, [path.join(template, "build-release.mjs"), "--commit", commit, "--out", second]);
+  run(process.execPath, buildArgs(first));
+  run(process.execPath, buildArgs(second));
   const files = (directory) => fs.readdirSync(directory).sort();
   const left = files(first); const right = files(second);
   if (JSON.stringify(left) !== JSON.stringify(right)) throw new Error("release generation is not idempotent: file sets differ");
