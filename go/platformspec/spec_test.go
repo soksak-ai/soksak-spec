@@ -87,6 +87,28 @@ func TestSidecarManifestIsExact(t *testing.T) {
 	}
 }
 
+func TestSidecarManifestDeclaresAProjectIndependentProcessRole(t *testing.T) {
+	body := []byte(`{"id":"soksak-sidecar-terminal-alacritty","version":"0.0.1","interface":[{"id":"terminal-state","version":"0.0.1"}],"process":"dist/soksak-sidecar-terminal-alacritty","processRole":"sidecar-terminal-alacritty"}`)
+	if _, err := ParseSidecarManifest(body); err != nil {
+		t.Fatal(err)
+	}
+	withoutRole := []byte(`{"id":"soksak-sidecar-terminal-alacritty","version":"0.0.1","interface":[{"id":"terminal-state","version":"0.0.1"}],"process":"dist/soksak-sidecar-terminal-alacritty"}`)
+	if _, err := ParseSidecarManifest(withoutRole); err == nil {
+		t.Fatal("Sidecar manifest without processRole was accepted")
+	}
+}
+
+func TestEnvironmentDeclaresTheMaterializedSidecarProcess(t *testing.T) {
+	body := []byte(`{"revision":1,"plugins":{},"sidecars":{"soksak-sidecar-terminal-alacritty":{"version":"0.0.1","path":"/installed/alacritty","process":"/installed/alacritty/dist/soksakv3-sidecar-terminal-alacritty","artifactSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source":"local","target":"aarch64-apple-darwin"}}}`)
+	if _, err := ParseEnvironment(body); err != nil {
+		t.Fatal(err)
+	}
+	outside := []byte(`{"revision":1,"plugins":{},"sidecars":{"soksak-sidecar-terminal-alacritty":{"version":"0.0.1","path":"/installed/alacritty","process":"/other/soksakv3-sidecar-terminal-alacritty","artifactSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","source":"local","target":"aarch64-apple-darwin"}}}`)
+	if _, err := ParseEnvironment(outside); err == nil {
+		t.Fatal("Sidecar process outside its materialized component was accepted")
+	}
+}
+
 func TestDevelopmentRecordHasNoArtifactAndNoRegistry(t *testing.T) {
 	environment := EmptyEnvironment()
 	environment.Plugins["demo"] = Plugin{Component: Component{Version: "0.0.1", Path: "/work/demo", Source: DevelopmentSource}, Enabled: true}
