@@ -182,6 +182,7 @@ conformance evidence가 소유하며 설치 시 provider 선택이나 fallback�
 {
   "id": "terminal-provider",
   "version": "0.0.1",
+  "processRole": "sidecar-terminal-provider",
   "interface": [{
     "id": "soksak-spec-sidecar-terminal",
     "version": "0.0.1"

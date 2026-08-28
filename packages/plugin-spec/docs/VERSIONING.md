@@ -184,6 +184,7 @@ evidence own the provided interface; there is no provider selection or fallback 
 {
   "id": "terminal-provider",
   "version": "0.0.1",
+  "processRole": "sidecar-terminal-provider",
   "interface": [{
     "id": "soksak-spec-sidecar-terminal",
     "version": "0.0.1"
