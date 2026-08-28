@@ -33,9 +33,9 @@ function regularDirectory(value, label, empty = false) {
 function readRelease(directory) {
   let bytes; let raw;
   try { bytes = fs.readFileSync(path.join(directory, "release.json")); raw = JSON.parse(bytes.toString("utf8")); }
-  catch (error) { fail("LOCAL_RELEASE_CORRUPT", `release.json cannot be read: ${String(error)}`); }
+  catch (error) { fail("LOCAL_RELEASE_CORRUPT", `${directory}: release.json cannot be read: ${String(error)}`); }
   const parsed = parseReleaseManifest(raw);
-  if (!parsed.ok) fail("LOCAL_RELEASE_CORRUPT", parsed.errors.join("; "));
+  if (!parsed.ok) fail("LOCAL_RELEASE_CORRUPT", `${directory}: ${parsed.errors.join("; ")}`);
   return { release: parsed.value, bytes };
 }
 
@@ -48,7 +48,7 @@ function canonical(directory) {
       repository, commit: release.source.commit, artifacts: directory, manifest: path.join(directory, "release.json"),
     });
   } catch (error) {
-    fail("LOCAL_RELEASE_CORRUPT", error instanceof Error ? error.message : String(error));
+    fail("LOCAL_RELEASE_CORRUPT", `${directory}: ${error instanceof Error ? error.message : String(error)}`);
   }
   const inventory = collected.assets.map(({ name, bytes: asset }) => ({ name, size: asset.length, sha256: sha256(asset) }));
   const digest = sha256(Buffer.from(`${JSON.stringify(inventory)}\n`));
