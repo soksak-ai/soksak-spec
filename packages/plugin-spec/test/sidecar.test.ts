@@ -3,6 +3,7 @@ import { parseSidecarManifest } from "../src/sidecar.js";
 
 const manifest = () => ({
   id: "soksak-sidecar-terminal-vt100", version: "0.0.1",
+  processRole: "sidecar-terminal-vt100",
   interface: [{ id: "soksak-spec-sidecar-terminal", version: "0.0.1" }],
   process: "dist/soksak-sidecar-terminal-vt100",
 });
@@ -15,6 +16,8 @@ describe("sidecar manifest", () => {
   it("rejects unknown fields and mismatched process paths", () => {
     expect(parseSidecarManifest({ ...manifest(), extra: true }).ok).toBe(false);
     expect(parseSidecarManifest({ ...manifest(), process: "dist/other" }).ok).toBe(false);
+    const { processRole: _processRole, ...withoutRole } = manifest();
+    expect(parseSidecarManifest(withoutRole).ok).toBe(false);
   });
   it("keeps component patches independent from the interface version", () => {
     expect(parseSidecarManifest({ ...manifest(), version: "0.0.4" })).toMatchObject({ ok: true, value: { version: "0.0.4", interface: [{ version: "0.0.1" }] } });
