@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -29,6 +30,13 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
 describe("verified plugin release output", () => {
+  it("exposes the verified output transaction as a command", () => {
+    const script = path.join(import.meta.dirname, "../release-template/verified-release-output.mjs");
+    const result = spawnSync(process.execPath, [script, "--candidate", candidate("command"), "--output", output], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ state: "created", output });
+  });
+
   it("publishes once by rename and leaves an equal repeated build unchanged", () => {
     const first = candidate("first");
     expect(publishVerifiedCandidate(first, output).state).toBe("created");
