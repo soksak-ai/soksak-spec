@@ -172,6 +172,11 @@ reference that resolves to different bytes or to no stored release fails with
    omitting it remains the publication boundary and requires the repository's complete target matrix.
    The exact Component Tooling release writes `component-build-receipt.json` after `make verify`
    and before publication; its artifact matrix is the matrix the release records.
+   A Plugin owner verifier builds and compares two base candidates before exposing either one. If
+   the addressed final output is absent, the verified directory is published by one rename. A
+   repeated equal base, including a final output that already carries the canonical Component
+   Tooling receipt, is `unchanged`. Different bytes fail while preserving the completed output.
+   Verification never recursively deletes the addressed final output.
 3. The local publisher validates and atomically stores the output. Same `source.commit` and same
    bytes return `unchanged`; same commit and different bytes fail with
    `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit replaces the version directory

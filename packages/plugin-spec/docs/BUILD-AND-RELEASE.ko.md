@@ -173,6 +173,10 @@ byte로 해석되거나 저장 release가 없는 reference는 dependent release�
    이 옵션을 생략한 publication 경계는 저장소의 전체 target matrix를 계속 요구합니다.
    Exact Component Tooling release는 `make verify` 뒤 publication 전에
    `component-build-receipt.json`을 만들며 receipt의 artifact matrix가 release matrix가 됩니다.
+   Plugin owner verifier는 둘 중 하나를 노출하기 전에 base candidate 두 벌을 만들고 비교합니다.
+   지정한 final output이 없으면 검증한 directory를 rename 한 번으로 공개합니다. 같은 base를 반복한
+   경우와 canonical Component Tooling receipt가 이미 붙은 final output은 `unchanged`입니다. 다른
+   byte는 완성된 output을 보존한 채 실패합니다. 검증은 지정한 final output을 재귀 삭제하지 않습니다.
 3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 `source.commit`에 같은 byte는
    `unchanged`를 반환하고, 같은 commit에 다른 byte는 `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로
    실패하며, 다른 commit은 BR12에 따라 version directory를 교체합니다.
