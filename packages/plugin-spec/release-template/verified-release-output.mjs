@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { isEntryModule } from "./entry.mjs";
+
 const RECEIPT = "component-build-receipt.json";
 
 function sha256(bytes) {
@@ -101,4 +103,28 @@ export function publishVerifiedCandidate(candidate, output) {
   }
   assertSameVerifiedReleaseBase(candidate, output);
   return { state: "unchanged", output };
+}
+
+function commandOptions(argv) {
+  if (argv.length !== 4) throw new Error("usage: verified-release-output.mjs --candidate <directory> --output <directory>");
+  const values = new Map();
+  for (let index = 0; index < argv.length; index += 2) {
+    const name = argv[index];
+    const value = argv[index + 1];
+    if ((name !== "--candidate" && name !== "--output") || !value || values.has(name)) {
+      throw new Error("usage: verified-release-output.mjs --candidate <directory> --output <directory>");
+    }
+    values.set(name, value);
+  }
+  return { candidate: values.get("--candidate"), output: values.get("--output") };
+}
+
+if (isEntryModule(import.meta.url)) {
+  try {
+    const options = commandOptions(process.argv.slice(2));
+    process.stdout.write(`${JSON.stringify(publishVerifiedCandidate(options.candidate, options.output))}\n`);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
 }
