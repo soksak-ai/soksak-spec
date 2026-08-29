@@ -6,12 +6,10 @@ import { parseReleaseManifest, verifyReference } from "../dist/release.js";
 import { collectCanonicalReleaseAssets } from "./publish-canonical-release.mjs";
 import { KIND_DIRECTORY, releaseDirectory } from "./resolve-release.mjs";
 
-// A replacement is two renames: <version> -> <version>~previous.<pid>, <version>~next.<pid> ->
-// <version>, then <version>~previous.<pid> is removed. '~' is outside the SemVer grammar, so a
-// staging directory never collides with a stored version. A leftover directory of either name
-// family is an interrupted replacement.
-const REPLACEMENT_SUFFIX = Object.freeze({ previous: `~previous.${process.pid}`, next: `~next.${process.pid}` });
-const REPLACEMENT_LEFTOVER_RE = /~(?:next|previous)\.[0-9]+$/;
+// A new version is copied under a non-SemVer staging name and renamed once. Existing versions are
+// immutable, so there is no previous-version staging family and no replacement transaction.
+const PUBLICATION_SUFFIX = `~next.${process.pid}`;
+const PUBLICATION_LEFTOVER_RE = /~next\.[0-9]+$/;
 // The runtimeDependencies group that pins a release of each dependency kind.
 const DEPENDENCY_GROUP = Object.freeze({ plugin: "plugins", sidecar: "sidecars" });
 
@@ -96,12 +94,12 @@ function* versionDirectories(root) {
 
 // Every store operation runs this at entry: a replacement leftover anywhere in the store refuses
 // the operation before any release is read or written. An absent store holds nothing.
-function assertNoReplacementLeftovers(store) {
+function assertNoPublicationLeftovers(store) {
   if (typeof store !== "string" || !path.isAbsolute(store)) fail("LOCAL_RELEASE_INVALID", "store must be absolute");
   if (!fs.existsSync(store)) return;
   for (const { version, entry } of versionDirectories(regularDirectory(store, "release store"))) {
-    if (REPLACEMENT_LEFTOVER_RE.test(version)) {
-      fail("LOCAL_RELEASE_REPLACEMENT_INTERRUPTED", `replacement leftover exists: ${entry}`);
+    if (PUBLICATION_LEFTOVER_RE.test(version)) {
+      fail("LOCAL_RELEASE_PUBLICATION_INTERRUPTED", `publication leftover exists: ${entry}`);
     }
   }
 }
@@ -111,28 +109,6 @@ function* storedReleases(root) {
   for (const { kind, id, version } of versionDirectories(root)) {
     yield { kind, id, version, directory: releaseDirectory(root, kind, id, version) };
   }
-}
-
-// The stored releases whose runtimeDependencies pin the release.json bytes of one stored release.
-function dependents(root, { kind, id, version, bytes }) {
-  const group = DEPENDENCY_GROUP[kind];
-  if (!group) return [];
-  const names = [];
-  for (const entry of storedReleases(root)) {
-    const references = readRelease(entry.directory).release.runtimeDependencies?.[group] ?? [];
-    const pinned = references.some((reference) => {
-      if (reference.id !== id || reference.version !== version) return false;
-      try { verifyReference(bytes, reference); return true; } catch { return false; }
-    });
-    if (pinned) names.push(releaseName(entry.kind, entry.id, entry.version));
-  }
-  return names;
-}
-
-// A release that a stored release pins is neither replaced nor deleted.
-function assertNotInUse(store, { kind, id, version, bytes }) {
-  const inUse = dependents(path.resolve(store), { kind, id, version, bytes });
-  if (inUse.length > 0) fail("LOCAL_RELEASE_IN_USE", `${releaseName(kind, id, version)} is pinned by ${inUse.join(", ")}`);
 }
 
 // Every runtimeDependencies reference of every stored release resolves inside the store with the
@@ -169,7 +145,7 @@ function withStoreLock(store, action) {
 }
 
 export function publishLocalRelease(input) {
-  assertNoReplacementLeftovers(input.store);
+  assertNoPublicationLeftovers(input.store);
   return withStoreLock(path.resolve(input.store), () => publishLocked(input));
 }
 
@@ -179,8 +155,7 @@ function publishLocked({ store, release: releaseInput }) {
   const { kind, id, version } = sourceState.release;
   const commit = sourceState.release.source.commit;
   const destination = releaseDirectory(store, kind, id, version);
-  const previous = `${destination}${REPLACEMENT_SUFFIX.previous}`;
-  const next = `${destination}${REPLACEMENT_SUFFIX.next}`;
+  const next = `${destination}${PUBLICATION_SUFFIX}`;
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
   const exists = fs.existsSync(destination);
   if (exists) {
@@ -189,7 +164,7 @@ function publishLocked({ store, release: releaseInput }) {
       if (existing.digest === sourceState.digest) return { state: "unchanged", kind, id, version, directory: destination, digest: existing.digest };
       fail("LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC", `${releaseName(kind, id, version)} at commit ${commit} produced different bytes`);
     }
-    assertNotInUse(store, { kind, id, version, bytes: existing.bytes });
+    fail("LOCAL_RELEASE_VERSION_CONFLICT", `${releaseName(kind, id, version)} is already bound to commit ${existing.release.source.commit}`);
   }
   try {
     copyRelease(source, next);
@@ -200,19 +175,12 @@ function publishLocked({ store, release: releaseInput }) {
     throw error;
   }
   try {
-    if (exists) {
-      fs.renameSync(destination, previous);
-      try { fs.renameSync(next, destination); }
-      catch (error) { fs.renameSync(previous, destination); throw error; }
-      fs.rmSync(previous, { recursive: true, force: true });
-    } else {
-      fs.renameSync(next, destination);
-    }
+    fs.renameSync(next, destination);
   } catch (error) {
     fs.rmSync(next, { recursive: true, force: true });
     throw error;
   }
-  return { state: exists ? "replaced" : "published", kind, id, version, directory: destination, digest: sourceState.digest };
+  return { state: "published", kind, id, version, directory: destination, digest: sourceState.digest };
 }
 
 function inspect({ store, kind, id, version }) {
@@ -226,23 +194,13 @@ function inspect({ store, kind, id, version }) {
 }
 
 export function inspectLocalRelease({ store, kind, id, version }) {
-  assertNoReplacementLeftovers(store);
+  assertNoPublicationLeftovers(store);
   const { directory, state } = inspect({ store, kind, id, version });
   return { kind, id, version, directory, digest: state.digest, assets: state.inventory };
 }
 
-export function deleteLocalRelease({ store, kind, id, version }) {
-  assertNoReplacementLeftovers(store);
-  const directory = releaseDirectory(store, kind, id, version);
-  if (!fs.existsSync(directory)) return { state: "absent", kind, id, version, directory };
-  const { state } = inspect({ store, kind, id, version });
-  assertNotInUse(store, { kind, id, version, bytes: state.bytes });
-  fs.rmSync(directory, { recursive: true, force: false });
-  return { state: "deleted", kind, id, version, directory };
-}
-
 export function verifyLocalReleaseStore({ store }) {
-  assertNoReplacementLeftovers(store);
+  assertNoPublicationLeftovers(store);
   if (!fs.existsSync(store)) return { releases: 0, entries: [] };
   const root = regularDirectory(store, "release store");
   const entries = []; const states = [];

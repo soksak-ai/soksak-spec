@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 
-import { deleteLocalRelease, inspectLocalRelease, publishLocalRelease, verifyLocalReleaseStore } from "./local-release-store.mjs";
+import { inspectLocalRelease, publishLocalRelease, verifyLocalReleaseStore } from "./local-release-store.mjs";
 import { isEntryModule } from "./entry.mjs";
 
 function parse(argv) {
@@ -26,12 +26,12 @@ export function runLocalRelease(argv) {
     if (Object.keys(values).length !== 1) throw new Error(`${command} requires only --store`);
     return verifyLocalReleaseStore({ store: values.store });
   }
-  if (command === "inspect" || command === "delete") {
+  if (command === "inspect") {
     if (Object.keys(values).sort().join(",") !== "id,kind,store,version") throw new Error(`${command} requires --store --kind --id --version`);
     const input = { store: values.store, kind: values.kind, id: values.id, version: values.version };
-    return command === "inspect" ? inspectLocalRelease(input) : deleteLocalRelease(input);
+    return inspectLocalRelease(input);
   }
-  throw new Error("command must be publish, list, inspect, verify, or delete");
+  throw new Error("command must be publish, list, inspect, or verify");
 }
 
 if (isEntryModule(import.meta.url)) {
