@@ -217,7 +217,8 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.match(makefile, /^attest:\s+require-tooling\s+release$/m);
   assert.match(makefile, /SDK_ROOT.*command line/);
   assert.match(makefile, /SDK_RELEASE.*command line/);
-  assert.match(makefile, /bin\/soksak-sdk[.]mjs["']?\s+attest/);
+  assert.match(makefile, /bin\/soksak-sdk["']?\s+attest/);
+  assert.doesNotMatch(makefile, /soksak-sdk[.]mjs/);
   assert.match(makefile, /go -C .*go\/platformspec.* env GOVERSION/);
   assert.doesNotMatch(makefile, /go_version=.*go version/);
   assert.match(makefile, /^release: verify\n(?=\n|[^\t])/m);
