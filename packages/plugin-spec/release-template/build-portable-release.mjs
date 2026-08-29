@@ -54,7 +54,9 @@ if (hasJavaScript === hasCargo) throw new Error("exactly one package.json or Car
 if (hasJavaScript) {
   assertNoLocalPackageDependencies(path.join(root, "package.json"));
   const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  const expectedPrivate = identity.kind === "kit" ? false : true;
+  // JavaScript Contracts and Kits are exact package-registry build inputs. The owner Makefile
+  // publishes the verified archive; private packages cannot satisfy their consumers.
+  const expectedPrivate = false;
   if (packageMetadata.private !== expectedPrivate || packageMetadata.version !== identity.version) {
     throw new Error(`${identity.kind} package publish metadata must match its portable component version`);
   }
