@@ -11,11 +11,12 @@ function option(name) {
 const stage = option("--stage");
 const output = option("--out");
 const kind = option("--kind");
+const store = option("--store");
 const generated = [];
 for (let index = 0; index < process.argv.length; index += 1) {
   if (process.argv[index] === "--generated") generated.push(process.argv[index + 1]);
 }
-if (!stage || !output || !path.isAbsolute(stage) || !path.isAbsolute(output)) {
-  throw new Error("--stage and --out must be absolute paths");
+if (!stage || !output || !path.isAbsolute(stage) || !path.isAbsolute(output) || (store !== undefined && !path.isAbsolute(store))) {
+  throw new Error("--stage and --out must be absolute paths; --store, when present, must be absolute");
 }
-process.stdout.write(`${JSON.stringify(buildNodeCandidate({ stage, output, kind, generated }))}\n`);
+process.stdout.write(`${JSON.stringify(buildNodeCandidate({ stage, output, kind, store, generated }))}\n`);

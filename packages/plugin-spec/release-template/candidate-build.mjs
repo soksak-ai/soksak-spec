@@ -18,7 +18,7 @@ function defaultCandidateChecks({ packageDirectory }) {
   run("pnpm", ["build"], packageDirectory);
 }
 
-export function buildNodeCandidate({ stage, output, kind, generated, runChecks = defaultCandidateChecks }) {
+export function buildNodeCandidate({ stage, output, kind, generated, store, runChecks = defaultCandidateChecks }) {
   const staged = fs.realpathSync(stage);
   const destination = fs.realpathSync(output);
   if ((kind !== "portable" && kind !== "plugin") || fs.readdirSync(destination).length !== 0) {
@@ -30,9 +30,9 @@ export function buildNodeCandidate({ stage, output, kind, generated, runChecks =
   const report = finalizeNodeCandidate({ output: staged, generated });
 
   const builder = path.join(import.meta.dirname, kind === "plugin" ? "build-release.mjs" : "build-portable-release.mjs");
-  const summary = JSON.parse(run(process.execPath, [
-    builder, "--commit", report.sourceCommit, "--out", destination,
-  ], staged).trim());
+  const builderArgs = [builder, "--commit", report.sourceCommit, "--out", destination];
+  if (store !== undefined) builderArgs.push("--store", store);
+  const summary = JSON.parse(run(process.execPath, builderArgs, staged).trim());
   const validator = path.resolve(import.meta.dirname, "../bin/validate.mjs");
   run(process.execPath, [validator, "release", path.join(destination, "release.json")], staged);
   const result = {
