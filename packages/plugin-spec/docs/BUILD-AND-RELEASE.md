@@ -55,15 +55,12 @@ toolchain installer and does not serialize a developer workstation into source.
   every bare `file` name in `release.json` is a regular file inside
   `<store>/<kind-plural>/<id>/<version>/`. Every bare `file` name matches the one release file
   grammar in [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3.
-- **BR12 — Published releases are immutable; the local store replaces by commit.** A published
-  GitHub Release never changes. In the local store, `<store>/<kind-plural>/<id>/<version>/` is one
-  release transaction. Publishing into an existing version directory compares `source.commit` and
-  bytes: same commit and same bytes is `unchanged`; same commit and different bytes fails with
-  `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit replaces the complete version
-  directory. The replacement is refused with `LOCAL_RELEASE_IN_USE` while any stored release pins
-  the old `release.json` size and digest in its `runtimeDependencies`; the error names each such
-  release. Those dependents are deleted from the store before the replacement and rebuilt against
-  the new release after it. Partial replacement is always invalid.
+- **BR12 — Every published version is immutable in both transports.** A published GitHub Release
+  never changes. In the local store, `<store>/<kind-plural>/<id>/<version>/` is one write-once
+  release transaction. Publishing the same source commit and identical bytes returns `unchanged`;
+  different bytes fail with `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`. A different source commit at
+  the same id/version is `LOCAL_RELEASE_VERSION_CONFLICT`; it never replaces or deletes the old
+  directory. A new source commit requires a new version. Partial replacement is always invalid.
 - **BR13 — Installation is shared; transport is not identity.** Local and registry installs share
   one closure resolver, target selector, validator, extractor, consent summary, progress stream,
   and atomic environment commit. A release reference is `{ id, version, size, sha256 }` and has no
@@ -180,8 +177,8 @@ reference that resolves to different bytes or to no stored release fails with
    Verification never recursively deletes the addressed final output.
 3. The local publisher validates and atomically stores the output. Same `source.commit` and same
    bytes return `unchanged`; same commit and different bytes fail with
-   `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit replaces the version directory
-   under BR12.
+   `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit at the same version fails with
+   `LOCAL_RELEASE_VERSION_CONFLICT` under BR12.
 4. A local build resolves its runtime dependencies from the addressed store only: each
    `{ id, version }` intent is read from `<store>/<kind-plural>/<id>/<version>/release.json` and
    recorded as `{ id, version, size, sha256 }`. A published build resolves from GitHub only. An

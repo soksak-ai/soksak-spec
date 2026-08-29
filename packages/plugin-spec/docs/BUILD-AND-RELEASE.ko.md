@@ -56,15 +56,12 @@ workstation 상태를 source에 직렬화하지 않습니다.
   이 형식에는 location이 없습니다. Store는 release directory를 file에 대응시킵니다. `release.json`의
   모든 bare `file` 이름은 `<store>/<kind 복수형>/<id>/<version>/` 안의 regular file입니다. 모든 bare
   `file` 이름은 [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3의 단일 release file grammar와 일치합니다.
-- **BR12 — 공개 release는 immutable이며 local store는 commit 기준으로 교체합니다.** 공개된 GitHub
-  Release는 바뀌지 않습니다. Local store에서는 `<store>/<kind 복수형>/<id>/<version>/`이 release
-  transaction 하나입니다. 이미 있는 version directory에 발행하면 `source.commit`과 byte를
-  비교합니다. 같은 commit에 같은 byte는 `unchanged`이고, 같은 commit에 다른 byte는
-  `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로 실패하며, 다른 commit은 version directory 전체를
-  교체합니다. 저장된 release 중 하나라도 `runtimeDependencies`에 기존 `release.json`의 size와
-  digest를 고정하고 있으면 교체는 `LOCAL_RELEASE_IN_USE`로 거부되며, 오류는 그런 release를 각각
-  이름으로 나열합니다. 그 dependent는 교체 전에 store에서 삭제하고 교체 후 새 release 기준으로
-  다시 build합니다. 일부 file만 교체한 상태는 언제나 잘못입니다.
+- **BR12 — 모든 transport의 version은 immutable입니다.** 공개된 GitHub Release는 바뀌지 않습니다.
+  Local store의 `<store>/<kind 복수형>/<id>/<version>/`도 한 번 쓰면 바뀌지 않는 release transaction
+  하나입니다. 같은 source commit과 동일한 byte는 `unchanged`이고, 같은 commit의 다른 byte는
+  `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로 실패합니다. 같은 id/version에 다른 source commit을
+  발행하면 `LOCAL_RELEASE_VERSION_CONFLICT`로 거부하며 기존 directory를 교체하거나 삭제하지
+  않습니다. 다른 commit은 새 version으로 발행해야 합니다. 일부 file 교체는 언제나 잘못입니다.
 - **BR13 — Installer는 하나이며 transport는 identity가 아닙니다.** Local install과 registry install은
   같은 closure resolver, target selector, validator, extractor, consent summary, progress stream, atomic
   environment commit을 사용합니다. Release reference는 `{ id, version, size, sha256 }`이며 location이
