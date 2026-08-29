@@ -74,8 +74,11 @@ test("repository owns a complete reproducible release boundary", () => {
   assert.deepEqual(files("packages/plugin-spec/release-template", ".mjs"), [
     "archive.mjs",
     "archive.test.mjs",
+    "build-node-candidate.mjs",
     "build-portable-release.mjs",
     "build-release.mjs",
+    "candidate-build.mjs",
+    "candidate-stage.mjs",
     "cargo-dependencies.mjs",
     "compose-runtime-dependencies.mjs",
     "entry.mjs",
@@ -85,6 +88,7 @@ test("repository owns a complete reproducible release boundary", () => {
     "publish-canonical-release.mjs",
     "publish-release.mjs",
     "resolve-release.mjs",
+    "stage-node-candidate.mjs",
     "verified-release-output.mjs",
     "verify-plugin-release.mjs",
   ]);
