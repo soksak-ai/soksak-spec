@@ -28,7 +28,7 @@ require-tooling:
 	@case "$(origin SDK_ROOT)" in "command line") ;; *) echo 'SDK_ROOT must be an absolute command-line path to an extracted soksak-sdk release' >&2; exit 64 ;; esac
 	@case "$(origin SDK_RELEASE)" in "command line") ;; *) echo 'SDK_RELEASE must be an absolute command-line path to the exact SDK release.json' >&2; exit 64 ;; esac
 	@case "$(SDK_ROOT):$(SDK_RELEASE)" in /*:/*) ;; *) echo 'SDK_ROOT and SDK_RELEASE must be absolute paths' >&2; exit 64 ;; esac
-	@test -d "$(SDK_ROOT)" && test ! -L "$(SDK_ROOT)" && test -f "$(SDK_ROOT)/bin/soksak-sdk.mjs" || { echo 'SDK_ROOT is not an extracted regular SDK release' >&2; exit 66; }
+	@test -d "$(SDK_ROOT)" && test ! -L "$(SDK_ROOT)" && test -x "$(SDK_ROOT)/bin/soksak-sdk" && test ! -L "$(SDK_ROOT)/bin/soksak-sdk" || { echo 'SDK_ROOT is not an extracted regular SDK release' >&2; exit 66; }
 	@test -f "$(SDK_RELEASE)" && test ! -L "$(SDK_RELEASE)" || { echo 'SDK_RELEASE is not a regular file' >&2; exit 66; }
 	@test -z "$$(find "$(SDK_ROOT)" -type l -print -quit)" || { echo 'SDK_ROOT contains a symbolic link' >&2; exit 66; }
 
@@ -36,7 +36,7 @@ attest: require-tooling release
 	@platform="$$(node -p 'process.platform')"; architecture="$$(node -p 'process.arch')"; \
 		node_version="$$(node -p 'process.versions.node')"; pnpm_version="$$(pnpm --version)"; \
 		rust_version="$$(rustc --version | awk '{print $$2}')"; go_version="$$(go -C "$(CURDIR)/go/platformspec" env GOVERSION | sed 's/^go//')"; \
-		node "$(SDK_ROOT)/bin/soksak-sdk.mjs" attest --release-dir "$(CURDIR)/artifacts" \
+		"$(SDK_ROOT)/bin/soksak-sdk" attest --release-dir "$(CURDIR)/artifacts" \
 		--spec-root "$(SDK_ROOT)/.dependencies/soksak-spec" --tooling-release "$(SDK_RELEASE)" \
 		--mode native --platform "$$platform" --architecture "$$architecture" \
 		--tool "node=$$node_version" --tool "pnpm=$$pnpm_version" --tool "rust=$$rust_version" --tool "go=$$go_version"
