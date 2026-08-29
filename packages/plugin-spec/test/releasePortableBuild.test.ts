@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { readRegularFileArchive } from "../release-template/archive.mjs";
 import { parseConformanceReport } from "../src/conformanceWire.js";
+import { GITHUB_ORG } from "../src/release-primitives.js";
 import { parseReleaseManifest } from "../src/release.js";
 
 const TEMPLATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../release-template");
@@ -19,7 +20,7 @@ let out = "";
 function writeFixture(kind: "contract" | "kit", id: string): void {
   fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
     name: `@soksak/${id}`, version: "0.0.1", private: true, exports: { ".": { types: "./src/index.ts", default: "./src/index.ts" } },
-    repository: { type: "git", url: `git+https://github.com/soksak-ai/${id}.git` },
+    repository: { type: "git", url: `git+https://github.com/${GITHUB_ORG}/${id}.git` },
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, `${kind}.json`), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["LICENSE", `${kind}.json`, "package.json", "src/index.ts"])}\n`);
@@ -30,7 +31,7 @@ function writeFixture(kind: "contract" | "kit", id: string): void {
 
 function writeCargoKitFixture(id: string): void {
   if (!RUST_EDITION) throw new Error("workspace Rust edition is missing");
-  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "${RUST_EDITION}"\npublish = false\nrepository = "https://github.com/soksak-ai/${id}"\n`);
+  fs.writeFileSync(path.join(root, "Cargo.toml"), `[package]\nname = "${id}"\nversion = "0.0.1"\nedition = "${RUST_EDITION}"\npublish = false\nrepository = "https://github.com/${GITHUB_ORG}/${id}"\n`);
   fs.writeFileSync(path.join(root, "kit.json"), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, "release-files.json"), `${JSON.stringify(["Cargo.toml", "LICENSE", "kit.json", "src/lib.rs"])}\n`);
   fs.writeFileSync(path.join(root, "LICENSE"), "MIT\n");
@@ -60,10 +61,15 @@ describe("portable contract and kit release builder", () => {
       expect(first.status, first.stderr).toBe(0);
       const summary = JSON.parse(first.stdout);
       expect(summary.archive).toBe(`${id}-0.0.1-any.tgz`);
-      const release = JSON.parse(fs.readFileSync(path.join(out, "release.json"), "utf8"));
+      const releaseBytes = fs.readFileSync(path.join(out, "release.json"));
+      const release = JSON.parse(releaseBytes.toString("utf8"));
       const parsed = parseReleaseManifest(release);
-      expect(parsed.ok).toBe(true);
-      expect(release).toMatchObject({ kind, id, version: "0.0.1" });
+      expect(parsed.ok, JSON.stringify(parsed)).toBe(true);
+      expect(release).toMatchObject({ kind, id, version: "0.0.1", source: { repository: `https://github.com/${GITHUB_ORG}/${id}`, commit: COMMIT } });
+      expect(release.artifacts).toEqual([{ target: "any", file: summary.archive, size: expect.any(Number), sha256: summary.sha256, format: "tgz", manifest: `${kind}.json` }]);
+      expect(release.manifest).toMatchObject({ file: `${kind}.json` });
+      expect(release.evidence.map(({ file }: { file: string }) => file)).toEqual(["conformance-manifest.json", "conformance-release.json"]);
+      expect(releaseBytes.toString("utf8")).not.toContain("url");
       const names = readRegularFileArchive(fs.readFileSync(path.join(out, summary.archive))).map(({ name }) => name);
       expect(names).toEqual(["package/LICENSE", `package/${kind}.json`, "package/package.json", "package/src/index.ts"]);
       const packageMetadata = JSON.parse(
@@ -98,6 +104,34 @@ describe("portable contract and kit release builder", () => {
     expect(release).toMatchObject({ kind: "kit", id: "soksak-kit-sidecar-example", version: "0.0.1" });
   });
 
+  it("refuses a Cargo path dependency in a portable release", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    fs.appendFileSync(path.join(root, "Cargo.toml"), '\n[dependencies]\nlocal = { path = "/tmp/local" }\n');
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local Cargo dependency is not a release input");
+  });
+
+  it("refuses a Cargo patch path in portable workspace settings", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    fs.mkdirSync(path.join(root, ".cargo"));
+    fs.writeFileSync(path.join(root, ".cargo", "config.toml"), '[patch."https://example.invalid/repository"]\nlocal = { path = "../local" }\n');
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local Cargo dependency is not a release input");
+  });
+
+  it("refuses a local Cargo package retained only in Cargo.lock", () => {
+    writeCargoKitFixture("soksak-kit-sidecar-example");
+    fs.writeFileSync(path.join(root, "Cargo.lock"), [
+      "version = 4", "", "[[package]]", 'name = "soksak-kit-sidecar-example"', 'version = "0.0.1"', "",
+      "[[package]]", 'name = "local-dependency"', 'version = "0.0.1"', "",
+    ].join("\n"));
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("local Cargo dependency is not a release input");
+  });
+
   it("refuses local dependency state in a portable release", () => {
     writeFixture("kit", "soksak-kit-example");
     const packagePath = path.join(root, "package.json");
@@ -124,6 +158,18 @@ describe("portable contract and kit release builder", () => {
     const result = build();
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("local dependency is not a release input");
+  });
+
+  it("refuses an archive name outside the release file grammar", () => {
+    writeFixture("kit", "soksak-kit-example");
+    for (const name of ["kit.json", "package.json"]) {
+      const file = path.join(root, name);
+      const value = JSON.parse(fs.readFileSync(file, "utf8"));
+      fs.writeFileSync(file, `${JSON.stringify({ ...value, version: "0.0.1+build.1" }, null, 2)}\n`);
+    }
+    const result = build();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/release file name is invalid/);
   });
 
   it("refuses local dependency state retained only in portable pnpm workspace settings", () => {
