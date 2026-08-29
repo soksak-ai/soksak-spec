@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { runLocalRelease } from "../release-template/local-release.mjs";
 import {
-  deleteLocalRelease,
   inspectLocalRelease,
   publishLocalRelease,
   verifyLocalReleaseStore,
@@ -90,34 +89,29 @@ describe("canonical local release store", () => {
     expect(fs.readFileSync(path.join(first.directory, "soksak-plugin-example-0.0.1-any.tgz"), "utf8")).toBe("first");
   });
 
-  it("replaces the stored version when another commit publishes it and leaves no replacement directory behind", () => {
+  it("never replaces a stored version when another commit publishes different bytes", () => {
     const first = publishLocalRelease({ store, release: releaseFixture({ content: "first" }) });
-    const replaced = publishLocalRelease({ store, release: releaseFixture({ content: "second", commit: COMMIT_B }) });
-    expect(replaced).toMatchObject({ state: "replaced", ...PLUGIN, directory: first.directory });
-    expect(replaced.digest).not.toBe(first.digest);
-    expect(fs.readFileSync(path.join(first.directory, "soksak-plugin-example-0.0.1-any.tgz"), "utf8")).toBe("second");
-    expect(JSON.parse(fs.readFileSync(path.join(first.directory, "release.json"), "utf8")).source.commit).toBe(COMMIT_B);
+    const message = refusal(() => publishLocalRelease({ store, release: releaseFixture({ content: "second", commit: COMMIT_B }) }));
+    expect(message).toMatch(/^LOCAL_RELEASE_VERSION_CONFLICT: /);
+    expect(fs.readFileSync(path.join(first.directory, "soksak-plugin-example-0.0.1-any.tgz"), "utf8")).toBe("first");
+    expect(JSON.parse(fs.readFileSync(path.join(first.directory, "release.json"), "utf8")).source.commit).toBe(COMMIT_A);
     expect(fs.readdirSync(path.dirname(first.directory))).toEqual(["0.0.1"]);
     expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 1 });
-    expect(deleteLocalRelease({ store, ...PLUGIN })).toMatchObject({ state: "deleted" });
-    expect(deleteLocalRelease({ store, ...PLUGIN })).toMatchObject({ state: "absent" });
   });
 
-  it("refuses to replace a release that a stored release pins and names the dependent", () => {
+  it("refuses to replace a stored dependency even after every dependent is absent", () => {
     const sidecar = publishLocalRelease({ store, release: releaseFixture({ identity: SIDECAR, content: "sidecar" }) });
     const pinned = fs.readFileSync(path.join(sidecar.directory, "release.json"));
     publishLocalRelease({ store, release: releaseFixture({ runtimeDependencies: { sidecars: [pin(sidecar.directory)] } }) });
     expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 2 });
     const replacement = releaseFixture({ identity: SIDECAR, content: "sidecar-2", commit: COMMIT_B });
     const message = refusal(() => publishLocalRelease({ store, release: replacement }));
-    expect(message).toMatch(/^LOCAL_RELEASE_IN_USE: /);
-    expect(message).toContain("plugin/soksak-plugin-example@0.0.1");
+    expect(message).toMatch(/^LOCAL_RELEASE_VERSION_CONFLICT: /);
     expect(fs.readFileSync(path.join(sidecar.directory, "release.json")).equals(pinned)).toBe(true);
     expect(fs.readdirSync(path.dirname(sidecar.directory))).toEqual(["0.0.1"]);
     // The same commit and bytes are still unchanged while in use.
     expect(publishLocalRelease({ store, release: releaseFixture({ identity: SIDECAR, content: "sidecar" }) })).toMatchObject({ state: "unchanged" });
-    deleteLocalRelease({ store, ...PLUGIN });
-    expect(publishLocalRelease({ store, release: replacement })).toMatchObject({ state: "replaced" });
+    expect(refusal(() => publishLocalRelease({ store, release: replacement }))).toMatch(/^LOCAL_RELEASE_VERSION_CONFLICT: /);
   });
 
   it("verifies that every runtime dependency pin resolves inside the store with matching size and sha256", () => {
@@ -130,20 +124,19 @@ describe("canonical local release store", () => {
     expect(refusal(() => runLocalRelease(["list", "--store", store]))).toMatch(/^LOCAL_RELEASE_DEPENDENCY_MISMATCH: /);
     publishLocalRelease({ store, release: sidecarRelease });
     expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 2 });
-    deleteLocalRelease({ store, ...PLUGIN });
-    publishLocalRelease({ store, release: releaseFixture({ runtimeDependencies: { sidecars: [{ ...pin(sidecarRelease), sha256: "f".repeat(64) }] } }) });
+    publishLocalRelease({ store, release: releaseFixture({ identity: { ...PLUGIN, version: "0.0.2" }, runtimeDependencies: { sidecars: [{ ...pin(sidecarRelease), sha256: "f".repeat(64) }] } }) });
     const mismatch = refusal(() => verifyLocalReleaseStore({ store }));
     expect(mismatch).toMatch(/^LOCAL_RELEASE_DEPENDENCY_MISMATCH: /);
     expect(mismatch).toContain("sidecar/soksak-sidecar-example@0.0.1");
     expect(mismatch).toContain("digest");
   });
 
-  it("refuses every store operation while a replacement leftover exists anywhere in the store and does not repair it", () => {
+  it("refuses every store operation while a publication leftover exists anywhere in the store and does not repair it", () => {
     const published = publishLocalRelease({ store, release: releaseFixture() });
     // The leftover is under another kind and id: the check walks the whole store, not the siblings of one version.
     const other = path.join(store, "sidecars", SIDECAR.id);
     fs.mkdirSync(other, { recursive: true });
-    for (const suffix of ["~previous.1", `~next.${process.pid}`]) {
+    for (const suffix of [`~next.${process.pid}`]) {
       const leftover = path.join(other, `${SIDECAR.version}${suffix}`);
       fs.mkdirSync(leftover);
       for (const action of [
@@ -151,10 +144,9 @@ describe("canonical local release store", () => {
         () => runLocalRelease(["list", "--store", store]),
         () => publishLocalRelease({ store, release: releaseFixture({ content: "second", commit: COMMIT_B }) }),
         () => inspectLocalRelease({ store, ...PLUGIN }),
-        () => deleteLocalRelease({ store, ...PLUGIN }),
       ]) {
         const message = refusal(action);
-        expect(message).toMatch(/^LOCAL_RELEASE_REPLACEMENT_INTERRUPTED: /);
+        expect(message).toMatch(/^LOCAL_RELEASE_PUBLICATION_INTERRUPTED: /);
         expect(message).toContain(leftover);
       }
       expect(fs.existsSync(leftover)).toBe(true);
@@ -173,20 +165,15 @@ describe("canonical local release store", () => {
     expect(runLocalRelease(["list", "--store", store])).toMatchObject({ releases: 1 });
     expect(inspectLocalRelease({ store, ...PLUGIN })).toMatchObject({ digest: published.digest });
     expect(publishLocalRelease({ store, release: releaseFixture() })).toMatchObject({ state: "unchanged" });
-    expect(deleteLocalRelease({ store, ...PLUGIN })).toMatchObject({ state: "deleted" });
-    expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 0 });
+    expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 1 });
   });
 
-  it("refuses to delete a release that a stored release pins and names the dependent", () => {
+  it("does not expose a command that deletes stored releases", () => {
     const sidecar = publishLocalRelease({ store, release: releaseFixture({ identity: SIDECAR, content: "sidecar" }) });
     publishLocalRelease({ store, release: releaseFixture({ runtimeDependencies: { sidecars: [pin(sidecar.directory)] } }) });
-    const message = refusal(() => deleteLocalRelease({ store, ...SIDECAR }));
-    expect(message).toMatch(/^LOCAL_RELEASE_IN_USE: /);
-    expect(message).toContain("plugin/soksak-plugin-example@0.0.1");
+    expect(refusal(() => runLocalRelease(["delete", "--store", store, "--kind", SIDECAR.kind, "--id", SIDECAR.id, "--version", SIDECAR.version]))).toMatch(/^command must be publish, list, inspect, or verify$/);
     expect(fs.existsSync(sidecar.directory)).toBe(true);
     expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 2 });
-    deleteLocalRelease({ store, ...PLUGIN });
-    expect(deleteLocalRelease({ store, ...SIDECAR })).toMatchObject({ state: "deleted" });
   });
 
   it("rejects partial mutation and undeclared files", () => {
