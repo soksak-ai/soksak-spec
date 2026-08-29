@@ -19,7 +19,7 @@ let out = "";
 
 function writeFixture(kind: "contract" | "kit", id: string): void {
   fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
-    name: `@soksak/${id}`, version: "0.0.1", private: true, exports: { ".": { types: "./src/index.ts", default: "./src/index.ts" } },
+    name: `@soksak/${id}`, version: "0.0.1", private: kind !== "kit", exports: { ".": { types: "./src/index.ts", default: "./src/index.ts" } },
     repository: { type: "git", url: `git+https://github.com/${GITHUB_ORG}/${id}.git` },
   }, null, 2)}\n`);
   fs.writeFileSync(path.join(root, `${kind}.json`), `${JSON.stringify({ id, version: "0.0.1" }, null, 2)}\n`);
@@ -89,6 +89,12 @@ describe("portable contract and kit release builder", () => {
       fs.rmSync(secondOut, { recursive: true, force: true });
     });
   }
+
+  it("allows a JavaScript kit release to be consumed from the declared package registry", () => {
+    writeFixture("kit", "soksak-kit-registry-example");
+    const result = build();
+    expect(result.status, result.stderr).toBe(0);
+  });
 
   it("rejects identity mismatch and undeclared manifest files", () => {
     writeFixture("kit", "soksak-kit-example");

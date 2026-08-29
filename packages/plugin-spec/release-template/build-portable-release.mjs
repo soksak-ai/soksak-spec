@@ -54,8 +54,9 @@ if (hasJavaScript === hasCargo) throw new Error("exactly one package.json or Car
 if (hasJavaScript) {
   assertNoLocalPackageDependencies(path.join(root, "package.json"));
   const packageMetadata = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  if (packageMetadata.private !== true || packageMetadata.version !== identity.version) {
-    throw new Error("private package version must equal portable component version");
+  const expectedPrivate = identity.kind === "kit" ? false : true;
+  if (packageMetadata.private !== expectedPrivate || packageMetadata.version !== identity.version) {
+    throw new Error(`${identity.kind} package publish metadata must match its portable component version`);
   }
   if (packageMetadata.name !== `@soksak/${identity.id}`) throw new Error("package name must equal portable component id");
   if (packageMetadata.publishConfig !== undefined || Object.keys(packageMetadata.scripts ?? {}).some((name) => /publish/i.test(name))) {

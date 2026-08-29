@@ -1,6 +1,6 @@
 [package]
 name = "soksak-spec-contract"
-version = "0.0.50"
+version = "0.0.51"
 edition.workspace = true
 publish = false
 license = "MIT"
