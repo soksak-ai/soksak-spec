@@ -129,8 +129,9 @@ function verifyDependencies(states) {
   }
 }
 
-// A version directory holds the release of one source commit. The same commit must produce the same
-// bytes; a different commit replaces the directory unless a stored release pins the current bytes.
+// A version directory is keyed by the contract identity and its complete release bytes. Source
+// commit is provenance only: equal bytes are idempotent, and any different bytes at one version are
+// a conflict. A changed source commit must publish a new version.
 // One publisher at a time per store: the lock directory refuses a second publisher by name.
 function withStoreLock(store, action) {
   const lock = path.join(store, ".publish-lock");
@@ -153,18 +154,14 @@ function publishLocked({ store, release: releaseInput }) {
   const source = regularDirectory(releaseInput, "release input");
   const sourceState = canonical(source);
   const { kind, id, version } = sourceState.release;
-  const commit = sourceState.release.source.commit;
   const destination = releaseDirectory(store, kind, id, version);
   const next = `${destination}${PUBLICATION_SUFFIX}`;
   fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o755 });
   const exists = fs.existsSync(destination);
   if (exists) {
     const existing = canonical(regularDirectory(destination, "stored release"));
-    if (existing.release.source.commit === commit) {
-      if (existing.digest === sourceState.digest) return { state: "unchanged", kind, id, version, directory: destination, digest: existing.digest };
-      fail("LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC", `${releaseName(kind, id, version)} at commit ${commit} produced different bytes`);
-    }
-    fail("LOCAL_RELEASE_VERSION_CONFLICT", `${releaseName(kind, id, version)} is already bound to commit ${existing.release.source.commit}`);
+    if (existing.digest === sourceState.digest) return { state: "unchanged", kind, id, version, directory: destination, digest: existing.digest };
+    fail("LOCAL_RELEASE_VERSION_CONFLICT", `${releaseName(kind, id, version)} already contains different release bytes`);
   }
   try {
     copyRelease(source, next);

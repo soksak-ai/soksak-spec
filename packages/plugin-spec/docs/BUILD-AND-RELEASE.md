@@ -57,8 +57,8 @@ toolchain installer and does not serialize a developer workstation into source.
   grammar in [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3.
 - **BR12 — Every published version is immutable in both transports.** A published GitHub Release
   never changes. In the local store, `<store>/<kind-plural>/<id>/<version>/` is one write-once
-  release transaction. Publishing the same source commit and identical bytes returns `unchanged`;
-  different bytes fail with `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`. A different source commit at
+  release transaction. Publishing identical release bytes returns `unchanged`; different bytes fail
+  with `LOCAL_RELEASE_VERSION_CONFLICT`, regardless of source commit. A different source commit at
   the same id/version is `LOCAL_RELEASE_VERSION_CONFLICT`; it never replaces or deletes the old
   directory. A new source commit requires a new version. Partial replacement is always invalid.
 - **BR13 — Installation is shared; transport is not identity.** Local and registry installs share
@@ -176,9 +176,8 @@ reference that resolves to different bytes or to no stored release fails with
    Tooling receipt, is `unchanged`. Different bytes fail while preserving the completed output.
    Verification never recursively deletes the addressed final output.
 3. The local publisher validates and atomically stores the output. Same `source.commit` and same
-   bytes return `unchanged`; same commit and different bytes fail with
-   `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`; a different commit at the same version fails with
-   `LOCAL_RELEASE_VERSION_CONFLICT` under BR12.
+   bytes return `unchanged`; any different bytes at the same version fail with
+   `LOCAL_RELEASE_VERSION_CONFLICT` under BR12, regardless of source commit.
 4. A local build resolves its runtime dependencies from the addressed store only: each
    `{ id, version }` intent is read from `<store>/<kind-plural>/<id>/<version>/release.json` and
    recorded as `{ id, version, size, sha256 }`. A published build resolves from GitHub only. An

@@ -58,8 +58,8 @@ workstation 상태를 source에 직렬화하지 않습니다.
   `file` 이름은 [PLATFORM-WIRE.md](PLATFORM-WIRE.md) §3의 단일 release file grammar와 일치합니다.
 - **BR12 — 모든 transport의 version은 immutable입니다.** 공개된 GitHub Release는 바뀌지 않습니다.
   Local store의 `<store>/<kind 복수형>/<id>/<version>/`도 한 번 쓰면 바뀌지 않는 release transaction
-  하나입니다. 같은 source commit과 동일한 byte는 `unchanged`이고, 같은 commit의 다른 byte는
-  `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로 실패합니다. 같은 id/version에 다른 source commit을
+  하나입니다. complete release byte가 같으면 `unchanged`이고, 다른 byte는 source commit과 무관하게
+  `LOCAL_RELEASE_VERSION_CONFLICT`로 실패합니다. 같은 id/version에 다른 source commit을
   발행하면 `LOCAL_RELEASE_VERSION_CONFLICT`로 거부하며 기존 directory를 교체하거나 삭제하지
   않습니다. 다른 commit은 새 version으로 발행해야 합니다. 일부 file 교체는 언제나 잘못입니다.
 - **BR13 — Installer는 하나이며 transport는 identity가 아닙니다.** Local install과 registry install은
@@ -175,9 +175,9 @@ byte로 해석되거나 저장 release가 없는 reference는 dependent release�
    지정한 final output이 없으면 검증한 directory를 rename 한 번으로 공개합니다. 같은 base를 반복한
    경우와 canonical Component Tooling receipt가 이미 붙은 final output은 `unchanged`입니다. 다른
    byte는 완성된 output을 보존한 채 실패합니다. 검증은 지정한 final output을 재귀 삭제하지 않습니다.
-3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 `source.commit`에 같은 byte는
-   `unchanged`를 반환하고, 같은 commit에 다른 byte는 `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`으로
-   실패하며, 다른 commit은 BR12에 따라 version directory를 교체합니다.
+3. Local publisher가 output을 검증하고 atomically 저장합니다. 같은 version의 complete release byte는
+   `unchanged`를 반환하고, 다른 byte는 source commit과 무관하게 BR12의
+   `LOCAL_RELEASE_VERSION_CONFLICT`로 실패합니다.
 4. Local build는 runtime dependency를 주소 지정된 store에서만 해석합니다. 각 `{ id, version }`
    intent를 `<store>/<kind 복수형>/<id>/<version>/release.json`에서 읽어
    `{ id, version, size, sha256 }`으로 기록합니다. 공개 build는 GitHub에서만 해석합니다. Intent에는

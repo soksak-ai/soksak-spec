@@ -70,7 +70,7 @@ beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), "local-release-s
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
 describe("canonical local release store", () => {
-  it("publishes atomically and treats identical bytes from one commit as unchanged", () => {
+  it("publishes atomically and treats identical release bytes as unchanged", () => {
     const release = releaseFixture();
     const first = publishLocalRelease({ store, release });
     const second = publishLocalRelease({ store, release });
@@ -82,9 +82,9 @@ describe("canonical local release store", () => {
     expect(verifyLocalReleaseStore({ store })).toMatchObject({ releases: 1 });
   });
 
-  it("rejects different bytes from one commit as a non-deterministic build and keeps the stored bytes", () => {
+  it("rejects different release bytes regardless of source commit and keeps the stored bytes", () => {
     const first = publishLocalRelease({ store, release: releaseFixture({ content: "first" }) });
-    expect(refusal(() => publishLocalRelease({ store, release: releaseFixture({ content: "changed" }) }))).toMatch(/^LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC: /);
+    expect(refusal(() => publishLocalRelease({ store, release: releaseFixture({ content: "changed", commit: COMMIT_B }) }))).toMatch(/^LOCAL_RELEASE_VERSION_CONFLICT: /);
     expect(inspectLocalRelease({ store, ...PLUGIN })).toMatchObject({ digest: first.digest });
     expect(fs.readFileSync(path.join(first.directory, "soksak-plugin-example-0.0.1-any.tgz"), "utf8")).toBe("first");
   });
