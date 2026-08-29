@@ -273,11 +273,10 @@ release is `https://github.com/soksak-ai/<id>/releases/download/v<version>/`, a 
 `https://github.com/soksak-ai/<id>`. Build dependencies remain solely in the language package
 manifest and lockfile.
 
-The first publication binds that local directory permanently. Re-publishing identical bytes from
-the same commit is idempotent; a different commit or different bytes at the same kind/id/version is
-`LOCAL_RELEASE_VERSION_CONFLICT` (or `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC` for one commit) and
-never replaces stored files. A published local release cannot be deleted through the canonical
-store command. New bytes require a new version.
+The first publication binds that local directory permanently. Re-publishing identical complete
+release bytes is idempotent, regardless of the recorded source commit; any different bytes at the
+same kind/id/version is `LOCAL_RELEASE_VERSION_CONFLICT` and never replaces stored files. A published
+local release cannot be deleted through the canonical store command. New bytes require a new version.
 
 <!-- example:plugin-release-valid:release -->
 ```json

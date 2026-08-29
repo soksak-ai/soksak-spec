@@ -269,11 +269,10 @@ file grammar를 따른다. Directory는 `kind`, `id`, `version`에서 유도하�
 값은 `https://github.com/soksak-ai/<id>`와 같다. 빌드 dependency는 언어 package manifest와
 lockfile만 소유한다.
 
-최초 publish가 해당 local directory를 영구적으로 고정한다. 같은 commit의 동일 byte를 다시 publish하면
-멱등하게 `unchanged`이고, 같은 kind/id/version에 다른 commit 또는 다른 byte를 publish하면
-`LOCAL_RELEASE_VERSION_CONFLICT`(같은 commit이면 `LOCAL_RELEASE_BUILD_NOT_DETERMINISTIC`)로 거부하며
-저장된 파일을 교체하지 않는다. Canonical store command로 공개된 local release를 삭제할 수 없다. 새
-byte는 반드시 새 version을 사용한다.
+최초 publish가 해당 local directory를 영구적으로 고정한다. 기록된 source commit과 무관하게 complete
+release byte가 같으면 멱등하게 `unchanged`이고, 같은 kind/id/version에 다른 byte를 publish하면
+`LOCAL_RELEASE_VERSION_CONFLICT`로 거부하며 저장된 파일을 교체하지 않는다. Canonical store command로
+공개된 local release를 삭제할 수 없다. 새 byte는 반드시 새 version을 사용한다.
 
 <!-- example:plugin-release-valid:release -->
 ```json
