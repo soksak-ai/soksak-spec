@@ -19,7 +19,7 @@ beforeEach(() => {
   artifact = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "candidate-input-")), "dependency.tgz");
   fs.writeFileSync(artifact, "candidate bytes");
   fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({
-    name: "@soksak/soksak-kit-example", version: "0.0.1", private: true,
+    name: "@soksak/soksak-kit-example", version: "0.0.1", private: false,
     repository: { type: "git", url: "git+https://github.com/soksak-ai/soksak-kit-example.git" },
     exports: { ".": { types: "./src/index.ts", default: "./dist/index.js" } },
     devDependencies: { "@soksak/dependency": "https://example.invalid/dependency.tgz" },
