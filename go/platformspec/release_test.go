@@ -59,7 +59,7 @@ func TestReleaseManifestRejectsNestedIdentityReportsAndWrongTargets(t *testing.T
 }
 func TestReleaseManifestBindsSourceRepositoryToTheOrgAndID(t *testing.T) {
 	for name, repository := range map[string]string{
-		"fork owner":       "https://github.com/example/soksak-plugin-example",
+		"foreign owner":    "https://github.com/example/soksak-plugin-example",
 		"id mismatch":      "https://github.com/soksak-ai/soksak-sidecar-example",
 		"git suffix":       "https://github.com/soksak-ai/soksak-plugin-example.git",
 		"trailing slash":   "https://github.com/soksak-ai/soksak-plugin-example/",
