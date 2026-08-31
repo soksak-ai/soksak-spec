@@ -17,6 +17,14 @@ A domain contract moves to a separate `soksak-contract-*` repository only
 when multiple independent implementations actually share it. The private PTY
 protocol is not part of this repository.
 
+## Runtime dependency declarations
+
+`sidecar.json` may declare `runtimeDependencies` with `plugins` and `sidecars` arrays.
+Each entry contains only an exact component `id` and `version`. The declaration selects
+the required component release; it does not select an implementation process name.
+The host resolves the declared release and exposes the resulting process through the
+consumer's public runtime contract.
+
 ## Distribution
 
 - Rust consumers use `git+https://github.com/soksak-ai/soksak-spec.git` pinned
