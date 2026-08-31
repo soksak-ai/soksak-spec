@@ -24,7 +24,15 @@ type SidecarManifest struct {
 	// its primary role. One sidecar, several contracts — a terminal engine
 	// also serves the surface channel.
 	Interfaces []Reference `json:"interface"`
+	RuntimeDependencies RuntimeDependencyIntents `json:"runtimeDependencies,omitempty"`
 	Process    string      `json:"process"`
+}
+
+// RuntimeDependencyIntents identifies components required at runtime. Release integrity is
+// stored in release.json; a manifest carries only id and version.
+type RuntimeDependencyIntents struct {
+	Plugins  []Reference `json:"plugins,omitempty"`
+	Sidecars []Reference `json:"sidecars,omitempty"`
 }
 
 const (

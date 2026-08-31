@@ -87,6 +87,17 @@ func TestSidecarManifestIsExact(t *testing.T) {
 	}
 }
 
+func TestSidecarManifestParsesRuntimeDependencies(t *testing.T) {
+	body := []byte(`{"id":"terminal-provider","version":"0.0.1","processRole":"sidecar-terminal-provider","interface":[{"id":"terminal-state","version":"0.0.1"}],"runtimeDependencies":{"sidecars":[{"id":"pty-provider","version":"0.0.2"}]},"process":"dist/terminal-provider"}`)
+	parsed, err := ParseSidecarManifest(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed.RuntimeDependencies.Sidecars) != 1 || parsed.RuntimeDependencies.Sidecars[0].ID != "pty-provider" {
+		t.Fatalf("runtime dependencies=%+v", parsed.RuntimeDependencies)
+	}
+}
+
 func TestSidecarManifestDeclaresAProjectIndependentProcessRole(t *testing.T) {
 	body := []byte(`{"id":"soksak-sidecar-terminal-alacritty","version":"0.0.1","interface":[{"id":"terminal-state","version":"0.0.1"}],"process":"dist/soksak-sidecar-terminal-alacritty","processRole":"sidecar-terminal-alacritty"}`)
 	if _, err := ParseSidecarManifest(body); err != nil {
