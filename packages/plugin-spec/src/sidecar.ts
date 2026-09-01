@@ -1,5 +1,6 @@
 import { SIDECAR_CONTRACT_ID_RE, parseContractProviderRef, type ContractProviderRef } from "./contracts.js";
 import { COMPONENT_ID_RE, STRICT_SEMVER_RE } from "./release-primitives.js";
+import { parseRuntimeDependencyIntents, type RuntimeDependencyIntents } from "./distribution.js";
 import { checkKnownKeys, isRecord } from "./util.js";
 
 export interface SidecarManifest {
@@ -9,14 +10,22 @@ export interface SidecarManifest {
   /** Every contract this sidecar serves; the first entry is its primary role. */
   interface: ContractProviderRef[];
   process: string;
+  /** Exact release intents required by this sidecar at runtime. */
+  runtimeDependencies?: RuntimeDependencyIntents;
 }
 
 export function parseSidecarManifest(raw: unknown): { ok: true; value: SidecarManifest } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   if (!isRecord(raw)) return { ok: false, errors: ["sidecar manifest must be an object"] };
-  checkKnownKeys(raw, ["id", "interface", "process", "processRole", "version"], "sidecar", errors);
+  checkKnownKeys(raw, ["id", "interface", "process", "processRole", "runtimeDependencies", "version"], "sidecar", errors);
   for (const key of ["id", "interface", "process", "processRole", "version"]) {
     if (!(key in raw)) errors.push(`sidecar.${key}: required`);
+  }
+  let runtimeDependencies: RuntimeDependencyIntents | undefined;
+  if (raw.runtimeDependencies !== undefined) {
+    const parsed = parseRuntimeDependencyIntents(raw.runtimeDependencies, "sidecar.runtimeDependencies");
+    if (parsed.ok) runtimeDependencies = parsed.value;
+    else errors.push(...parsed.errors);
   }
   if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id)) errors.push("sidecar.id: sidecar id required");
   if (typeof raw.version !== "string" || !STRICT_SEMVER_RE.test(raw.version)) errors.push("sidecar.version: strict SemVer required");
@@ -39,5 +48,5 @@ export function parseSidecarManifest(raw: unknown): { ok: true; value: SidecarMa
     });
   }
   if (errors.length > 0 || interfaces.length === 0 || typeof raw.id !== "string") return { ok: false, errors };
-  return { ok: true, value: { id: raw.id, version: raw.version as string, processRole: raw.processRole as string, interface: interfaces, process: raw.process as string } };
+  return { ok: true, value: { id: raw.id, version: raw.version as string, processRole: raw.processRole as string, interface: interfaces, process: raw.process as string, ...(runtimeDependencies ? { runtimeDependencies } : {}) } };
 }

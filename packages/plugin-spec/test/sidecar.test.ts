@@ -13,6 +13,12 @@ describe("sidecar manifest", () => {
     expect(parseSidecarManifest(manifest())).toMatchObject({ ok: true });
     expect(parseSidecarManifest({ ...manifest(), process: `${manifest().process}.exe` })).toMatchObject({ ok: true });
   });
+  it("accepts exact runtime dependency intents for the sidecar closure", () => {
+    expect(parseSidecarManifest({
+      ...manifest(),
+      runtimeDependencies: { sidecars: [{ id: "soksak-sidecar-pty", version: "0.0.22" }] },
+    })).toMatchObject({ ok: true, value: { runtimeDependencies: { sidecars: [{ id: "soksak-sidecar-pty", version: "0.0.22" }] } } });
+  });
   it("rejects unknown fields and mismatched process paths", () => {
     expect(parseSidecarManifest({ ...manifest(), extra: true }).ok).toBe(false);
     expect(parseSidecarManifest({ ...manifest(), process: "dist/other" }).ok).toBe(false);
