@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   ID, INTERFACE, INTERFACES, SIDECAR, VERSION,
   assertBaseline, assertCommit, assertNativeBinaryTarget, assertNoLinkPath, assertTag, ensureEmptyDirectory, jsonBytes,
-  parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, targetEntry, writeRegularFile,
+  composeRuntimeDependencies, parseOptions, readRegularFile, readSidecarReleaseArchive, readTargetMatrix, releaseAssetName, releaseIdentity, sha256, targetEntry, writeRegularFile,
 } from "./release-contract.mjs";
 
 // --emit-summary is an additive boolean flag: the core release.build handler passes it to read the
@@ -16,7 +16,7 @@ const rawArgs = process.argv.slice(2);
 const emitSummary = rawArgs.includes("--emit-summary");
 const options = parseOptions(
   rawArgs.filter((arg) => arg !== "--emit-summary"),
-  ["commit", "tag", "artifacts", "out"], ["target"],
+  ["commit", "tag", "artifacts", "out"], ["target", "store"],
 );
 assertBaseline();
 assertCommit(options.commit);
@@ -38,7 +38,8 @@ const artifacts = requestedTargets.map(({ target }) => {
   const process = `dist/${ID}${target.includes("windows") ? ".exe" : ""}`;
   if (
     manifest.id !== ID || manifest.version !== VERSION ||
-    JSON.stringify(manifest.interface) !== JSON.stringify(INTERFACES) || manifest.process !== process
+    JSON.stringify(manifest.interface) !== JSON.stringify(INTERFACES) ||
+    JSON.stringify(manifest.runtimeDependencies) !== JSON.stringify(SIDECAR.runtimeDependencies) || manifest.process !== process
   ) throw new Error(`${asset}: archive sidecar manifest differs from the release identity`);
   const archivedProcess = archived.find((entry) => entry.name === process);
   if (!archivedProcess) throw new Error(`${asset}: archive has no declared sidecar process`);
@@ -80,10 +81,12 @@ const evidenceFiles = [
   return { name, bytes, reference: { file: name, size: bytes.length, sha256: sha256(bytes) } };
 });
 const manifestBytes = jsonBytes(SIDECAR);
+const runtimeDependencies = await composeRuntimeDependencies(SIDECAR.runtimeDependencies, options.store);
 const release = {
   ...releaseIdentity(options.commit),
   manifest: { file: "sidecar.json", size: manifestBytes.length, sha256: sha256(manifestBytes) },
   artifacts,
+  ...(runtimeDependencies ? { runtimeDependencies } : {}),
   evidence: evidenceFiles.map(({ reference }) => reference),
 };
 const releaseBytes = jsonBytes(release);

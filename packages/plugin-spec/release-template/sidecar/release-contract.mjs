@@ -37,7 +37,8 @@ function releaseFileName(name) {
 export function parseSidecarManifest(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("sidecar manifest must be an object");
   const keys = Object.keys(raw).sort();
-  if (JSON.stringify(keys) !== JSON.stringify(["id", "interface", "process", "processRole", "version"])) throw new Error("sidecar manifest keys are closed");
+  const allowed = ["id", "interface", "process", "processRole", "runtimeDependencies", "version"];
+  if (keys.some((key) => !allowed.includes(key))) throw new Error("sidecar manifest keys are closed");
   if (typeof raw.id !== "string" || !COMPONENT_ID_RE.test(raw.id) || typeof raw.version !== "string" || !SEMVER.test(raw.version)) throw new Error("invalid sidecar identity");
   if (raw.process !== `dist/${raw.id}` && raw.process !== `dist/${raw.id}.exe`) throw new Error("sidecar process path must match its platform executable");
   if (typeof raw.processRole !== "string" || !/^sidecar(?:-[a-z0-9]+)+$/.test(raw.processRole)) throw new Error("sidecar process role must be project-independent");
@@ -53,7 +54,32 @@ export function parseSidecarManifest(raw) {
     ) throw new Error("interface provider must match the sidecar version");
     seen.add(entry.id);
   }
-  return Object.freeze({ ...raw, interface: Object.freeze(raw.interface.map((entry) => Object.freeze({ ...entry }))) });
+  let runtimeDependencies;
+  if (raw.runtimeDependencies !== undefined) {
+    const groups = raw.runtimeDependencies;
+    if (!groups || typeof groups !== "object" || Array.isArray(groups)) throw new Error("sidecar runtimeDependencies must be an object");
+    const groupNames = Object.keys(groups).sort();
+    if (groupNames.some((group) => group !== "plugins" && group !== "sidecars") || groupNames.length === 0) throw new Error("sidecar runtimeDependencies groups are invalid");
+    runtimeDependencies = {};
+    for (const group of groupNames) {
+      const entries = groups[group];
+      if (!Array.isArray(entries) || entries.length === 0) throw new Error(`sidecar runtimeDependencies.${group} must be a non-empty array`);
+      const refs = entries.map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+            JSON.stringify(Object.keys(entry).sort()) !== JSON.stringify(["id", "version"]) ||
+            typeof entry.id !== "string" || !COMPONENT_ID_RE.test(entry.id) ||
+            typeof entry.version !== "string" || !SEMVER.test(entry.version)) {
+          throw new Error(`sidecar runtimeDependencies.${group} entry is invalid`);
+        }
+        return Object.freeze({ id: entry.id, version: entry.version });
+      });
+      const names = refs.map((entry) => `${entry.id}@${entry.version}`);
+      if (new Set(names).size !== names.length || names.some((name, index) => name !== [...names].sort()[index])) throw new Error(`sidecar runtimeDependencies.${group} must be sorted and unique`);
+      runtimeDependencies[group] = Object.freeze(refs);
+    }
+    runtimeDependencies = Object.freeze(runtimeDependencies);
+  }
+  return Object.freeze({ ...raw, interface: Object.freeze(raw.interface.map((entry) => Object.freeze({ ...entry }))), ...(runtimeDependencies ? { runtimeDependencies } : {}) });
 }
 
 export function readSidecarManifest(filename = path.join(ROOT, "sidecar.json")) {
@@ -80,6 +106,47 @@ export function releaseIdentity(commit, sidecar = SIDECAR) {
 
 export function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+// Sidecar builders are vendored as a standalone five-file set. Resolve each manifest intent here
+// rather than importing the source checkout or an SDK path. A local store is the deterministic
+// release path; CI may omit it and resolve the immutable GitHub release document.
+export async function composeRuntimeDependencies(intents, store) {
+  if (intents === undefined) return undefined;
+  if (store !== undefined && (!path.isAbsolute(store) || fs.existsSync(store) && fs.lstatSync(store).isSymbolicLink())) {
+    throw new Error("--store must be an absolute regular local release store");
+  }
+  const groups = {};
+  for (const [kind, entries] of [["plugins", intents.plugins], ["sidecars", intents.sidecars]]) {
+    if (!entries) continue;
+    const directory = kind === "plugins" ? "plugins" : "sidecars";
+    groups[kind] = [];
+    for (const { id, version } of entries) {
+      const file = store
+        ? path.join(store, directory, id, version, "release.json")
+        : `https://github.com/${GITHUB_ORG}/${id}/releases/download/v${version}/release.json`;
+      let bytes;
+      try {
+        if (store) {
+          const stat = fs.lstatSync(file);
+          if (!stat.isFile() || stat.isSymbolicLink() || fs.realpathSync(file) !== file) throw new Error("regular release.json required");
+          bytes = fs.readFileSync(file);
+        } else {
+          const response = await fetch(file);
+          if (!response.ok) throw new Error(`GET ${file}: ${response.status}`);
+          bytes = Buffer.from(await response.arrayBuffer());
+        }
+        const release = JSON.parse(bytes.toString("utf8"));
+        if (!release || release.kind !== (kind === "plugins" ? "plugin" : "sidecar") || release.id !== id || release.version !== version) {
+          throw new Error("resolved release identity differs from the declared intent");
+        }
+      } catch (error) {
+        throw new Error(`runtime dependency ${kind} ${id}@${version}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      groups[kind].push({ id, version, size: bytes.length, sha256: sha256(bytes) });
+    }
+  }
+  return groups;
 }
 
 export function parseOptions(argv, required, optional = []) {
