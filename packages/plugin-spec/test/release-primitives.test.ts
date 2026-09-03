@@ -16,7 +16,7 @@ import {
 describe("public plugin, sidecar, and kit identity source", () => {
   it("uses one flat, third-party-friendly id grammar for plugin, sidecar, and kit", () => {
     expect(RELEASE_KINDS).toEqual(["contract", "kit", "plugin", "sidecar", "spec"]);
-    for (const id of ["weather", "third-party-plugin", "[redacted]"]) {
+    for (const id of ["weather", "third-party-plugin", "soksak-sidecar-example-engine"]) {
       expect(COMPONENT_ID_RE.test(id), id).toBe(true);
     }
     for (const id of ["io.github.example/plugin/weather", "io.github.example", "Bad", "bad_id", "-bad"]) {
